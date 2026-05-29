@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Piliavalon Worksite Governance</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --ink: #20242a;
+      --muted: #5f6b7a;
+      --line: #d7dce2;
+      --panel: #ffffff;
+      --yellow: #9a6400;
+      --green: #1f7a4d;
+    }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+    }
+    main {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+    h1 {
+      font-size: 28px;
+      margin: 0 0 8px;
+      letter-spacing: 0;
+    }
+    h2 {
+      font-size: 18px;
+      margin: 0 0 12px;
+      letter-spacing: 0;
+    }
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+      margin-top: 24px;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    ul {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .status {
+      display: inline-block;
+      margin-top: 12px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 650;
+      background: #fff3d6;
+      color: var(--yellow);
+    }
+    .ok {
+      background: #ddf5e9;
+      color: var(--green);
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 0.95em;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Piliavalon Worksite Governance</h1>
+    <p>Read-only dashboard for Phase 0B worksite construction. Product source remains on <code>main</code>; governance evidence remains on <code>governance</code>.</p>
+
+    <div class="grid">
+      <section>
+        <h2>Topology</h2>
+        <ul>
+          <li>Design institute: Obsidian Piliavalon</li>
+          <li>Main worksite: <code>/home/mo/Documents/piliavalon</code></li>
+          <li>Material yard: <code>/home/mo/Documents/piliavalon-yard</code></li>
+        </ul>
+        <span class="status ok">structure defined</span>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <ul>
+          <li>CI build evidence required</li>
+          <li>Android install evidence required</li>
+          <li>Device shielding evidence required</li>
+        </ul>
+        <span class="status">open yellow</span>
+      </section>
+
+      <section>
+        <h2>Source Policy</h2>
+        <ul>
+          <li>Reference remotes are read-only</li>
+          <li>No fork source trees in product branch</li>
+          <li>Code reuse requires attribution record</li>
+        </ul>
+        <span class="status ok">policy active</span>
+      </section>
+
+      <section>
+        <h2>Phase 1 Gate</h2>
+        <ul>
+          <li>Interfaces before implementation</li>
+          <li>Rollback path before rollout</li>
+          <li>Testing gaps stay open</li>
+        </ul>
+        <span class="status">not accepted yet</span>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

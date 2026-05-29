@@ -1,0 +1,24 @@
+name: Upstream Monitor
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * 1'
+
+jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout worksite
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Add upstream
+        run: git remote add upstream https://github.com/bggRGjQaUbCoE/PiliPlus.git
+
+      - name: Fetch upstream
+        run: git fetch upstream main
+
+      - name: Show divergence
+        run: git log --oneline --left-right --cherry-pick HEAD...upstream/main
