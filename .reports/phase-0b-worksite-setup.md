@@ -10,6 +10,7 @@ Status: yellow-ready
 - Main worksite keeps product source on `main`.
 - Governance branch is orphaned from product source.
 - `piliplusx` remote is intentionally absent pending identity confirmation.
+- CI workflow files on this orphan branch are governance templates/evidence. They do not enforce PR checks on product `main` until explicitly promoted to the branch GitHub evaluates.
 
 ## Evidence Boundary
 
@@ -19,5 +20,6 @@ This report does not claim Android acceptance. Current environment cannot perfor
 
 - Flutter/FVM not proven in this environment.
 - CI build evidence not yet recorded in this branch.
+- PR check enforcement on product `main` not yet proven.
 - Android APK install and launch not tested.
 - Recommendation and comment shielding behavior not tested on device.

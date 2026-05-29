@@ -37,6 +37,7 @@ Construction follows the design institute open-source ethics standard and defens
 
 Local Android testing is unavailable in the current environment. The following remain unresolved:
 
+- PR check enforcement on product `main`; workflows in this orphan branch are templates until promoted
 - Flutter/FVM verification or CI substitute
 - `flutter pub get`
 - `flutter analyze`
