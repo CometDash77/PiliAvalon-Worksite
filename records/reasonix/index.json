@@ -1,0 +1,10 @@
+{
+  "schema": "cometdash77.piliavalon-worksite.reasonix-index.v1",
+  "policy_version": "2026-05-30.reasonix-inbox.v1",
+  "owner": "codex",
+  "target_repo": "CometDash77/PiliAvalon-Worksite",
+  "inbox_glob": "records/reasonix/inbox/*.ready.md",
+  "artifact_status_before_review": "unreviewed candidate evidence",
+  "last_scan_utc": null,
+  "entries": []
+}
