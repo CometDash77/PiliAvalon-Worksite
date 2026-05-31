@@ -4,25 +4,30 @@ Date: 2026-05-31
 
 ## Release State
 
-Status: draft, not released, not green.
+Status: prebuild available for user retest; not green.
 
 This note consolidates Phase 1 shielding changes and evidence requirements
 across prior per-prebuild notes and the current acceptance-fixes worktree. It is
-not a stable release note until final commit, CI, runtime smoke, technical-lead
-review, and user/manual acceptance evidence are filled in.
+not a stable release note until technical-lead review and user/manual
+acceptance evidence are filled in.
 
 ## Target
 
 - Repository: `CometDash77/PiliAvalon-Worksite`
 - Current local branch: `phase-1-shielding-acceptance-fixes`
-- Current local HEAD before dirty changes:
-  `ce5f6915dac362a824857f7eee228f49b364d177`
+- Reviewed branch HEAD:
+  `eda5bee71c2a1f0a0d15187d7104b7bda7a5a915`
 - Integration branch: `phase-1-shielding-core`
-- Final commit SHA: `<PENDING_FINAL_COMMIT>`
-- Final tag: `<PENDING_FINAL_TAG>`
-- Release URL: `<PENDING_RELEASE_URL>`
-- CI run URL: `<PENDING_FRESH_CI_URL>`
-- Runtime smoke URL: `<PENDING_FRESH_RUNTIME_SMOKE_URL>`
+- Final commit SHA: `eda5bee71c2a1f0a0d15187d7104b7bda7a5a915`
+- Final tag: `phase-1-prebuild.26707279023`
+- Release URL:
+  https://github.com/CometDash77/PiliAvalon-Worksite/releases/tag/phase-1-prebuild.26707279023
+- CI run URL:
+  https://github.com/CometDash77/PiliAvalon-Worksite/actions/runs/26707276542
+- Build run URL:
+  https://github.com/CometDash77/PiliAvalon-Worksite/actions/runs/26707279023
+- Runtime smoke URL:
+  https://github.com/CometDash77/PiliAvalon-Worksite/actions/runs/26707550380
 
 ## Superseded Or Historical Evidence
 
@@ -78,22 +83,35 @@ Local results:
 
 Required CI and runtime evidence:
 
-- Fresh CI on the exact final ref.
-- If merged into `phase-1-shielding-core`, fresh CI on the merged core ref.
-- Fresh Android build artifact for the final ref.
-- Fresh Android runtime smoke on the final APK/ref.
-- Screenshots, UI evidence, and logcat evidence from the runtime smoke.
+- Fresh CI on the exact final ref: Reasonix-monitored and Codex-reviewed for
+  run `26707276542`.
+- Fresh Android build artifact for the final ref: Reasonix-monitored and
+  Codex-reviewed for run `26707279023`.
+- Fresh Android runtime smoke on the final APK/ref: Reasonix-monitored and
+  Codex-reviewed for run `26707550380`.
+- Screenshots, UI evidence, and logcat evidence from runtime smoke are in
+  smoke evidence artifact `7315187616`.
+- If merged into `phase-1-shielding-core`, fresh CI and smoke are required
+  again on the merged core ref.
 - Technical-lead review result.
 - User/manual acceptance result or explicit deferral.
 
 ## Known Open Items
 
-- No remote `phase-1-shielding-acceptance-fixes` branch exists yet.
-- No CI run exists for `phase-1-shielding-acceptance-fixes`.
-- Runtime smoke is missing for the final fix set.
+- Remote automation on `phase-1-shielding-acceptance-fixes` was monitored by
+  Reasonix and reviewed by Codex with restrictions.
 - Technical-lead review is pending.
 - User/manual acceptance is pending.
 - Phase 1 remains yellow.
+
+## User Retest Package
+
+- Retest handoff:
+  `records/session/2026-05-31-phase-1-user-retest-handoff.md`
+- Recommended physical-device APK for most Android phones:
+  `PiliAvalon_android_2.0.7-eda5bee71+5041_arm64-v8a.apk`
+- Release URL:
+  https://github.com/CometDash77/PiliAvalon-Worksite/releases/tag/phase-1-prebuild.26707279023
 
 ## Rollback Plan
 

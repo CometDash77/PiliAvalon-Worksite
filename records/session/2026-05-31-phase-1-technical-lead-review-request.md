@@ -14,7 +14,7 @@ technical-lead review and does not make Phase 1 green.
 - Repo: `CometDash77/PiliAvalon-Worksite`
 - Worktree: `C:\tmp\PiliAvalon-Worksite-phase1`
 - Local branch: `phase-1-shielding-acceptance-fixes`
-- Local HEAD before dirty changes: `ce5f6915dac362a824857f7eee228f49b364d177`
+- Reviewed branch HEAD: `eda5bee71c2a1f0a0d15187d7104b7bda7a5a915`
 - Intended integration branch: `phase-1-shielding-core`
 - Remote core head at request time:
   `9c9669e477310d9fa1325ca454a022688dc31597`
@@ -55,10 +55,22 @@ Results:
 
 These local results are not sufficient for Phase 1 green.
 
+## Fresh Remote Evidence
+
+Reasonix monitored these runs and Codex reviewed the monitor artifact with
+restrictions:
+
+- Phase 1 Shielding Verify:
+  https://github.com/CometDash77/PiliAvalon-Worksite/actions/runs/26707276542
+- Android Build:
+  https://github.com/CometDash77/PiliAvalon-Worksite/actions/runs/26707279023
+- Android Runtime Smoke:
+  https://github.com/CometDash77/PiliAvalon-Worksite/actions/runs/26707550380
+- Codex review:
+  `records/reasonix/review/2026-05-31-phase-1-remote-ci-smoke-monitor-codex-review.md`
+
 ## Evidence Still Missing Before Gate Closure
 
-- Fresh CI on the exact final ref.
-- Fresh Android runtime smoke on the final APK/ref.
 - User/manual acceptance.
 - Technical-lead review result.
 

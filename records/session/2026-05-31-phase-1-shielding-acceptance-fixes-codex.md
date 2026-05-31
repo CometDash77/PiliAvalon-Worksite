@@ -3,7 +3,7 @@
 Date: 2026-05-31
 Branch: `phase-1-shielding-acceptance-fixes`
 Base worktree: `C:\tmp\PiliAvalon-Worksite-phase1`
-Status: implementation in progress; Phase 1 remains yellow
+Status: ready for user retest; Phase 1 remains yellow
 
 ## Evidence Boundary
 
@@ -169,9 +169,34 @@ No whitespace errors reported.
 - Technical-lead review is not passed.
 - Phase 1 must remain yellow until code verification, runtime smoke, and user re-confirmation are complete.
 
+## Remote Automation - 2026-05-31
+
+Codex pushed the acceptance-fixes branch at
+`eda5bee71c2a1f0a0d15187d7104b7bda7a5a915` and triggered fresh remote
+automation:
+
+- Phase 1 Shielding Verify:
+  https://github.com/CometDash77/PiliAvalon-Worksite/actions/runs/26707276542
+- Android Build:
+  https://github.com/CometDash77/PiliAvalon-Worksite/actions/runs/26707279023
+- Android Runtime Smoke:
+  https://github.com/CometDash77/PiliAvalon-Worksite/actions/runs/26707550380
+
+Reasonix monitored these GitHub runs and wrote:
+
+- `records/reasonix/monitor/2026-05-31-phase-1-remote-ci-smoke-monitor.md`
+
+Codex reviewed the monitor artifact with restrictions:
+
+- `records/reasonix/review/2026-05-31-phase-1-remote-ci-smoke-monitor-codex-review.md`
+
+The reviewed monitor reports all three remote automation runs successful and
+records Android APK artifact ids plus smoke evidence artifact id. This does not
+close technical-lead review or user/manual acceptance.
+
 ## Next Session Handoff - 2026-05-31
 
-Status: implementation in progress; Phase 1 remains yellow.
+Status: ready for user retest; Phase 1 remains yellow.
 
 ### Confirmed Environment
 
@@ -286,10 +311,9 @@ Key changed/untracked areas:
    - `test/features/shielding/shielding_migration_test.dart`
    - `test/pages/setting/models/shielding_settings_test.dart`
 3. Review final diff and decide whether to push `phase-1-shielding-acceptance-fixes` or merge into `phase-1-shielding-core`.
-4. Run fresh CI on the exact final ref; existing old `phase-1-shielding-core` runs cannot be reused as pass evidence.
-5. Run fresh Android runtime smoke on the final APK/ref.
-6. Use the technical-lead review request artifact to obtain explicit review result.
-7. Request user retest only after final CI and smoke evidence are available.
-8. Update closure matrix and consolidated release note with final commit, run URLs, smoke evidence, review result, and user retest result.
-9. Review any new Reasonix output through Codex review gate before citing it.
-10. Do not announce Phase 1 green until all acceptance gates are complete.
+4. Use the technical-lead review request artifact to obtain explicit review result.
+5. Hand the user the retest package:
+   `records/session/2026-05-31-phase-1-user-retest-handoff.md`.
+6. Record user retest result or explicit deferral.
+7. If merged into `phase-1-shielding-core`, rerun fresh CI/build/smoke on the merged ref.
+8. Do not announce Phase 1 green until all acceptance gates are complete.
