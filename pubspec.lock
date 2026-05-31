@@ -1486,10 +1486,10 @@ packages:
     dependency: "direct main"
     description:
       name: saver_gallery
-      sha256: "5afc7073672f6fd073ddd15118f53f59a2bceee433e586420a3548888cd40820"
+      sha256: dcecd87113ffcb0eb467bb0ef5ed8f6dd894e26ff3dfd5822624281e7d2cb894
       url: "https://pub.dev"
     source: hosted
-    version: "5.0.2"
+    version: "5.1.0"
   screen_brightness_android:
     dependency: transitive
     description:
