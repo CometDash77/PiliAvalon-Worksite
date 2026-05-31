@@ -67,6 +67,61 @@ void main() {
       expect(ruleSet.loadErrors, isNotEmpty);
     });
 
+    test('damaged raw payload replaces stale in-memory rules', () async {
+      final box = _MemoryBox();
+      final store = ShieldSettingsStore(box: box);
+      await store.save(
+        ShieldRuleSet(
+          rules: [
+            ShieldRule(
+              id: 'stale',
+              type: ShieldRuleType.keyword,
+              matchMode: ShieldMatchMode.exact,
+              scope: ShieldScope.recommendation,
+              action: ShieldAction.block,
+              pattern: 'cat',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            ),
+          ],
+        ),
+      );
+      box.values[ShieldSettingsStore.rulesKey] = 'not-json';
+
+      final loaded = await store.load();
+      final snapshot = store.snapshot();
+
+      expect(loaded.globalEnabled, isFalse);
+      expect(loaded.rules, isEmpty);
+      expect(snapshot.globalEnabled, isFalse);
+      expect(snapshot.rules, isEmpty);
+    });
+
+    test('snapshot is isolated per injected settings box', () async {
+      final firstStore = ShieldSettingsStore(box: _MemoryBox());
+      await firstStore.save(
+        ShieldRuleSet(
+          rules: [
+            ShieldRule(
+              id: 'first-box-rule',
+              type: ShieldRuleType.keyword,
+              matchMode: ShieldMatchMode.exact,
+              scope: ShieldScope.recommendation,
+              action: ShieldAction.block,
+              pattern: 'cat',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            ),
+          ],
+        ),
+      );
+
+      final secondStore = ShieldSettingsStore(box: _MemoryBox());
+      final secondSnapshot = secondStore.snapshot();
+
+      expect(firstStore.snapshot().rules, hasLength(1));
+      expect(secondSnapshot.rules, isEmpty);
+      expect(secondSnapshot.globalEnabled, isTrue);
+    });
+
     test('rejects invalid regex without overwriting previous payload', () async {
       final box = _MemoryBox();
       final store = ShieldSettingsStore(box: box);

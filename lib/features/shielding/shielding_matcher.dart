@@ -50,18 +50,22 @@ abstract final class ShieldMatcher {
     );
   }
 
-  static bool _scopeMatches(ShieldScope ruleScope, ShieldScope candidateScope) =>
-      ruleScope == ShieldScope.both || ruleScope == candidateScope;
+  static bool _scopeMatches(
+    ShieldScope ruleScope,
+    ShieldScope candidateScope,
+  ) => ruleScope == ShieldScope.both || ruleScope == candidateScope;
 
   static bool _matches(ShieldRule rule, ShieldCandidate candidate) {
     return switch (rule.matchMode) {
       ShieldMatchMode.exact => _exactMatches(rule, candidate),
-      ShieldMatchMode.regex => _matchValues(rule, candidate).any(
-        RegExp(rule.pattern, caseSensitive: false).hasMatch,
-      ),
-      ShieldMatchMode.token => candidate.tokens.any(
-        (token) => token.toLowerCase() == rule.pattern.toLowerCase(),
-      ),
+      ShieldMatchMode.regex => _matchValues(
+        rule,
+        candidate,
+      ).any(RegExp(rule.pattern, caseSensitive: false).hasMatch),
+      ShieldMatchMode.token => _tokenValues(
+        rule,
+        candidate,
+      ).any((token) => token.toLowerCase() == rule.pattern.toLowerCase()),
     };
   }
 
@@ -71,20 +75,34 @@ abstract final class ShieldMatcher {
       rule,
       candidate,
     ).map((value) => value.toLowerCase());
-    if (rule.type == ShieldRuleType.keyword) {
+    if (rule.type == ShieldRuleType.keyword ||
+        rule.type == ShieldRuleType.userKeyword) {
       return values.any((value) => value.contains(pattern));
     }
     return values.any((value) => value == pattern);
   }
 
+  static Iterable<String> _tokenValues(
+    ShieldRule rule,
+    ShieldCandidate candidate,
+  ) sync* {
+    final values = _matchValues(rule, candidate).toList();
+    if (values.isEmpty) {
+      yield* candidate.tokens;
+      return;
+    }
+    for (final value in values) {
+      yield* value.split(RegExp(r'[\s,，。！？!?:：;；]+'));
+    }
+  }
+
   static Iterable<String> _matchValues(
     ShieldRule rule,
     ShieldCandidate candidate,
-  ) =>
-      _valuesForRule(
-        rule.type,
-        candidate,
-      ).where((value) => value.trim().isNotEmpty);
+  ) => _valuesForRule(
+    rule.type,
+    candidate,
+  ).where((value) => value.trim().isNotEmpty);
 
   static Iterable<String> _valuesForRule(
     ShieldRuleType type,
@@ -94,6 +112,8 @@ abstract final class ShieldMatcher {
       case ShieldRuleType.keyword:
         yield ifNullEmpty(candidate.title);
         yield ifNullEmpty(candidate.body);
+      case ShieldRuleType.userKeyword:
+        yield ifNullEmpty(candidate.uid);
         yield ifNullEmpty(candidate.authorName);
       case ShieldRuleType.uid:
         yield ifNullEmpty(candidate.uid);

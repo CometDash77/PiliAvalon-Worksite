@@ -81,6 +81,47 @@ void main() {
       expect(controller.applyFirstFloorShielding(visibleRoot), visibleRoot);
       expect(controller.applyFirstFloorShielding(blockedRoot), isNull);
     });
+
+    test(
+      'target reply lookup uses unfiltered replies before display filtering',
+      () {
+        final controller = _TargetLookupController(
+          targetId: 42,
+          ruleSet: ShieldRuleSet(
+            rules: [
+              ShieldRule(
+                id: 'spoiler',
+                type: ShieldRuleType.keyword,
+                matchMode: ShieldMatchMode.exact,
+                scope: ShieldScope.comment,
+                action: ShieldAction.block,
+                pattern: '剧透',
+                updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+              ),
+            ],
+          ),
+        );
+        final replies = [
+          ReplyInfo(
+            id: Int64(1),
+            mid: Int64(1),
+            content: Content(message: '正常评论'),
+            member: Member(mid: Int64(1), name: '用户A'),
+          ),
+          ReplyInfo(
+            id: Int64(42),
+            mid: Int64(2),
+            content: Content(message: '剧透评论'),
+            member: Member(mid: Int64(2), name: '用户B'),
+          ),
+        ];
+
+        controller.handleListResponse(replies);
+
+        expect(controller.index.value, 1);
+        expect(replies.map((reply) => reply.id.toInt()), [1]);
+      },
+    );
   });
 }
 
@@ -111,6 +152,28 @@ class _ReplyReplyController extends VideoReplyReplyController {
         dialog: null,
         replyType: 1,
       );
+
+  final ShieldRuleSet ruleSet;
+
+  @override
+  ShieldRuleSet get shieldingRuleSet => ruleSet;
+
+  @override
+  void jumpToItem(int index) {}
+}
+
+class _TargetLookupController extends VideoReplyReplyController {
+  _TargetLookupController({
+    required int targetId,
+    required this.ruleSet,
+  }) : super(
+         hasRoot: false,
+         id: targetId,
+         oid: 1,
+         rpid: 1,
+         dialog: null,
+         replyType: 1,
+       );
 
   final ShieldRuleSet ruleSet;
 

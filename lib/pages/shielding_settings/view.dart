@@ -71,12 +71,14 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
           bottom: padding.bottom + 100,
         ),
         children: [
+          _buildSectionHeader('总开关与场景'),
           _buildSwitchTile(
             icon: Icons.shield_outlined,
             title: '启用全局屏蔽',
-            subtitle: '关闭后，推荐和评论场景都不会应用 Phase 1 屏蔽规则',
+            subtitle: '关闭后，推荐、评论和旧推荐过滤兼容路径都不会应用屏蔽规则',
             value: _ruleSet.globalEnabled,
-            onChanged: (value) => _save(_ruleSet.copyWith(globalEnabled: value)),
+            onChanged: (value) =>
+                _save(_ruleSet.copyWith(globalEnabled: value)),
           ),
           _buildSwitchTile(
             icon: Icons.explore_outlined,
@@ -91,7 +93,16 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
             title: '评论屏蔽',
             subtitle: '在评论场景应用规则',
             value: _ruleSet.commentEnabled,
-            onChanged: (value) => _save(_ruleSet.copyWith(commentEnabled: value)),
+            onChanged: (value) =>
+                _save(_ruleSet.copyWith(commentEnabled: value)),
+          ),
+          _buildSectionHeader('旧规则兼容'),
+          custom.ListTile(
+            leading: const Icon(Icons.merge_type_outlined),
+            title: const Text('旧推荐过滤'),
+            subtitle: const Text(
+              '标题关键词、时长、播放量、点赞率和相关视频旧过滤跟随全局与推荐流开关；关闭任一开关后不再暗中应用旧推荐过滤。',
+            ),
           ),
           const Divider(height: 1),
           custom.ListTile(
@@ -114,15 +125,14 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
               ),
               subtitle: Text(_ruleSet.loadErrors.join('\n')),
             ),
+          ..._buildCategorizedRules(),
           if (_ruleSet.rules.isEmpty)
             custom.ListTile(
               leading: const Icon(Icons.rule_folder_outlined),
               title: const Text('暂无规则'),
               subtitle: const Text('点击右上角或规则入口添加'),
               onTap: () => _openEditor(),
-            )
-          else
-            ..._sortedRules.map(_buildRuleItem),
+            ),
         ],
       ),
       floatingActionButton: showAppBar
@@ -135,8 +145,60 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
     );
   }
 
-  List<ShieldRule> get _sortedRules => [..._ruleSet.rules]
-    ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  List<ShieldRule> get _sortedRules =>
+      [..._ruleSet.rules]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+  List<Widget> _buildCategorizedRules() {
+    final rules = _sortedRules;
+    return [
+      _buildSectionHeader('推荐流'),
+      ...rules
+          .where(
+            (rule) =>
+                rule.scope != ShieldScope.comment &&
+                rule.type != ShieldRuleType.uid &&
+                rule.type != ShieldRuleType.userKeyword &&
+                rule.type != ShieldRuleType.tag,
+          )
+          .map(_buildRuleItem),
+      _buildSectionHeader('评论'),
+      ...rules
+          .where(
+            (rule) =>
+                rule.scope == ShieldScope.comment &&
+                rule.type != ShieldRuleType.uid &&
+                rule.type != ShieldRuleType.userKeyword &&
+                rule.type != ShieldRuleType.tag,
+          )
+          .map(_buildRuleItem),
+      _buildSectionHeader('用户 / UP'),
+      ...rules
+          .where(
+            (rule) =>
+                rule.type == ShieldRuleType.uid ||
+                rule.type == ShieldRuleType.userKeyword,
+          )
+          .map(_buildRuleItem),
+      _buildSectionHeader('标签'),
+      ...rules
+          .where((rule) => rule.type == ShieldRuleType.tag)
+          .map(_buildRuleItem),
+    ];
+  }
+
+  Widget _buildSectionHeader(String title) {
+    final colorScheme = ColorScheme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
+      child: Text(
+        title,
+        style: TextStyle(
+          color: colorScheme.primary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
 
   Widget _buildSwitchTile({
     required IconData icon,
@@ -284,7 +346,8 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
                 }
                 Get.back(
                   result: ShieldRule(
-                    id: rule?.id ??
+                    id:
+                        rule?.id ??
                         'manual-${DateTime.now().microsecondsSinceEpoch}',
                     type: type,
                     matchMode: mode,
@@ -324,10 +387,8 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
       decoration: InputDecoration(labelText: label),
       items: values
           .map(
-            (value) => DropdownMenuItem<T>(
-              value: value,
-              child: Text(text(value)),
-            ),
+            (value) =>
+                DropdownMenuItem<T>(value: value, child: Text(text(value))),
           )
           .toList(),
       onChanged: (value) {

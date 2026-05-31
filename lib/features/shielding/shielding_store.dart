@@ -44,7 +44,7 @@ class ShieldSettingsStore {
 
   final ShieldSettingsBox _box;
 
-  static ShieldRuleSet? _cachedSnapshot;
+  ShieldRuleSet? _cachedSnapshot;
 
   Future<ShieldRuleSet> load() async {
     try {
@@ -74,7 +74,9 @@ class ShieldSettingsStore {
       _cachedSnapshot = resolved;
       return resolved;
     } catch (e) {
-      return ShieldRuleSet.disabledWithError(e);
+      final disabled = ShieldRuleSet.disabledWithError(e);
+      _cachedSnapshot = disabled;
+      return disabled;
     }
   }
 
@@ -112,8 +114,10 @@ class ShieldSettingsStore {
       );
       _cachedSnapshot = resolved;
       return resolved;
-    } catch (_) {
-      return ShieldRuleSet(globalEnabled: false, rules: const []);
+    } catch (e) {
+      final disabled = ShieldRuleSet.disabledWithError(e);
+      _cachedSnapshot = disabled;
+      return disabled;
     }
   }
 

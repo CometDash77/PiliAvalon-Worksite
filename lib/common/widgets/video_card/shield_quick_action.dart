@@ -1,5 +1,6 @@
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/common/widgets/image/image_save.dart';
+import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -32,9 +33,7 @@ abstract final class VideoCardShieldQuickAction {
       return;
     }
     if (showToast) {
-      SmartDialog.showToast(
-        '已添加：${successLabel ?? _ruleLabel(type, trimmed)}',
-      );
+      SmartDialog.showToast('已添加：${successLabel ?? _ruleLabel(type, trimmed)}');
     }
   }
 
@@ -53,8 +52,8 @@ abstract final class VideoCardShieldQuickAction {
         ),
       if (trimmedName.isNotEmpty)
         UpShieldRuleOption(
-          label: '屏蔽用户名关键词: $trimmedName',
-          type: ShieldRuleType.keyword,
+          label: '屏蔽用户关键词: $trimmedName',
+          type: ShieldRuleType.userKeyword,
           pattern: trimmedName,
         ),
     ];
@@ -75,48 +74,54 @@ abstract final class VideoCardShieldQuickAction {
       builder: (context) => AlertDialog(
         title: const Text('推荐屏蔽'),
         content: SingleChildScrollView(
-          child: SelectionArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _TextActionRow(
-                  label: '标题',
-                  text: title,
-                  type: ShieldRuleType.keyword,
-                  onRuleAdded: onRuleAdded,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _RecommendationPreview(
+                title: title,
+                upName: upName,
+                cover: cover,
+              ),
+              const SizedBox(height: 12),
+              SelectionArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _TextActionRow(
+                      label: '标题',
+                      text: title,
+                      type: ShieldRuleType.keyword,
+                      onRuleAdded: onRuleAdded,
+                    ),
+                    if (upName?.trim().isNotEmpty == true)
+                      _UpActionRow(
+                        upName: upName!.trim(),
+                        upUid: upUid,
+                        onRuleAdded: onRuleAdded,
+                      ),
+                    if (reason?.trim().isNotEmpty == true)
+                      _TextActionRow(
+                        label: '推荐理由',
+                        text: reason!.trim(),
+                        type: ShieldRuleType.keyword,
+                        onRuleAdded: onRuleAdded,
+                      ),
+                  ],
                 ),
-                if (upName?.trim().isNotEmpty == true)
-                  _UpActionRow(
-                    upName: upName!.trim(),
-                    upUid: upUid,
-                    onRuleAdded: onRuleAdded,
-                  ),
-                if (reason?.trim().isNotEmpty == true)
-                  _TextActionRow(
-                    label: '推荐理由',
-                    text: reason!.trim(),
-                    type: ShieldRuleType.keyword,
-                    onRuleAdded: onRuleAdded,
-                  ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
         actions: [
           if (cover?.isNotEmpty == true)
             TextButton(
-              onPressed: () => imageSaveDialog(
-                title: title,
-                cover: cover,
-                bvid: bvid,
-              ),
+              onPressed: () =>
+                  imageSaveDialog(title: title, cover: cover, bvid: bvid),
               child: const Text('保存封面'),
             ),
-          TextButton(
-            onPressed: Get.back,
-            child: const Text('关闭'),
-          ),
+          TextButton(onPressed: Get.back, child: const Text('关闭')),
         ],
       ),
     );
@@ -141,12 +146,7 @@ abstract final class VideoCardShieldQuickAction {
             ),
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: Get.back,
-            child: const Text('关闭'),
-          ),
-        ],
+        actions: [TextButton(onPressed: Get.back, child: const Text('关闭'))],
       ),
     );
   }
@@ -226,6 +226,7 @@ abstract final class VideoCardShieldQuickAction {
   static String _ruleLabel(ShieldRuleType type, String pattern) =>
       switch (type) {
         ShieldRuleType.uid => '屏蔽推荐用户 UID $pattern',
+        ShieldRuleType.userKeyword => '屏蔽推荐用户关键词「$pattern」',
         ShieldRuleType.keyword => '屏蔽推荐关键词「$pattern」',
         ShieldRuleType.category => '屏蔽推荐分区「$pattern」',
         ShieldRuleType.tag => '屏蔽推荐标签「$pattern」',
@@ -246,6 +247,55 @@ abstract final class VideoCardShieldQuickAction {
       return '屏蔽推荐理由关键词「$pattern」';
     }
     return _ruleLabel(type, pattern);
+  }
+}
+
+class _RecommendationPreview extends StatelessWidget {
+  const _RecommendationPreview({
+    required this.title,
+    required this.upName,
+    required this.cover,
+  });
+
+  final String title;
+  final String? upName;
+  final String? cover;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        NetworkImgLayer(src: cover, width: 128, height: 72),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.titleSmall,
+              ),
+              if (upName?.trim().isNotEmpty == true) ...[
+                const SizedBox(height: 6),
+                Text(
+                  upName!.trim(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -394,8 +444,8 @@ class _TextActionRowState extends State<_TextActionRow> {
                   await VideoCardShieldQuickAction.addRule(
                     type: widget.type,
                     pattern: selectedText,
-                    successLabel: VideoCardShieldQuickAction
-                        ._contextualRuleLabel(
+                    successLabel:
+                        VideoCardShieldQuickAction._contextualRuleLabel(
                           widget.label,
                           widget.type,
                           selectedText,

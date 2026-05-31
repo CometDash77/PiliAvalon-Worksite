@@ -26,14 +26,11 @@ void main() {
         'tag': ['萌宠'],
       });
 
-      final candidate = ShieldingAdapters.fromRecommendationJson(
-        item,
-        {
-          'owner': {'mid': 42, 'name': 'UP主'},
-          'tname': '动物',
-          'tag': ['萌宠'],
-        },
-      );
+      final candidate = ShieldingAdapters.fromRecommendationJson(item, {
+        'owner': {'mid': 42, 'name': 'UP主'},
+        'tname': '动物',
+        'tag': ['萌宠'],
+      });
 
       expect(candidate.title, '猫咪睡觉合集');
       expect(candidate.uid, '42');
@@ -57,12 +54,9 @@ void main() {
         'uri': '',
       });
 
-      final candidate = ShieldingAdapters.fromRecommendationJson(
-        item,
-        {
-          'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
-        },
-      );
+      final candidate = ShieldingAdapters.fromRecommendationJson(item, {
+        'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
+      });
 
       expect(candidate.title, '游戏攻略');
       expect(candidate.uid, '88');
@@ -114,58 +108,66 @@ void main() {
       expect(candidate.tags, isEmpty);
     });
 
-    test('filterList handles all-blocked list without requesting more data', () {
-      final visible = ShieldingAdapters.filterList(
-        [1, 2, 3],
-        enabled: true,
-        toCandidate: (item) => ShieldCandidate(
-          scope: ShieldScope.recommendation,
-          title: 'blocked-$item',
-        ),
-        ruleSet: ShieldRuleSet(rules: [
-          ShieldRule(
-            id: 'all',
-            type: ShieldRuleType.keyword,
-            matchMode: ShieldMatchMode.regex,
+    test(
+      'filterList handles all-blocked list without requesting more data',
+      () {
+        final visible = ShieldingAdapters.filterList(
+          [1, 2, 3],
+          enabled: true,
+          toCandidate: (item) => ShieldCandidate(
             scope: ShieldScope.recommendation,
-            action: ShieldAction.block,
-            pattern: r'blocked-\d',
-            updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            title: 'blocked-$item',
           ),
-        ]),
-      );
+          ruleSet: ShieldRuleSet(
+            rules: [
+              ShieldRule(
+                id: 'all',
+                type: ShieldRuleType.keyword,
+                matchMode: ShieldMatchMode.regex,
+                scope: ShieldScope.recommendation,
+                action: ShieldAction.block,
+                pattern: r'blocked-\d',
+                updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+              ),
+            ],
+          ),
+        );
 
-      expect(visible, isEmpty);
-    });
+        expect(visible, isEmpty);
+      },
+    );
 
-    test('filterList preserves original list when total switch is disabled', () {
-      final items = [1, 2, 3];
-      final visible = ShieldingAdapters.filterList(
-        items,
-        enabled: true,
-        toCandidate: (item) => ShieldCandidate(
-          scope: ShieldScope.recommendation,
-          title: 'blocked-$item',
-        ),
-        ruleSet: ShieldRuleSet(
-          globalEnabled: false,
-          rules: [
-            ShieldRule(
-              id: 'all',
-              type: ShieldRuleType.keyword,
-              matchMode: ShieldMatchMode.regex,
-              scope: ShieldScope.recommendation,
-              action: ShieldAction.block,
-              pattern: r'blocked-\d',
-              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
-            ),
-          ],
-        ),
-      );
+    test(
+      'filterList preserves original list when total switch is disabled',
+      () {
+        final items = [1, 2, 3];
+        final visible = ShieldingAdapters.filterList(
+          items,
+          enabled: true,
+          toCandidate: (item) => ShieldCandidate(
+            scope: ShieldScope.recommendation,
+            title: 'blocked-$item',
+          ),
+          ruleSet: ShieldRuleSet(
+            globalEnabled: false,
+            rules: [
+              ShieldRule(
+                id: 'all',
+                type: ShieldRuleType.keyword,
+                matchMode: ShieldMatchMode.regex,
+                scope: ShieldScope.recommendation,
+                action: ShieldAction.block,
+                pattern: r'blocked-\d',
+                updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+              ),
+            ],
+          ),
+        );
 
-      expect(identical(visible, items), isTrue);
-      expect(visible, items);
-    });
+        expect(identical(visible, items), isTrue);
+        expect(visible, items);
+      },
+    );
 
     test('filterList applies comment-scoped rules to reply info lists', () {
       final visibleReply = ReplyInfo(
@@ -217,14 +219,11 @@ void main() {
         'tname': '动物',
       });
 
-      final candidate = ShieldingAdapters.fromRecommendationJson(
-        item,
-        {
-          'owner': {'mid': 42, 'name': 'UP主'},
-          'tname': '动物',
-          'tag': ['萌宠'],
-        },
-      );
+      final candidate = ShieldingAdapters.fromRecommendationJson(item, {
+        'owner': {'mid': 42, 'name': 'UP主'},
+        'tname': '动物',
+        'tag': ['萌宠'],
+      });
 
       final rules = ShieldRuleSet(
         rules: [
@@ -245,70 +244,75 @@ void main() {
       expect(ShieldingAdapters.isVisible(candidate, rules), isFalse);
     });
 
-    test('filterRecommendationVideos applies category rules to video lists', () {
-      final visibleVideo = HotVideoItemModel.fromJson({
-        'aid': 1,
-        'cid': 2,
-        'bvid': 'BV1',
-        'videos': 1,
-        'tid': 17,
-        'tname': '音乐',
-        'copyright': 1,
-        'pic': '',
-        'title': '现场合集',
-        'pubdate': 1,
-        'ctime': 1,
-        'desc': '',
-        'duration': 60,
-        'owner': {'mid': 42, 'name': '音乐UP'},
-        'stat': {'view': 1, 'like': 1, 'danmaku': 1},
-      });
-      final blockedVideo = HotVideoItemModel.fromJson({
-        'aid': 2,
-        'cid': 3,
-        'bvid': 'BV2',
-        'videos': 1,
-        'tid': 18,
-        'tname': '游戏',
-        'copyright': 1,
-        'pic': '',
-        'title': '攻略合集',
-        'pubdate': 1,
-        'ctime': 1,
-        'desc': '',
-        'duration': 60,
-        'owner': {'mid': 88, 'name': '游戏UP'},
-        'stat': {'view': 1, 'like': 1, 'danmaku': 1},
-      });
+    test(
+      'recommendation category is not substituted as tag when tag fields are absent',
+      () {
+        final item = RcmdVideoItemModel.fromJson({
+          'id': 1,
+          'bvid': 'BV1',
+          'cid': 2,
+          'goto': 'av',
+          'uri': '',
+          'pic': '',
+          'title': '猫咪睡觉合集',
+          'duration': 60,
+          'pubdate': 1,
+          'owner': {'mid': 42, 'name': 'UP主'},
+          'stat': {'view': 1, 'like': 1, 'danmaku': 1},
+          'tname': '动物',
+        });
 
-      final visible = ShieldingAdapters.filterRecommendationVideos(
-        [visibleVideo, blockedVideo],
-        ShieldRuleSet(
+        final candidate = ShieldingAdapters.fromRecommendationJson(item, {
+          'owner': {'mid': 42, 'name': 'UP主'},
+          'tname': '动物',
+        });
+
+        final rules = ShieldRuleSet(
           rules: [
             ShieldRule(
-              id: 'tag-game',
-              type: ShieldRuleType.category,
+              id: 'tag-category-name',
+              type: ShieldRuleType.tag,
               matchMode: ShieldMatchMode.exact,
               scope: ShieldScope.recommendation,
               action: ShieldAction.block,
-              pattern: '游戏',
+              pattern: '动物',
               updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
             ),
           ],
-        ),
-      );
+        );
 
-      expect(visible, [visibleVideo]);
-    });
+        expect(candidate.category, '动物');
+        expect(candidate.tags, isEmpty);
+        expect(ShieldingAdapters.isVisible(candidate, rules), isTrue);
+      },
+    );
 
-    test('filterRecommendationVideos bypasses rules when recommendation is off', () {
-      final items = [
-        HotVideoItemModel.fromJson({
+    test(
+      'filterRecommendationVideos applies category rules to video lists',
+      () {
+        final visibleVideo = HotVideoItemModel.fromJson({
           'aid': 1,
           'cid': 2,
           'bvid': 'BV1',
           'videos': 1,
           'tid': 17,
+          'tname': '音乐',
+          'copyright': 1,
+          'pic': '',
+          'title': '现场合集',
+          'pubdate': 1,
+          'ctime': 1,
+          'desc': '',
+          'duration': 60,
+          'owner': {'mid': 42, 'name': '音乐UP'},
+          'stat': {'view': 1, 'like': 1, 'danmaku': 1},
+        });
+        final blockedVideo = HotVideoItemModel.fromJson({
+          'aid': 2,
+          'cid': 3,
+          'bvid': 'BV2',
+          'videos': 1,
+          'tid': 18,
           'tname': '游戏',
           'copyright': 1,
           'pic': '',
@@ -317,31 +321,99 @@ void main() {
           'ctime': 1,
           'desc': '',
           'duration': 60,
-          'owner': {'mid': 42, 'name': '游戏UP'},
+          'owner': {'mid': 88, 'name': '游戏UP'},
           'stat': {'view': 1, 'like': 1, 'danmaku': 1},
-        }),
-      ];
+        });
 
-      final visible = ShieldingAdapters.filterRecommendationVideos(
-        items,
-        ShieldRuleSet(
-          recommendationEnabled: false,
-          rules: [
-            ShieldRule(
-              id: 'tag-game',
-              type: ShieldRuleType.category,
-              matchMode: ShieldMatchMode.exact,
-              scope: ShieldScope.recommendation,
-              action: ShieldAction.block,
-              pattern: '游戏',
-              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
-            ),
-          ],
-        ),
-      );
+        final visible = ShieldingAdapters.filterRecommendationVideos(
+          [visibleVideo, blockedVideo],
+          ShieldRuleSet(
+            rules: [
+              ShieldRule(
+                id: 'tag-game',
+                type: ShieldRuleType.category,
+                matchMode: ShieldMatchMode.exact,
+                scope: ShieldScope.recommendation,
+                action: ShieldAction.block,
+                pattern: '游戏',
+                updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+              ),
+            ],
+          ),
+        );
 
-      expect(identical(visible, items), isTrue);
-    });
+        expect(visible, [visibleVideo]);
+      },
+    );
+
+    test(
+      'filterRecommendationVideos bypasses rules when recommendation is off',
+      () {
+        final items = [
+          HotVideoItemModel.fromJson({
+            'aid': 1,
+            'cid': 2,
+            'bvid': 'BV1',
+            'videos': 1,
+            'tid': 17,
+            'tname': '游戏',
+            'copyright': 1,
+            'pic': '',
+            'title': '攻略合集',
+            'pubdate': 1,
+            'ctime': 1,
+            'desc': '',
+            'duration': 60,
+            'owner': {'mid': 42, 'name': '游戏UP'},
+            'stat': {'view': 1, 'like': 1, 'danmaku': 1},
+          }),
+        ];
+
+        final visible = ShieldingAdapters.filterRecommendationVideos(
+          items,
+          ShieldRuleSet(
+            recommendationEnabled: false,
+            rules: [
+              ShieldRule(
+                id: 'tag-game',
+                type: ShieldRuleType.category,
+                matchMode: ShieldMatchMode.exact,
+                scope: ShieldScope.recommendation,
+                action: ShieldAction.block,
+                pattern: '游戏',
+                updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+              ),
+            ],
+          ),
+        );
+
+        expect(identical(visible, items), isTrue);
+      },
+    );
+
+    test(
+      'legacy recommendation filter is bypassed by the new global switch',
+      () {
+        expect(
+          ShieldingAdapters.shouldApplyLegacyRecommendationFilter(
+            ShieldRuleSet(globalEnabled: false),
+          ),
+          isFalse,
+        );
+        expect(
+          ShieldingAdapters.shouldApplyLegacyRecommendationFilter(
+            ShieldRuleSet(globalEnabled: true, recommendationEnabled: false),
+          ),
+          isFalse,
+        );
+        expect(
+          ShieldingAdapters.shouldApplyLegacyRecommendationFilter(
+            ShieldRuleSet(globalEnabled: true, recommendationEnabled: true),
+          ),
+          isTrue,
+        );
+      },
+    );
 
     test('direct reply target lookup runs before comment shielding', () {
       final controller = _TargetLookupController(targetId: 42);

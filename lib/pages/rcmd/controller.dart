@@ -14,6 +14,9 @@ class RcmdController extends CommonListController {
   bool get isEnd => false;
 
   @override
+  bool get treatEmptyPageAsEnd => false;
+
+  @override
   void onInit() {
     super.onInit();
     page = 0;

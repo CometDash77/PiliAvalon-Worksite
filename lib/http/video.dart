@@ -69,6 +69,10 @@ abstract final class VideoHttp {
     if (res.data['code'] == 0) {
       List<RcmdVideoItemModel> list = <RcmdVideoItemModel>[];
       final shieldRuleSet = ShieldSettingsStore().snapshot();
+      final applyLegacyFilter =
+          ShieldingAdapters.shouldApplyLegacyRecommendationFilter(
+            shieldRuleSet,
+          );
       for (final i in res.data['data']['item']) {
         //过滤掉live与ad，以及拉黑用户
         if (i['goto'] == 'av' &&
@@ -82,7 +86,8 @@ abstract final class VideoHttp {
             ),
             shieldRuleSet,
           );
-          if (!RecommendFilter.filter(videoItem) && visible) {
+          if (!(applyLegacyFilter && RecommendFilter.filter(videoItem)) &&
+              visible) {
             list.add(videoItem);
           }
         }
@@ -150,6 +155,10 @@ abstract final class VideoHttp {
     if (res.data['code'] == 0) {
       List<RcmdVideoItemAppModel> list = <RcmdVideoItemAppModel>[];
       final shieldRuleSet = ShieldSettingsStore().snapshot();
+      final applyLegacyFilter =
+          ShieldingAdapters.shouldApplyLegacyRecommendationFilter(
+            shieldRuleSet,
+          );
       for (final i in res.data['data']['items']) {
         // 屏蔽推广和拉黑用户
         if (i['card_goto'] != 'ad_av' &&
@@ -157,7 +166,8 @@ abstract final class VideoHttp {
             i['ad_info'] == null &&
             (i['args'] != null &&
                 !GlobalData().blackMids.contains(i['args']['up_id']))) {
-          if (enableFilter &&
+          if (applyLegacyFilter &&
+              enableFilter &&
               i['args']?['tname'] != null &&
               zoneRegExp.hasMatch(i['args']['tname'])) {
             continue;
@@ -170,7 +180,8 @@ abstract final class VideoHttp {
             ),
             shieldRuleSet,
           );
-          if (!RecommendFilter.filter(videoItem) && visible) {
+          if (!(applyLegacyFilter && RecommendFilter.filter(videoItem)) &&
+              visible) {
             list.add(videoItem);
           }
         }
@@ -192,14 +203,21 @@ abstract final class VideoHttp {
     );
     if (res.data['code'] == 0) {
       List<HotVideoItemModel> list = <HotVideoItemModel>[];
+      final shieldRuleSet = ShieldSettingsStore().snapshot();
+      final applyLegacyFilter =
+          ShieldingAdapters.shouldApplyLegacyRecommendationFilter(
+            shieldRuleSet,
+          );
       for (final i in res.data['data']['list']) {
         if (!GlobalData().blackMids.contains(i['owner']['mid']) &&
-            !RecommendFilter.filterTitle(i['title']) &&
-            !RecommendFilter.filterLikeRatio(
-              i['stat']['like'],
-              i['stat']['view'],
-            )) {
-          if (enableFilter &&
+            (!applyLegacyFilter ||
+                (!RecommendFilter.filterTitle(i['title']) &&
+                    !RecommendFilter.filterLikeRatio(
+                      i['stat']['like'],
+                      i['stat']['view'],
+                    )))) {
+          if (applyLegacyFilter &&
+              enableFilter &&
               i['tname'] != null &&
               zoneRegExp.hasMatch(i['tname'])) {
             continue;
@@ -207,7 +225,6 @@ abstract final class VideoHttp {
           list.add(HotVideoItemModel.fromJson(i));
         }
       }
-      final shieldRuleSet = ShieldSettingsStore().snapshot();
       return Success(
         ShieldingAdapters.filterRecommendationVideos(list, shieldRuleSet),
       );
@@ -347,10 +364,15 @@ abstract final class VideoHttp {
       final items = (res.data['data'] as List?)?.map(
         (i) => HotVideoItemModel.fromJson(i),
       );
-      final list = RecommendFilter.applyFilterToRelatedVideos
+      final shieldRuleSet = ShieldSettingsStore().snapshot();
+      final applyLegacyFilter =
+          ShieldingAdapters.shouldApplyLegacyRecommendationFilter(
+            shieldRuleSet,
+          );
+      final list =
+          applyLegacyFilter && RecommendFilter.applyFilterToRelatedVideos
           ? items?.where((i) => !RecommendFilter.filterAll(i)).toList()
           : items?.toList();
-      final shieldRuleSet = ShieldSettingsStore().snapshot();
       final visibleList = list == null
           ? null
           : ShieldingAdapters.filterRecommendationVideos(list, shieldRuleSet);
@@ -890,14 +912,16 @@ abstract final class VideoHttp {
     return null;
   }
 
-  static bool _canAddRank(Map i) {
+  static bool _canAddRank(Map i, {required bool applyLegacyFilter}) {
     if (!GlobalData().blackMids.contains(i['owner']['mid']) &&
-        !RecommendFilter.filterTitle(i['title']) &&
-        !RecommendFilter.filterLikeRatio(
-          i['stat']['like'],
-          i['stat']['view'],
-        )) {
-      if (enableFilter &&
+        (!applyLegacyFilter ||
+            (!RecommendFilter.filterTitle(i['title']) &&
+                !RecommendFilter.filterLikeRatio(
+                  i['stat']['like'],
+                  i['stat']['view'],
+                )))) {
+      if (applyLegacyFilter &&
+          enableFilter &&
           i['tname'] != null &&
           zoneRegExp.hasMatch(i['tname'])) {
         return false;
@@ -917,8 +941,13 @@ abstract final class VideoHttp {
     );
     if (res.data['code'] == 0) {
       List<HotVideoItemModel> list = <HotVideoItemModel>[];
+      final shieldRuleSet = ShieldSettingsStore().snapshot();
+      final applyLegacyFilter =
+          ShieldingAdapters.shouldApplyLegacyRecommendationFilter(
+            shieldRuleSet,
+          );
       for (final i in res.data['data']['list']) {
-        if (_canAddRank(i)) {
+        if (_canAddRank(i, applyLegacyFilter: applyLegacyFilter)) {
           list.add(HotVideoItemModel.fromJson(i));
           // final List? others = i['others'];
           // if (others != null && others.isNotEmpty) {
@@ -930,7 +959,9 @@ abstract final class VideoHttp {
           // }
         }
       }
-      return Success(list);
+      return Success(
+        ShieldingAdapters.filterRecommendationVideos(list, shieldRuleSet),
+      );
     } else {
       return Error(res.data['message']);
     }

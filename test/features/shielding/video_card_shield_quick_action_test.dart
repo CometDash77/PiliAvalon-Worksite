@@ -14,20 +14,18 @@ void main() {
       expect(options[0].type, ShieldRuleType.uid);
       expect(options[0].pattern, '12345');
       expect(options[0].label, '屏蔽用户 UID: 12345');
-      expect(options[1].type, ShieldRuleType.keyword);
+      expect(options[1].type, ShieldRuleType.userKeyword);
       expect(options[1].pattern, '测试UP');
-      expect(options[1].label, '屏蔽用户名关键词: 测试UP');
+      expect(options[1].label, '屏蔽用户关键词: 测试UP');
     });
 
     test('falls back to username keyword action when uid is missing', () {
-      final options = VideoCardShieldQuickAction.upRuleOptions(
-        upName: '测试UP',
-      );
+      final options = VideoCardShieldQuickAction.upRuleOptions(upName: '测试UP');
 
       expect(options, hasLength(1));
-      expect(options.single.type, ShieldRuleType.keyword);
+      expect(options.single.type, ShieldRuleType.userKeyword);
       expect(options.single.pattern, '测试UP');
-      expect(options.single.label, '屏蔽用户名关键词: 测试UP');
+      expect(options.single.label, '屏蔽用户关键词: 测试UP');
     });
   });
 }

@@ -2,6 +2,7 @@ import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/pages/setting/models/shielding_settings.dart';
 import 'package:PiliPlus/pages/shielding_settings/view.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
 void main() {
@@ -33,21 +34,58 @@ void main() {
       expect(shieldRuleSubtitle(rule), '评论 / 完全相同 / 已启用');
     });
 
-    test('labels keyword exact semantics as contains instead of exact equality', () {
+    test(
+      'labels keyword exact semantics as contains instead of exact equality',
+      () {
+        final rule = _rule(
+          id: 'keyword',
+          type: ShieldRuleType.keyword,
+          matchMode: ShieldMatchMode.exact,
+          pattern: '猫',
+        );
+
+        expect(shieldMatchModeLabel(rule.matchMode, type: rule.type), '包含文字');
+        expect(shieldRuleSubtitle(rule), '推荐和评论 / 包含文字 / 已启用');
+        expect(shieldMatchModeLabel(ShieldMatchMode.exact), '完全相同');
+      },
+    );
+
+    test('labels user keyword as a user scoped rule type', () {
       final rule = _rule(
-        id: 'keyword',
-        type: ShieldRuleType.keyword,
+        id: 'user-keyword',
+        type: ShieldRuleType.userKeyword,
         matchMode: ShieldMatchMode.exact,
-        pattern: '猫',
+        pattern: '测试UP',
       );
 
-      expect(shieldMatchModeLabel(rule.matchMode, type: rule.type), '包含文字');
-      expect(shieldRuleSubtitle(rule), '推荐和评论 / 包含文字 / 已启用');
-      expect(shieldMatchModeLabel(ShieldMatchMode.exact), '完全相同');
+      expect(shieldRuleTitle(rule), '屏蔽 用户关键词: 测试UP');
+      expect(shieldRuleSubtitle(rule), '推荐和评论 / 包含 UID 或用户名 / 已启用');
     });
   });
 
   group('ShieldingSettingsPage', () {
+    testWidgets('settings page shows acceptance categories', (tester) async {
+      await tester.pumpWidget(
+        GetMaterialApp(
+          home: ShieldingSettingsPage(
+            store: ShieldSettingsStore(box: _MemoryBox()),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('总开关与场景'), findsOneWidget);
+      expect(find.text('推荐流'), findsOneWidget);
+      expect(find.text('评论'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('用户 / UP'),
+        120,
+        scrollable: find.byType(Scrollable),
+      );
+      expect(find.text('用户 / UP'), findsOneWidget);
+      expect(find.text('旧规则兼容'), findsOneWidget);
+    });
+
     testWidgets('new manual rule editor shows type match and action controls', (
       tester,
     ) async {
@@ -79,17 +117,16 @@ ShieldRule _rule({
   ShieldAction action = ShieldAction.block,
   required String pattern,
   bool enabled = true,
-}) =>
-    ShieldRule(
-      id: id,
-      type: type,
-      matchMode: matchMode,
-      scope: scope,
-      action: action,
-      pattern: pattern,
-      enabled: enabled,
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
-    );
+}) => ShieldRule(
+  id: id,
+  type: type,
+  matchMode: matchMode,
+  scope: scope,
+  action: action,
+  pattern: pattern,
+  enabled: enabled,
+  updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+);
 
 class _MemoryBox implements ShieldSettingsBox {
   final values = <String, Object?>{};

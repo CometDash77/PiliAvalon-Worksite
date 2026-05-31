@@ -16,20 +16,23 @@ String shieldRuleSubtitle(ShieldRule rule) =>
 
 String shieldRuleTypeLabel(ShieldRuleType type) => switch (type) {
   ShieldRuleType.keyword => '关键词',
+  ShieldRuleType.userKeyword => '用户关键词',
   ShieldRuleType.uid => '用户 UID',
   ShieldRuleType.category => '分区',
   ShieldRuleType.tag => '标签',
 };
 
-String shieldMatchModeLabel(
-  ShieldMatchMode mode, {
-  ShieldRuleType? type,
-}) => switch (mode) {
-  ShieldMatchMode.exact =>
-    type == ShieldRuleType.keyword ? '包含文字' : '完全相同',
-  ShieldMatchMode.regex => '正则匹配',
-  ShieldMatchMode.token => '词元匹配',
-};
+String shieldMatchModeLabel(ShieldMatchMode mode, {ShieldRuleType? type}) =>
+    switch (mode) {
+      ShieldMatchMode.exact =>
+        type == ShieldRuleType.keyword
+            ? '包含文字'
+            : type == ShieldRuleType.userKeyword
+            ? '包含 UID 或用户名'
+            : '完全相同',
+      ShieldMatchMode.regex => '正则匹配',
+      ShieldMatchMode.token => '词元匹配',
+    };
 
 String shieldScopeLabel(ShieldScope scope) => switch (scope) {
   ShieldScope.recommendation => '推荐',

@@ -6,6 +6,7 @@ abstract class CommonListController<R, T> extends CommonController<R, T> {
   int page = 1;
   bool isEnd = false;
   bool? hasFooter;
+  bool get treatEmptyPageAsEnd => true;
 
   @override
   Rx<LoadingState<List<T>?>> loadingState =
@@ -28,13 +29,14 @@ abstract class CommonListController<R, T> extends CommonController<R, T> {
       if (!customHandleResponse(isRefresh, res)) {
         final dataList = getDataList(response);
         if (dataList == null || dataList.isEmpty) {
-          isEnd = true;
+          isEnd = treatEmptyPageAsEnd;
           if (isRefresh) {
             loadingState.value = Success(dataList);
           } else if (hasFooter == true) {
             loadingState.refresh();
           }
           isLoading = false;
+          page++;
           return;
         }
         handleListResponse(dataList);

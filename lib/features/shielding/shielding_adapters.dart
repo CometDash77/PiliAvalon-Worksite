@@ -19,15 +19,12 @@ abstract final class ShieldingAdapters {
       scope: ShieldScope.recommendation,
       title: item.title,
       uid: _string(owner?['mid'] ?? args?['up_id'] ?? item.owner.mid),
-      authorName:
-          _string(owner?['name'] ?? args?['up_name'] ?? item.owner.name),
+      authorName: _string(
+        owner?['name'] ?? args?['up_name'] ?? item.owner.name,
+      ),
       category: category,
       tags: tags,
-      tokens: _tokens([
-        item.title,
-        item.owner.name,
-        ...tags,
-      ]),
+      tokens: _tokens([item.title, item.owner.name, ...tags]),
     );
   }
 
@@ -56,11 +53,7 @@ abstract final class ShieldingAdapters {
         uid: item.owner.mid?.toString(),
         authorName: item.owner.name,
         category: item.tname,
-        tokens: _tokens([
-          item.title,
-          item.owner.name,
-          item.tname,
-        ]),
+        tokens: _tokens([item.title, item.owner.name, item.tname]),
       );
 
   static List<T> filterList<T>(
@@ -73,23 +66,27 @@ abstract final class ShieldingAdapters {
       return items;
     }
     return items
-        .where((item) => ShieldMatcher.match(toCandidate(item), ruleSet).visible)
+        .where(
+          (item) => ShieldMatcher.match(toCandidate(item), ruleSet).visible,
+        )
         .toList();
   }
 
   static bool isVisible(ShieldCandidate candidate, ShieldRuleSet ruleSet) =>
       ShieldMatcher.match(candidate, ruleSet).visible;
 
+  static bool shouldApplyLegacyRecommendationFilter(ShieldRuleSet ruleSet) =>
+      ruleSet.globalEnabled && ruleSet.recommendationEnabled;
+
   static List<HotVideoItemModel> filterRecommendationVideos(
     List<HotVideoItemModel> items,
     ShieldRuleSet ruleSet,
-  ) =>
-      filterList(
-        items,
-        enabled: ruleSet.recommendationEnabled,
-        ruleSet: ruleSet,
-        toCandidate: fromRelatedVideo,
-      );
+  ) => filterList(
+    items,
+    enabled: ruleSet.recommendationEnabled,
+    ruleSet: ruleSet,
+    toCandidate: fromRelatedVideo,
+  );
 
   static List<String> _tags(Map<String, dynamic> json) {
     final raw = json['tag'] ?? json['tags'];

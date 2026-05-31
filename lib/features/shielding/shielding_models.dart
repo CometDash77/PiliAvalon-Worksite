@@ -1,32 +1,12 @@
-enum ShieldRuleType {
-  keyword,
-  uid,
-  category,
-  tag,
-}
+enum ShieldRuleType { keyword, userKeyword, uid, category, tag }
 
-enum ShieldMatchMode {
-  exact,
-  regex,
-  token,
-}
+enum ShieldMatchMode { exact, regex, token }
 
-enum ShieldScope {
-  recommendation,
-  comment,
-  both,
-}
+enum ShieldScope { recommendation, comment, both }
 
-enum ShieldAction {
-  block,
-  allow,
-}
+enum ShieldAction { block, allow }
 
-enum ShieldRuleSource {
-  manual,
-  quickAction,
-  imported,
-}
+enum ShieldRuleSource { manual, quickAction, imported }
 
 class ShieldRule {
   const ShieldRule({
@@ -61,18 +41,17 @@ class ShieldRule {
     bool? enabled,
     DateTime? updatedAt,
     ShieldRuleSource? source,
-  }) =>
-      ShieldRule(
-        id: id ?? this.id,
-        type: type ?? this.type,
-        matchMode: matchMode ?? this.matchMode,
-        scope: scope ?? this.scope,
-        action: action ?? this.action,
-        pattern: pattern ?? this.pattern,
-        enabled: enabled ?? this.enabled,
-        updatedAt: updatedAt ?? this.updatedAt,
-        source: source ?? this.source,
-      );
+  }) => ShieldRule(
+    id: id ?? this.id,
+    type: type ?? this.type,
+    matchMode: matchMode ?? this.matchMode,
+    scope: scope ?? this.scope,
+    action: action ?? this.action,
+    pattern: pattern ?? this.pattern,
+    enabled: enabled ?? this.enabled,
+    updatedAt: updatedAt ?? this.updatedAt,
+    source: source ?? this.source,
+  );
 
   Map<String, Object?> toJson() => {
     'id': id,
@@ -89,17 +68,12 @@ class ShieldRule {
   factory ShieldRule.fromJson(Map<String, Object?> json) => ShieldRule(
     id: json._string('id'),
     type: _enumByName(ShieldRuleType.values, json._string('type')),
-    matchMode: _enumByName(
-      ShieldMatchMode.values,
-      json._string('match_mode'),
-    ),
+    matchMode: _enumByName(ShieldMatchMode.values, json._string('match_mode')),
     scope: _enumByName(ShieldScope.values, json._string('scope')),
     action: _enumByName(ShieldAction.values, json._string('action')),
     pattern: json._string('pattern'),
     enabled: json['enabled'] as bool? ?? true,
-    updatedAt: DateTime.fromMillisecondsSinceEpoch(
-      json._int('updated_at'),
-    ),
+    updatedAt: DateTime.fromMillisecondsSinceEpoch(json._int('updated_at')),
     source: _enumByName(
       ShieldRuleSource.values,
       json['source']?.toString() ?? ShieldRuleSource.manual.name,
@@ -125,12 +99,10 @@ class ShieldRuleSet {
           ? rawRules
                 .whereType<Map>()
                 .map(
-                  (rule) => ShieldRule.fromJson(
-                    rule.cast<String, Object?>(),
-                  ),
+                  (rule) => ShieldRule.fromJson(rule.cast<String, Object?>()),
                 )
                 .toList()
-      : const [],
+          : const [],
       globalEnabled: json['global_enabled'] as bool? ?? true,
       recommendationEnabled: json['recommendation_enabled'] as bool? ?? true,
       commentEnabled: json['comment_enabled'] as bool? ?? true,
@@ -180,16 +152,15 @@ class ShieldRuleSet {
     int? version,
     DateTime? lastLoadedAt,
     List<String>? loadErrors,
-  }) =>
-      ShieldRuleSet(
-        rules: rules ?? this.rules,
-        globalEnabled: globalEnabled ?? this.globalEnabled,
-        recommendationEnabled: recommendationEnabled ?? this.recommendationEnabled,
-        commentEnabled: commentEnabled ?? this.commentEnabled,
-        version: version ?? this.version,
-        lastLoadedAt: lastLoadedAt ?? this.lastLoadedAt,
-        loadErrors: loadErrors ?? this.loadErrors,
-      );
+  }) => ShieldRuleSet(
+    rules: rules ?? this.rules,
+    globalEnabled: globalEnabled ?? this.globalEnabled,
+    recommendationEnabled: recommendationEnabled ?? this.recommendationEnabled,
+    commentEnabled: commentEnabled ?? this.commentEnabled,
+    version: version ?? this.version,
+    lastLoadedAt: lastLoadedAt ?? this.lastLoadedAt,
+    loadErrors: loadErrors ?? this.loadErrors,
+  );
 
   Map<String, Object?> toJson() => {
     'version': version,
@@ -240,10 +211,7 @@ class ShieldMatchResult {
 }
 
 class ShieldMatchError {
-  const ShieldMatchError({
-    required this.rule,
-    required this.message,
-  });
+  const ShieldMatchError({required this.rule, required this.message});
 
   final ShieldRule rule;
   final String message;
