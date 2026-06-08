@@ -182,7 +182,7 @@ void main() {
       expect(updated!.channelName, 'NewName');
       expect(updated.hideComments, isTrue);
       expect(updated.hideDanmaku, isTrue);
-      expect(updated.createdAt, originalCreated);
+      expect(updated.createdAt.millisecondsSinceEpoch, originalCreated.millisecondsSinceEpoch);
       expect(
         updated.updatedAt.millisecondsSinceEpoch,
         greaterThan(originalCreated.millisecondsSinceEpoch),

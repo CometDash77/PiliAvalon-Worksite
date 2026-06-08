@@ -3,6 +3,7 @@ import 'package:PiliPlus/common/widgets/view_safe_area.dart';
 import 'package:PiliPlus/http/login.dart';
 import 'package:PiliPlus/models/common/setting_type.dart';
 import 'package:PiliPlus/pages/about/view.dart';
+import 'package:PiliPlus/pages/channel_quiet_settings/view.dart';
 import 'package:PiliPlus/pages/login/controller.dart';
 import 'package:PiliPlus/pages/setting/extra_setting.dart';
 import 'package:PiliPlus/pages/setting/play_setting.dart';
@@ -55,6 +56,11 @@ class _SettingPageState extends State<SettingPage> {
       type: SettingType.shieldingSetting,
       subtitle: '全局开关、推荐/评论场景、规则列表',
       icon: Icon(Icons.shield_outlined),
+    ),
+    _SettingsModel(
+      type: SettingType.channelQuietSetting,
+      subtitle: '按频道持久隐藏评论和弹幕',
+      icon: Icon(Icons.visibility_off_outlined),
     ),
     _SettingsModel(
       type: SettingType.recommendSetting,
@@ -122,6 +128,8 @@ class _SettingPageState extends State<SettingPage> {
                       ),
                       SettingType.shieldingSetting =>
                         const ShieldingSettingsPage(showAppBar: false),
+                      SettingType.channelQuietSetting =>
+                        const ChannelQuietSettingsPage(showAppBar: false),
                       SettingType.recommendSetting => const RecommendSetting(
                         showAppBar: false,
                       ),
