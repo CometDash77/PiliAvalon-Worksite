@@ -1219,15 +1219,19 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       if (videoDetailController.showReply)
         PopupMenuItem(
           onTap: videoDetailController.toggleTempHideReply,
-          child: Text(
-            videoDetailController.tempHideReply.value ? '显示评论' : '隐藏评论',
+          child: Obx(
+            () => Text(
+              videoDetailController.tempHideReply.value ? '显示评论' : '隐藏评论',
+            ),
           ),
         ),
       if (videoDetailController.plPlayerController.enableShowDanmaku.value)
         PopupMenuItem(
           onTap: videoDetailController.toggleTempHideDanmaku,
-          child: Text(
-            videoDetailController.tempHideDanmaku.value ? '显示弹幕' : '隐藏弹幕',
+          child: Obx(
+            () => Text(
+              videoDetailController.tempHideDanmaku.value ? '显示弹幕' : '隐藏弹幕',
+            ),
           ),
         ),
     ];
@@ -1317,53 +1321,51 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     );
   }
 
-  Widget _moreBtn(Color color, {List<Shadow>? shadows}) => Obx(
-    () => PopupMenuButton(
-      icon: Icon(
-        size: 22,
-        Icons.more_vert,
-        color: color,
-        shadows: shadows,
-      ),
-      itemBuilder: (BuildContext context) => <PopupMenuEntry>[
-        ...quietControlPopupItems(context),
-        PopupMenuItem(
-          onTap: introController.viewLater,
-          child: const Text('稍后再看'),
-        ),
-        if (videoDetailController.epId == null)
-          PopupMenuItem(
-            onTap: () => videoDetailController.showNoteList(context),
-            child: const Text('查看笔记'),
-          ),
-        if (!videoDetailController.isFileSource)
-          PopupMenuItem(
-            onTap: () => videoDetailController.onDownload(this.context),
-            child: const Text('缓存视频'),
-          ),
-        if (videoDetailController.cover.value.isNotEmpty)
-          PopupMenuItem(
-            onTap: () =>
-                ImageUtils.downloadImg([videoDetailController.cover.value]),
-            child: const Text('保存封面'),
-          ),
-        if (!videoDetailController.isFileSource && videoDetailController.isUgc)
-          PopupMenuItem(
-            onTap: videoDetailController.toAudioPage,
-            child: const Text('听音频'),
-          ),
-        PopupMenuItem(
-          onTap: () {
-            if (!Accounts.main.isLogin) {
-              SmartDialog.showToast('账号未登录');
-            } else {
-              PageUtils.reportVideo(videoDetailController.aid);
-            }
-          },
-          child: const Text('举报'),
-        ),
-      ],
+  Widget _moreBtn(Color color, {List<Shadow>? shadows}) => PopupMenuButton(
+    icon: Icon(
+      size: 22,
+      Icons.more_vert,
+      color: color,
+      shadows: shadows,
     ),
+    itemBuilder: (BuildContext context) => <PopupMenuEntry>[
+      ...quietControlPopupItems(context),
+      PopupMenuItem(
+        onTap: introController.viewLater,
+        child: const Text('稍后再看'),
+      ),
+      if (videoDetailController.epId == null)
+        PopupMenuItem(
+          onTap: () => videoDetailController.showNoteList(context),
+          child: const Text('查看笔记'),
+        ),
+      if (!videoDetailController.isFileSource)
+        PopupMenuItem(
+          onTap: () => videoDetailController.onDownload(this.context),
+          child: const Text('缓存视频'),
+        ),
+      if (videoDetailController.cover.value.isNotEmpty)
+        PopupMenuItem(
+          onTap: () =>
+              ImageUtils.downloadImg([videoDetailController.cover.value]),
+          child: const Text('保存封面'),
+        ),
+      if (!videoDetailController.isFileSource && videoDetailController.isUgc)
+        PopupMenuItem(
+          onTap: videoDetailController.toAudioPage,
+          child: const Text('听音频'),
+        ),
+      PopupMenuItem(
+        onTap: () {
+          if (!Accounts.main.isLogin) {
+            SmartDialog.showToast('账号未登录');
+          } else {
+            PageUtils.reportVideo(videoDetailController.aid);
+          }
+        },
+        child: const Text('举报'),
+      ),
+    ],
   );
 
   Widget plPlayer({

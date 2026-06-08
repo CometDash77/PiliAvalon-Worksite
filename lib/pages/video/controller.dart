@@ -158,14 +158,17 @@ class VideoDetailController extends GetxController
       ? plPlayerController.showVideoReply
       : plPlayerController.showBangumiReply;
 
-  final RxBool tempHideReply = false.obs;
-  final RxBool tempHideDanmaku = false.obs;
-
   /// The quiet rule currently matched for this video's channel.
   /// Set by later slices once channel identity is known.
   /// `null` means no persistent rule is active for the current channel.
-  final Rx<ChannelQuietRule?> currentChannelQuietRule =
-      Rx<ChannelQuietRule?>(null);
+  final Rx<ChannelQuietRule?> currentChannelQuietRule = Rx<ChannelQuietRule?>(
+    null,
+  );
+
+  /// Per-page temporary hide controls.
+  /// These reset on video/page change and are not persisted.
+  final RxBool tempHideReply = false.obs;
+  final RxBool tempHideDanmaku = false.obs;
 
   bool get persistentRuleHideReply =>
       currentChannelQuietRule.value?.hideComments ?? false;
@@ -184,11 +187,18 @@ class VideoDetailController extends GetxController
     temporaryHide: tempHideDanmaku.value,
   );
 
+  /// Toggle per-page temporary hide for comments.
+  ///
+  /// No-op when the global comment gate is off.
   void toggleTempHideReply() {
     if (!showReply) return;
     tempHideReply.toggle();
   }
 
+  /// Toggle per-page temporary hide for danmaku.
+  ///
+  /// No-op when the global danmaku gate is off. Clears visible danmaku
+  /// immediately when hiding so the screen does not show stale danmaku.
   void toggleTempHideDanmaku() {
     if (!plPlayerController.enableShowDanmaku.value) return;
     tempHideDanmaku.toggle();
@@ -197,6 +207,7 @@ class VideoDetailController extends GetxController
     }
   }
 
+  /// Reset per-page temporary hide controls to their defaults.
   void resetTempQuietControls() {
     tempHideReply.value = false;
     tempHideDanmaku.value = false;
@@ -1465,11 +1476,11 @@ class VideoDetailController extends GetxController
 
     // danmaku
     savedDanmaku = null;
-    resetTempQuietControls();
     // Clear the current persistent-rule match without touching the stored
     // database -- later slices re-evaluate the match when channel identity
     // becomes available again.
     currentChannelQuietRule.value = null;
+    resetTempQuietControls();
 
     // subtitle
     subtitles.clear();
