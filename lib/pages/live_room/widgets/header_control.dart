@@ -84,20 +84,14 @@ class _LiveHeaderControlState extends State<LiveHeaderControl>
           Row(
             spacing: 10,
             children: [
-              Obx(() {
-                final upName = widget.liveController.roomInfoH5.value
-                    ?.anchorInfo
-                    ?.baseInfo
-                    ?.uname;
-                if (upName == null) return const SizedBox.shrink();
-                return Text(
+              if (widget.upName case final upName?)
+                Text(
                   upName,
                   style: const TextStyle(
                     fontSize: 12,
                     color: Colors.white,
                   ),
-                );
-              }),
+                ),
               liveController.watchedWidget,
               widget.onlineWidget,
               liveController.timeWidget,

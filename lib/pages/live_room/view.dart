@@ -253,6 +253,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
       key: playerKey,
       () {
         if (_liveRoomController.isLoaded.value && plPlayerController.isLive) {
+          final roomInfoH5 = _liveRoomController.roomInfoH5.value;
           return PLVideoPlayer(
             maxWidth: width,
             maxHeight: height,
@@ -261,8 +262,8 @@ class _LiveRoomPageState extends State<LiveRoomPage>
             plPlayerController: plPlayerController,
             headerControl: LiveHeaderControl(
               key: _liveRoomController.headerKey,
-              title: null,
-              upName: null,
+              title: roomInfoH5?.roomInfo?.title,
+              upName: roomInfoH5?.anchorInfo?.baseInfo?.uname,
               plPlayerController: plPlayerController,
               onSendDanmaku: _liveRoomController.onSendDanmaku,
               onPlayAudio: _liveRoomController.queryLiveUrl,

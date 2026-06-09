@@ -1423,7 +1423,10 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
         if (plPlayerController.enableTapDm)
           Obx(
             () {
-              if (!videoDetailController.effectiveShowDanmaku) {
+              final effectiveShowDanmaku =
+                  widget.videoDetailController?.effectiveShowDanmaku ??
+                  plPlayerController.enableShowDanmaku.value;
+              if (!effectiveShowDanmaku) {
                 return const SizedBox.shrink();
               }
               final dmOffset = _dmOffset.value;
