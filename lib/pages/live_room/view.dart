@@ -327,7 +327,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
             width: fullScreenSCWidth,
             child: Obx(() {
               final item = _liveRoomController.fsSC.value;
-              if (item == null) {
+              if (item == null || !_liveRoomController.effectiveShowSC) {
                 return const SizedBox.shrink();
               }
               try {
@@ -703,6 +703,47 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                     ],
                   ),
                 ),
+              if (plPlayerController.enableShowDanmaku.value ||
+                  _liveRoomController.showSuperChat)
+                const PopupMenuDivider(),
+              if (plPlayerController.enableShowDanmaku.value)
+                PopupMenuItem(
+                  onTap: _liveRoomController.toggleTempHideDanmaku,
+                  child: Obx(() {
+                    final tempHide = _liveRoomController.tempHideDanmaku.value;
+                    return Row(
+                      spacing: 10,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          tempHide ? CustomIcons.dm_off : CustomIcons.dm_on,
+                          size: 19,
+                          color: color,
+                        ),
+                        Text(tempHide ? '显示弹幕' : '隐藏弹幕'),
+                      ],
+                    );
+                  }),
+                ),
+              if (_liveRoomController.showSuperChat)
+                PopupMenuItem(
+                  onTap: _liveRoomController.toggleTempHideSC,
+                  child: Obx(() {
+                    final tempHide = _liveRoomController.tempHideSC.value;
+                    return Row(
+                      spacing: 10,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          tempHide ? Icons.visibility_off : Icons.visibility,
+                          size: 19,
+                          color: color,
+                        ),
+                        Text(tempHide ? '显示 SC' : '隐藏 SC'),
+                      ],
+                    );
+                  }),
+                ),
             ];
           },
         ),
@@ -777,24 +818,26 @@ class _LiveRoomPageState extends State<LiveRoomPage>
     );
     return Padding(
       padding: EdgeInsets.only(bottom: 12, top: isPortrait ? 12 : 0),
-      child: _liveRoomController.showSuperChat
-          ? PageView<CustomHorizontalDragGestureRecognizer>(
-              key: pageKey,
-              controller: _liveRoomController.pageController,
-              physics: clampingScrollPhysics,
-              onPageChanged: (value) =>
-                  _liveRoomController.pageIndex.value = value,
-              horizontalDragGestureRecognizer:
-                  CustomHorizontalDragGestureRecognizer.new,
-              children: [
-                KeepAliveWrapper(child: chat()),
-                SuperChatPanel(
-                  key: scKey,
-                  controller: _liveRoomController,
-                ),
-              ],
-            )
-          : chat(),
+      child: Obx(
+        () => _liveRoomController.effectiveShowSC
+            ? PageView<CustomHorizontalDragGestureRecognizer>(
+                key: pageKey,
+                controller: _liveRoomController.pageController,
+                physics: clampingScrollPhysics,
+                onPageChanged: (value) =>
+                    _liveRoomController.pageIndex.value = value,
+                horizontalDragGestureRecognizer:
+                    CustomHorizontalDragGestureRecognizer.new,
+                children: [
+                  KeepAliveWrapper(child: chat()),
+                  SuperChatPanel(
+                    key: scKey,
+                    controller: _liveRoomController,
+                  ),
+                ],
+              )
+            : chat(),
+      ),
     );
   }
 
@@ -1109,7 +1152,7 @@ class _LiveDanmakuState extends State<LiveDanmaku> {
     final option = DanmakuOptions.get(notFullscreen: widget.notFullscreen);
     return Obx(
       () => AnimatedOpacity(
-        opacity: plPlayerController.enableShowDanmaku.value
+        opacity: widget.liveRoomController.effectiveShowDanmaku
             ? plPlayerController.danmakuOpacity.value
             : 0,
         duration: const Duration(milliseconds: 100),

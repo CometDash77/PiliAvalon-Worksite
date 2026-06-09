@@ -19,6 +19,7 @@ import 'package:PiliPlus/models_new/live/live_room_play_info/codec.dart';
 import 'package:PiliPlus/models_new/live/live_superchat/item.dart';
 import 'package:PiliPlus/pages/common/publish/publish_route.dart';
 import 'package:PiliPlus/pages/danmaku/danmaku_model.dart';
+import 'package:PiliPlus/pages/live_room/quiet_state.dart';
 import 'package:PiliPlus/pages/live_room/send_danmaku/view.dart';
 import 'package:PiliPlus/pages/video/widgets/header_control.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
@@ -107,6 +108,8 @@ class LiveRoomController extends GetxController {
   late final fsSC = Rxn<SuperChatItem>();
   late final RxList<SuperChatItem> superChatMsg = <SuperChatItem>[].obs;
   final disableAutoScroll = false.obs;
+  final tempHideDanmaku = false.obs;
+  final tempHideSC = false.obs;
   bool autoScroll = true;
   LiveMessageStream? _msgStream;
   late final ScrollController scrollController;
@@ -127,6 +130,16 @@ class LiveRoomController extends GetxController {
 
   final superChatType = Pref.superChatType;
   late final showSuperChat = superChatType != SuperChatType.disable;
+
+  bool get effectiveShowDanmaku => effectiveShowLiveDanmaku(
+    globalShow: plPlayerController.enableShowDanmaku.value,
+    temporaryHide: tempHideDanmaku.value,
+  );
+
+  bool get effectiveShowSC => effectiveShowLiveSuperChat(
+    globalType: superChatType,
+    temporaryHide: tempHideSC.value,
+  );
 
   final headerKey = GlobalKey<TimeBatteryMixin>();
 
@@ -314,8 +327,10 @@ class LiveRoomController extends GetxController {
     final res = await LiveHttp.liveRoomDmPrefetch(roomId: roomId);
     if (res case Success(:final response)) {
       if (response != null && response.isNotEmpty) {
-        messages.addAll(response);
-        scrollToBottom();
+        if (!tempHideDanmaku.value) {
+          messages.addAll(response);
+          scrollToBottom();
+        }
       }
     } else {
       if (kDebugMode) {
@@ -325,6 +340,7 @@ class LiveRoomController extends GetxController {
   }
 
   Future<void> getSuperChatMsg() async {
+    if (tempHideSC.value) return;
     final res = await LiveHttp.superChatMsg(roomId);
     if (res.dataOrNull?.list case final list?) {
       superChatMsg.addAll(list);
@@ -333,6 +349,30 @@ class LiveRoomController extends GetxController {
 
   void clearSC() {
     superChatMsg.removeWhere((e) => e.expired);
+  }
+
+  void toggleTempHideDanmaku() {
+    if (!plPlayerController.enableShowDanmaku.value) return;
+    tempHideDanmaku.toggle();
+    if (tempHideDanmaku.value) {
+      danmakuController?.clear();
+      messages.removeWhere((msg) => msg is DanmakuMsg);
+    }
+  }
+
+  void toggleTempHideSC() {
+    if (!showSuperChat) return;
+    tempHideSC.toggle();
+    if (tempHideSC.value) {
+      pageIndex.value = 0;
+      final pageController = this.pageController;
+      if (pageController?.hasClients ?? false) {
+        pageController!.jumpToPage(0);
+      }
+      fsSC.value = null;
+      superChatMsg.clear();
+      messages.removeWhere((msg) => msg is SuperChatItem);
+    }
   }
 
   void startLiveMsg() {
@@ -427,16 +467,19 @@ class LiveRoomController extends GetxController {
 
   void addDm(dynamic msg, [DanmakuContentItem<DanmakuExtra>? item]) {
     if (plPlayerController.showDanmaku) {
-      if (item != null) {
+      if (item != null && effectiveShowDanmaku) {
         danmakuController?.addDanmaku(item);
       }
       if (autoScroll && !disableAutoScroll.value) {
-        messages.add(msg);
-        scrollToBottom();
+        if (msg is! DanmakuMsg || effectiveShowDanmaku) {
+          messages.add(msg);
+          scrollToBottom();
+        }
         return;
       }
     }
 
+    if (msg is DanmakuMsg && !effectiveShowDanmaku) return;
     messages.addOnly(msg);
   }
 
@@ -503,17 +546,19 @@ class LiveRoomController extends GetxController {
           break;
         case 'SUPER_CHAT_MESSAGE' when showSuperChat:
           final item = SuperChatItem.fromJson(obj['data']);
-          superChatMsg.insert(0, item);
-          if (plPlayerController.showDanmaku &&
-              (isFullScreen || plPlayerController.isDesktopPip)) {
-            fsSC.value = item.copyWith(
-              endTime: math.min(
-                item.endTime,
-                DateTime.now().millisecondsSinceEpoch ~/ 1000 + 10,
-              ),
-            );
+          if (effectiveShowSC) {
+            superChatMsg.insert(0, item);
+            if (plPlayerController.showDanmaku &&
+                (isFullScreen || plPlayerController.isDesktopPip)) {
+              fsSC.value = item.copyWith(
+                endTime: math.min(
+                  item.endTime,
+                  DateTime.now().millisecondsSinceEpoch ~/ 1000 + 10,
+                ),
+              );
+            }
+            addDm(item);
           }
-          addDm(item);
           break;
         // case 'SUPER_CHAT_MESSAGE_DELETE' when showSuperChat:
         //   if (obj['roomid'] == roomId) {
