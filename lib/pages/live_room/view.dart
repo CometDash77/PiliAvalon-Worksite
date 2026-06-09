@@ -327,7 +327,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
             width: fullScreenSCWidth,
             child: Obx(() {
               final item = _liveRoomController.fsSC.value;
-              if (item == null) {
+              if (item == null || _liveRoomController.tempHideSC.value) {
                 return const SizedBox.shrink();
               }
               try {
@@ -703,6 +703,55 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                     ],
                   ),
                 ),
+                const PopupMenuDivider(),
+                if (mounted && plPlayerController.enableShowDanmaku.value)
+                  PopupMenuItem(
+                    onTap: () => _liveRoomController.tempHideDanmaku.toggle(),
+                    child: Obx(
+                      () => Row(
+                        spacing: 10,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _liveRoomController.tempHideDanmaku.value
+                                ? CustomIcons.dm_off
+                                : CustomIcons.dm_on,
+                            size: 19,
+                            color: color,
+                          ),
+                          Text(
+                            _liveRoomController.tempHideDanmaku.value
+                                ? '显示弹幕'
+                                : '隐藏弹幕',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (mounted && _liveRoomController.showSuperChat)
+                  PopupMenuItem(
+                    onTap: () => _liveRoomController.tempHideSC.toggle(),
+                    child: Obx(
+                      () => Row(
+                        spacing: 10,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _liveRoomController.tempHideSC.value
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            size: 19,
+                            color: color,
+                          ),
+                          Text(
+                            _liveRoomController.tempHideSC.value
+                                ? '显示 SC'
+                                : '隐藏 SC',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
             ];
           },
         ),
@@ -777,24 +826,27 @@ class _LiveRoomPageState extends State<LiveRoomPage>
     );
     return Padding(
       padding: EdgeInsets.only(bottom: 12, top: isPortrait ? 12 : 0),
-      child: _liveRoomController.showSuperChat
-          ? PageView<CustomHorizontalDragGestureRecognizer>(
-              key: pageKey,
-              controller: _liveRoomController.pageController,
-              physics: clampingScrollPhysics,
-              onPageChanged: (value) =>
-                  _liveRoomController.pageIndex.value = value,
-              horizontalDragGestureRecognizer:
-                  CustomHorizontalDragGestureRecognizer.new,
-              children: [
-                KeepAliveWrapper(child: chat()),
-                SuperChatPanel(
-                  key: scKey,
-                  controller: _liveRoomController,
-                ),
-              ],
-            )
-          : chat(),
+      child: Obx(
+        () => _liveRoomController.showSuperChat &&
+                !_liveRoomController.tempHideSC.value
+            ? PageView<CustomHorizontalDragGestureRecognizer>(
+                key: pageKey,
+                controller: _liveRoomController.pageController,
+                physics: clampingScrollPhysics,
+                onPageChanged: (value) =>
+                    _liveRoomController.pageIndex.value = value,
+                horizontalDragGestureRecognizer:
+                    CustomHorizontalDragGestureRecognizer.new,
+                children: [
+                  KeepAliveWrapper(child: chat()),
+                  SuperChatPanel(
+                    key: scKey,
+                    controller: _liveRoomController,
+                  ),
+                ],
+              )
+            : chat(),
+      ),
     );
   }
 
@@ -1107,11 +1159,11 @@ class _LiveDanmakuState extends State<LiveDanmaku> {
   @override
   Widget build(BuildContext context) {
     final option = DanmakuOptions.get(notFullscreen: widget.notFullscreen);
-    return Obx(
-      () => AnimatedOpacity(
-        opacity: plPlayerController.enableShowDanmaku.value
-            ? plPlayerController.danmakuOpacity.value
-            : 0,
+    return Obx(() {
+      final effectiveDanmaku = plPlayerController.enableShowDanmaku.value &&
+          !widget.liveRoomController.tempHideDanmaku.value;
+      return AnimatedOpacity(
+        opacity: effectiveDanmaku ? plPlayerController.danmakuOpacity.value : 0,
         duration: const Duration(milliseconds: 100),
         child: DanmakuScreen<DanmakuExtra>(
           createdController: (e) {
@@ -1121,7 +1173,7 @@ class _LiveDanmakuState extends State<LiveDanmaku> {
           option: option,
           size: widget.size,
         ),
-      ),
-    );
+      );
+    });
   }
 }

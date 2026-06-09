@@ -58,6 +58,9 @@ class LiveRoomChatPanel extends StatelessWidget {
             itemBuilder: (_, index) {
               final item = liveRoomController.messages[index];
               if (item is DanmakuMsg) {
+                if (liveRoomController.tempHideDanmaku.value) {
+                  return const SizedBox.shrink();
+                }
                 WidgetSpan? medal;
                 if (item.medalInfo case final medalInfo?) {
                   try {

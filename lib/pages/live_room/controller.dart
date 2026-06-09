@@ -107,6 +107,8 @@ class LiveRoomController extends GetxController {
   late final fsSC = Rxn<SuperChatItem>();
   late final RxList<SuperChatItem> superChatMsg = <SuperChatItem>[].obs;
   final disableAutoScroll = false.obs;
+  final tempHideDanmaku = false.obs;
+  final tempHideSC = false.obs;
   bool autoScroll = true;
   LiveMessageStream? _msgStream;
   late final ScrollController scrollController;
@@ -152,6 +154,11 @@ class LiveRoomController extends GetxController {
   void onInit() {
     super.onInit();
     scrollController = ScrollController()..addListener(listener);
+    ever(tempHideSC, (bool value) {
+      if (value) {
+        fsSC.value = null;
+      }
+    });
     final account = Accounts.main;
     isLogin = account.isLogin;
     mid = account.mid;
@@ -427,7 +434,7 @@ class LiveRoomController extends GetxController {
 
   void addDm(dynamic msg, [DanmakuContentItem<DanmakuExtra>? item]) {
     if (plPlayerController.showDanmaku) {
-      if (item != null) {
+      if (item != null && !tempHideDanmaku.value) {
         danmakuController?.addDanmaku(item);
       }
       if (autoScroll && !disableAutoScroll.value) {
@@ -505,6 +512,7 @@ class LiveRoomController extends GetxController {
           final item = SuperChatItem.fromJson(obj['data']);
           superChatMsg.insert(0, item);
           if (plPlayerController.showDanmaku &&
+              !tempHideSC.value &&
               (isFullScreen || plPlayerController.isDesktopPip)) {
             fsSC.value = item.copyWith(
               endTime: math.min(
