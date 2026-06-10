@@ -97,7 +97,7 @@ class ExposureTrackerStore {
       }
       // Cooling expired — delete and treat as first exposure.
       box.delete(bv);
-      _recordFirstExposure(bv, now);
+      _recordFirstExposure(bv, now, normalized.maxCacheSize);
       return true;
     }
 
@@ -107,14 +107,14 @@ class ExposureTrackerStore {
       if (windowAge.inDays >= normalized.windowDays) {
         // Outside the counting window — delete and treat as first exposure.
         box.delete(bv);
-        _recordFirstExposure(bv, now);
+        _recordFirstExposure(bv, now, normalized.maxCacheSize);
         return true;
       }
     }
 
     // --- First exposure ------------------------------------------------
     if (existing == null) {
-      _recordFirstExposure(bv, now);
+      _recordFirstExposure(bv, now, normalized.maxCacheSize);
       return true;
     }
 
@@ -210,7 +210,7 @@ class ExposureTrackerStore {
     }
   }
 
-  void _recordFirstExposure(String bvid, DateTime now) {
+  void _recordFirstExposure(String bvid, DateTime now, int maxCacheSize) {
     box.put(
       bvid,
       ExposureRecord(
@@ -220,5 +220,6 @@ class ExposureTrackerStore {
         lastExposedAt: now,
       ),
     );
+    _lruEvict(maxCacheSize);
   }
 }
