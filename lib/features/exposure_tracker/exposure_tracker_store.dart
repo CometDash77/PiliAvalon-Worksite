@@ -206,7 +206,7 @@ class ExposureTrackerStore {
         }
       }
       if (oldestBvid == null) break;
-      box.delete(oldestBvid!);
+      box.delete(oldestBvid);
     }
   }
 
