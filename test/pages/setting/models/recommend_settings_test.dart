@@ -22,6 +22,11 @@ void main() {
     GStorage.setting.delete(SettingBoxKey.tagEnrichConcurrency);
     GStorage.setting.delete(SettingBoxKey.tagEnrichTimeout);
     GStorage.setting.delete(SettingBoxKey.tagEnrichCacheMaxMb);
+    GStorage.setting.delete(SettingBoxKey.repeatExposureFilterEnabled);
+    GStorage.setting.delete(SettingBoxKey.repeatExposureWindowDays);
+    GStorage.setting.delete(SettingBoxKey.repeatExposureThreshold);
+    GStorage.setting.delete(SettingBoxKey.repeatExposureCoolingDays);
+    GStorage.setting.delete(SettingBoxKey.repeatExposureMaxCacheSize);
   });
 
   group('recommendSettings', () {
@@ -124,7 +129,41 @@ void main() {
 
     test('total settings count includes tag enrichment entries', () {
       final list = recommendSettings;
-      expect(list.length, 12);
+      expect(list.length, 17);
+    });
+
+    test('contains repeat exposure filter settings', () {
+      final list = recommendSettings;
+      final titles = list.map((e) => e.effectiveTitle).toList();
+
+      expect(titles, contains('启用重复曝光过滤'));
+      expect(titles, contains('重复曝光统计窗口'));
+      expect(titles, contains('重复曝光阈值'));
+      expect(titles, contains('重复曝光冷却期'));
+      expect(titles, contains('重复曝光缓存状态'));
+    });
+
+    test('repeat exposure settings show default values', () {
+      final list = recommendSettings;
+
+      expect(
+        list
+            .firstWhere((e) => e.effectiveTitle == '重复曝光统计窗口')
+            .effectiveSubtitle,
+        contains('当前: 7天'),
+      );
+      expect(
+        list
+            .firstWhere((e) => e.effectiveTitle == '重复曝光阈值')
+            .effectiveSubtitle,
+        contains('当前: 10次'),
+      );
+      expect(
+        list
+            .firstWhere((e) => e.effectiveTitle == '重复曝光冷却期')
+            .effectiveSubtitle,
+        contains('当前: 30天'),
+      );
     });
   });
 }

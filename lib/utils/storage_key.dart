@@ -157,6 +157,12 @@ abstract final class SettingBoxKey {
       removeSafeArea = 'removeSafeArea',
       angleDegrees = 'angleDegrees';
 
+  static const String repeatExposureFilterEnabled = 'repeatExposureFilterEnabled',
+      repeatExposureWindowDays = 'repeatExposureWindowDays',
+      repeatExposureThreshold = 'repeatExposureThreshold',
+      repeatExposureCoolingDays = 'repeatExposureCoolingDays',
+      repeatExposureMaxCacheSize = 'repeatExposureMaxCacheSize';
+
   static const String minimizeOnExit = 'minimizeOnExit',
       windowSize = 'windowSize',
       windowPosition = 'windowPosition',
