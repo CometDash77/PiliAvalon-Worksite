@@ -211,6 +211,7 @@ class ExposureTrackerStore {
   }
 
   void _recordFirstExposure(String bvid, DateTime now, int maxCacheSize) {
+    _lruEvict(maxCacheSize - 1);
     box.put(
       bvid,
       ExposureRecord(
@@ -220,6 +221,5 @@ class ExposureTrackerStore {
         lastExposedAt: now,
       ),
     );
-    _lruEvict(maxCacheSize);
   }
 }
