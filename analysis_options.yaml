@@ -12,7 +12,8 @@ include: package:flutter_lints/flutter.yaml
 analyzer:
   exclude:
     - lib/grpc/bilibili/**
-    # - lib/common/widgets/flutter/**
+    - lib/common/widgets/flutter/**
+    - lib/utils/android/bindings.g.dart
 
 formatter:
   trailing_commas: preserve

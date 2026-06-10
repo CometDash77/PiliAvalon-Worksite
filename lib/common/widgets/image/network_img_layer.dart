@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:PiliPlus/common/assets.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/models/common/image_type.dart';

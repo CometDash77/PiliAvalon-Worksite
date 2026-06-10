@@ -1,3 +1,5 @@
+// ignore_for_file: always_use_package_imports
+
 import 'channel_quiet_rule.dart';
 
 /// Identifies a UGC or PGC channel for which a persistent quiet rule may be

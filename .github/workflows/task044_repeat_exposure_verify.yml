@@ -1,0 +1,57 @@
+name: Task 044 Repeat Exposure Verify
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - task-042-repeat-exposure-prefilter-from-5122
+    paths:
+      - ".github/workflows/task044_repeat_exposure_verify.yml"
+      - "lib/**"
+      - "test/features/exposure_tracker/**"
+      - "test/pages/setting/models/recommend_settings_test.dart"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Task 044 focused verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify dependency lock is clean
+        run: git diff --exit-code pubspec.yaml pubspec.lock
+
+      - name: Run Task 044 focused tests
+        run: flutter test test/features/exposure_tracker test/pages/setting/models/recommend_settings_test.dart
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Install ripgrep
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ripgrep
+
+      - name: Scope grep
+        run: rg -n "ExposureTracker|filterAndRecord|clearExposure|onRecommendationTapBvid" lib test

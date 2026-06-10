@@ -30,6 +30,7 @@ import 'package:PiliPlus/models_new/video/video_note_list/data.dart';
 import 'package:PiliPlus/models_new/video/video_play_info/data.dart';
 import 'package:PiliPlus/models_new/video/video_relation/data.dart';
 import 'package:PiliPlus/models_new/video/video_shot/data.dart';
+import 'package:PiliPlus/features/exposure_tracker/exposure_tracker.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/app_sign.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
@@ -96,7 +97,7 @@ abstract final class VideoHttp {
         getBvid: (item) => item.bvid,
         getCid: (item) => item.cid,
       );
-      return Success(list);
+      return Success(ExposureTracker.instance.filterAndRecord(list, getBvid: (item) => item.bvid));
     } else {
       return Error(res.data['message']);
     }
@@ -192,7 +193,7 @@ abstract final class VideoHttp {
         getBvid: (item) => item.bvid,
         getCid: (item) => item.cid,
       );
-      return Success(list);
+      return Success(ExposureTracker.instance.filterAndRecord(list, getBvid: (item) => item.bvid));
     } else {
       return Error(res.data['message']);
     }

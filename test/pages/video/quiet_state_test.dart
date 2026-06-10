@@ -95,17 +95,19 @@ void main() {
       );
     });
 
-    test('visible when channel rule only has hideDanmaku (not hideComments)',
-        () {
-      expect(
-        effectiveShowContent(
-          globalShow: true,
-          persistentRuleHide: false,
-          temporaryHide: false,
-        ),
-        isTrue,
-      );
-    });
+    test(
+      'visible when channel rule only has hideDanmaku (not hideComments)',
+      () {
+        expect(
+          effectiveShowContent(
+            globalShow: true,
+            persistentRuleHide: false,
+            temporaryHide: false,
+          ),
+          isTrue,
+        );
+      },
+    );
 
     test('visible when no channel rule matches (persistentRuleHide false)', () {
       expect(
@@ -118,25 +120,27 @@ void main() {
       );
     });
 
-    test('hard gate: global off overrides everything even with channel rule',
-        () {
-      expect(
-        effectiveShowContent(
-          globalShow: false,
-          persistentRuleHide: true,
-          temporaryHide: false,
-        ),
-        isFalse,
-      );
-      expect(
-        effectiveShowContent(
-          globalShow: false,
-          persistentRuleHide: false,
-          temporaryHide: false,
-        ),
-        isFalse,
-      );
-    });
+    test(
+      'hard gate: global off overrides everything even with channel rule',
+      () {
+        expect(
+          effectiveShowContent(
+            globalShow: false,
+            persistentRuleHide: true,
+            temporaryHide: false,
+          ),
+          isFalse,
+        );
+        expect(
+          effectiveShowContent(
+            globalShow: false,
+            persistentRuleHide: false,
+            temporaryHide: false,
+          ),
+          isFalse,
+        );
+      },
+    );
   });
 
   group('danmaku gate: persistent hideDanmaku hides danmaku', () {
@@ -151,17 +155,19 @@ void main() {
       );
     });
 
-    test('visible when channel rule only has hideComments (not hideDanmaku)',
-        () {
-      expect(
-        effectiveShowContent(
-          globalShow: true,
-          persistentRuleHide: false,
-          temporaryHide: false,
-        ),
-        isTrue,
-      );
-    });
+    test(
+      'visible when channel rule only has hideComments (not hideDanmaku)',
+      () {
+        expect(
+          effectiveShowContent(
+            globalShow: true,
+            persistentRuleHide: false,
+            temporaryHide: false,
+          ),
+          isTrue,
+        );
+      },
+    );
 
     test('visible when no channel rule matches (persistentRuleHide false)', () {
       expect(
@@ -174,9 +180,8 @@ void main() {
       );
     });
 
-    test(
-        'hard gate: global off overrides everything even with '
-            'channel hideDanmaku rule', () {
+    test('hard gate: global off overrides everything even with '
+        'channel hideDanmaku rule', () {
       expect(
         effectiveShowContent(
           globalShow: false,
@@ -249,19 +254,22 @@ void main() {
       );
     });
 
-    test('shifts playlist index right when comments are restored before it', () {
-      expect(
-        quietControlsEffectiveTabIndex(
-          currentIndex: 1,
-          previousLength: 2,
-          nextLength: 3,
-          previousHadReply: false,
-          nextHasReply: true,
-          showIntro: true,
-        ),
-        2,
-      );
-    });
+    test(
+      'shifts playlist index right when comments are restored before it',
+      () {
+        expect(
+          quietControlsEffectiveTabIndex(
+            currentIndex: 1,
+            previousLength: 2,
+            nextLength: 3,
+            previousHadReply: false,
+            nextHasReply: true,
+            showIntro: true,
+          ),
+          2,
+        );
+      },
+    );
 
     test('keeps a valid index when comments are the first tab', () {
       expect(

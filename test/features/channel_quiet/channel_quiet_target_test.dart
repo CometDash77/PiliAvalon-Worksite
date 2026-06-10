@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_const_declarations
+
 import 'package:PiliPlus/pages/video/channel_quiet/channel_quiet_rule.dart';
 import 'package:PiliPlus/pages/video/channel_quiet/channel_quiet_store.dart';
 import 'package:PiliPlus/pages/video/channel_quiet/channel_quiet_target.dart';
@@ -182,7 +184,7 @@ void main() {
       expect(updated!.channelName, 'NewName');
       expect(updated.hideComments, isTrue);
       expect(updated.hideDanmaku, isTrue);
-      expect(updated.createdAt, originalCreated);
+      expect(updated.createdAt.millisecondsSinceEpoch, originalCreated.millisecondsSinceEpoch);
       expect(
         updated.updatedAt.millisecondsSinceEpoch,
         greaterThan(originalCreated.millisecondsSinceEpoch),

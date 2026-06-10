@@ -1,3 +1,4 @@
+import 'package:PiliPlus/features/exposure_tracker/exposure_tracker_settings.dart';
 import 'package:PiliPlus/features/shielding/shielding_recommend_tag_enricher.dart';
 import 'package:PiliPlus/pages/rcmd/controller.dart';
 import 'package:PiliPlus/pages/setting/models/model.dart';
@@ -151,6 +152,7 @@ List<SettingsModel> get recommendSettings => [
       );
     },
   ),
+  ...exposureTrackerSettings(buildNumberInputModel: _buildNumberInputModel),
 ];
 
 SettingsModel _buildNumberInputModel({

@@ -27,14 +27,17 @@ int quietControlsEffectiveTabIndex({
   return currentIndex.clamp(0, nextLength - 1);
 }
 
+/// Per-page temporary quiet gate: global show AND temporary hide.
+///
+/// Used by UI controls that toggle per-page hide state without affecting
+/// persistent channel rules.
 bool effectiveShowTemporaryContent({
   required bool globalShow,
   required bool temporaryHide,
-}) =>
-    globalShow && !temporaryHide;
+}) => globalShow && !temporaryHide;
 
 /// Three-level effective visibility: global gate, persistent channel rule,
-/// and temporary (per-page) override.
+/// and per-page temporary hide.
 ///
 /// Global off is a hard gate that cannot be overridden by persistent or
 /// temporary controls.
@@ -42,5 +45,4 @@ bool effectiveShowContent({
   required bool globalShow,
   required bool persistentRuleHide,
   required bool temporaryHide,
-}) =>
-    globalShow && !persistentRuleHide && !temporaryHide;
+}) => globalShow && !persistentRuleHide && !temporaryHide;

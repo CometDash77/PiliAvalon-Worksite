@@ -429,6 +429,46 @@ class HeaderControlState extends State<HeaderControl>
                   leading: const Icon(Icons.hourglass_top_outlined, size: 20),
                   title: const Text('定时关闭', style: titleStyle),
                 ),
+                Obx(() {
+                  if (!videoDetailCtr.showReply) return const SizedBox.shrink();
+                  final tempHide = videoDetailCtr.tempHideReply.value;
+                  return ListTile(
+                    dense: true,
+                    onTap: () {
+                      Get.back();
+                      videoDetailCtr.toggleTempHideReply();
+                    },
+                    leading: Icon(
+                      size: 20,
+                      tempHide ? Icons.comment : Icons.comment_outlined,
+                    ),
+                    title: Text(
+                      tempHide ? '显示评论' : '隐藏评论',
+                      style: titleStyle,
+                    ),
+                  );
+                }),
+                Obx(() {
+                  if (!plPlayerController.enableShowDanmaku.value) {
+                    return const SizedBox.shrink();
+                  }
+                  final tempHide = videoDetailCtr.tempHideDanmaku.value;
+                  return ListTile(
+                    dense: true,
+                    onTap: () {
+                      Get.back();
+                      videoDetailCtr.toggleTempHideDanmaku();
+                    },
+                    leading: Icon(
+                      size: 20,
+                      tempHide ? CustomIcons.dm_on : CustomIcons.dm_off,
+                    ),
+                    title: Text(
+                      tempHide ? '显示弹幕' : '隐藏弹幕',
+                      style: titleStyle,
+                    ),
+                  );
+                }),
                 if (!isFileSource) ...[
                   ListTile(
                     dense: true,
@@ -577,46 +617,6 @@ class HeaderControlState extends State<HeaderControl>
                     ],
                   ),
                 ),
-                Obx(() {
-                  if (!videoDetailCtr.showReply) return const SizedBox.shrink();
-                  final tempHide = videoDetailCtr.tempHideReply.value;
-                  return ListTile(
-                    dense: true,
-                    onTap: () {
-                      Get.back();
-                      videoDetailCtr.toggleTempHideReply();
-                    },
-                    leading: Icon(
-                      size: 20,
-                      tempHide ? Icons.comment : Icons.comment_outlined,
-                    ),
-                    title: Text(
-                      tempHide ? '显示评论' : '隐藏评论',
-                      style: titleStyle,
-                    ),
-                  );
-                }),
-                Obx(() {
-                  if (!plPlayerController.enableShowDanmaku.value) {
-                    return const SizedBox.shrink();
-                  }
-                  final tempHide = videoDetailCtr.tempHideDanmaku.value;
-                  return ListTile(
-                    dense: true,
-                    onTap: () {
-                      Get.back();
-                      videoDetailCtr.toggleTempHideDanmaku();
-                    },
-                    leading: Icon(
-                      size: 20,
-                      tempHide ? CustomIcons.dm_on : CustomIcons.dm_off,
-                    ),
-                    title: Text(
-                      tempHide ? '显示弹幕' : '隐藏弹幕',
-                      style: titleStyle,
-                    ),
-                  );
-                }),
                 if (!isFileSource) ...[
                   ListTile(
                     dense: true,
@@ -1973,9 +1973,7 @@ class HeaderControlState extends State<HeaderControl>
                     icon: Icon(
                       Icons.comment_outlined,
                       size: 19,
-                      color: tempHide
-                          ? Colors.white54
-                          : Colors.white,
+                      color: tempHide ? Colors.white54 : Colors.white,
                     ),
                   ),
                 );
@@ -1995,9 +1993,7 @@ class HeaderControlState extends State<HeaderControl>
                     icon: Icon(
                       size: 20,
                       tempHide ? CustomIcons.dm_off : CustomIcons.dm_on,
-                      color: tempHide
-                          ? Colors.white54
-                          : Colors.white,
+                      color: tempHide ? Colors.white54 : Colors.white,
                     ),
                   ),
                 );

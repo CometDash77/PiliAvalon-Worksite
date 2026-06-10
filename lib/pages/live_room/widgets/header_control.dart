@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:PiliPlus/common/widgets/custom_icon.dart';
 import 'package:PiliPlus/common/widgets/marquee.dart';
 import 'package:PiliPlus/pages/live_room/controller.dart';
 import 'package:PiliPlus/pages/video/widgets/header_control.dart';
@@ -246,6 +247,38 @@ class _LiveHeaderControlState extends State<LiveHeaderControl>
               color: Colors.white,
             ),
           ),
+          Obx(() {
+            if (!plPlayerController.enableShowDanmaku.value) {
+              return const SizedBox.shrink();
+            }
+            final tempHide = liveController.tempHideDanmaku.value;
+            return ComBtn(
+              height: 30,
+              tooltip: tempHide ? '显示弹幕' : '隐藏弹幕',
+              onTap: liveController.toggleTempHideDanmaku,
+              icon: Icon(
+                size: 18,
+                tempHide ? CustomIcons.dm_off : CustomIcons.dm_on,
+                color: tempHide ? Colors.white54 : Colors.white,
+              ),
+            );
+          }),
+          Obx(() {
+            if (!liveController.showSuperChat) {
+              return const SizedBox.shrink();
+            }
+            final tempHide = liveController.tempHideSC.value;
+            return ComBtn(
+              height: 30,
+              tooltip: tempHide ? '显示 SC' : '隐藏 SC',
+              onTap: liveController.toggleTempHideSC,
+              icon: Icon(
+                size: 18,
+                tempHide ? Icons.visibility_off : Icons.visibility,
+                color: tempHide ? Colors.white54 : Colors.white,
+              ),
+            );
+          }),
         ],
       ),
     );

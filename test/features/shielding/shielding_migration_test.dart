@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_const_declarations
+
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/utils/recommend_filter.dart';
 import 'package:flutter_test/flutter_test.dart';
