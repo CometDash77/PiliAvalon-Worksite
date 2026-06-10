@@ -170,6 +170,7 @@ void main() {
       );
       ExposureTracker.instance.testStore = _storeWithBox(box);
       GStorage.setting.put(SettingBoxKey.repeatExposureFilterEnabled, true);
+      GStorage.setting.put(SettingBoxKey.repeatExposureThreshold, 3);
 
       final items = ['BV1', 'BV2'];
       final result = ExposureTracker.instance.filterAndRecord(
