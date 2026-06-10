@@ -48,5 +48,10 @@ jobs:
       - name: Analyze
         run: flutter analyze
 
+      - name: Install ripgrep
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ripgrep
+
       - name: Scope grep
         run: rg -n "ExposureTracker|filterAndRecord|clearExposure|onRecommendationTapBvid" lib test
