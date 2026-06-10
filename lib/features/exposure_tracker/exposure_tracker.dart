@@ -47,10 +47,10 @@ class ExposureTracker {
   /// original [items] list is returned unchanged and nothing is written.
   ///
   /// [getBvid] extracts the BV ID string from an item.  Items whose BV is
-  /// empty or whitespace are kept and not recorded.
+  /// null, empty, or whitespace are kept and not recorded.
   List<T> filterAndRecord<T>(
     List<T> items, {
-    required String Function(T) getBvid,
+    required String? Function(T) getBvid,
   }) {
     final store = _ensureStore;
     if (store == null) return items;
@@ -62,7 +62,8 @@ class ExposureTracker {
     // per-call so we can pass the raw config here.
     final kept = <T>[];
     for (final item in items) {
-      if (store.recordAndShouldKeep(getBvid(item), config)) {
+      final bvid = getBvid(item);
+      if (bvid == null || store.recordAndShouldKeep(bvid, config)) {
         kept.add(item);
       }
     }

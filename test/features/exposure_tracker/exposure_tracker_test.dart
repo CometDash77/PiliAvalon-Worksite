@@ -138,6 +138,22 @@ void main() {
       expect(box.valuesByKey.containsKey('BV2'), isTrue);
     });
 
+    test('null BV is kept and not recorded', () {
+      final box = _MemoryExposureBox();
+      ExposureTracker.instance.testStore = _storeWithBox(box);
+      GStorage.setting.put(SettingBoxKey.repeatExposureFilterEnabled, true);
+
+      final items = ['missing', 'BV2'];
+      final result = ExposureTracker.instance.filterAndRecord(
+        items,
+        getBvid: (s) => s == 'missing' ? null : s,
+      );
+
+      expect(result.length, 2);
+      expect(box.valuesByKey.containsKey('missing'), isFalse);
+      expect(box.valuesByKey.containsKey('BV2'), isTrue);
+    });
+
     // ---- Threshold crossing ---------------------------------------------
 
     test('threshold crossing starts cooling and removes current item', () {
