@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use, prefer_initializing_formals, unnecessary_lambdas
+
 import 'package:PiliPlus/common/widgets/flutter/list_tile.dart' as custom;
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/pages/setting/models/shielding_settings.dart';

@@ -61,11 +61,11 @@ class HiveExposureTrackerBox implements ExposureTrackerBox {
 class ExposureTrackerStore {
   ExposureTrackerStore({
     required this.box,
-    required DateTime Function() clock,
-  }) : _clock = clock;
+    required this.clock,
+  });
 
   final ExposureTrackerBox box;
-  final DateTime Function() _clock;
+  final DateTime Function() clock;
 
   // ---------------------------------------------------------------------------
   // Public API
@@ -85,7 +85,7 @@ class ExposureTrackerStore {
     _lazyCleanup(normalized);
 
     final existing = box.get(bv);
-    final now = _clock();
+    final now = clock();
 
     // --- Cooling record ------------------------------------------------
     if (existing != null && existing.isCooling) {
@@ -169,7 +169,7 @@ class ExposureTrackerStore {
   /// Lazy cleanup: expire cooling records, expire old non-cooling records,
   /// then apply LRU eviction if still over [config.maxCacheSize].
   void _lazyCleanup(ExposureTrackerConfig config) {
-    final now = _clock();
+    final now = clock();
 
     // 1. Expire cooling records whose cooling period has elapsed.
     final toDelete = <String>[];

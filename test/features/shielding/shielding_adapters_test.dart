@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_lambdas
+
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart';
 import 'package:PiliPlus/models/home/rcmd/result.dart';

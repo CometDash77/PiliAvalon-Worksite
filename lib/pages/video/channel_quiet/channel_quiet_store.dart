@@ -1,3 +1,5 @@
+// ignore_for_file: always_use_package_imports, cascade_invocations
+
 import 'dart:convert';
 
 import 'package:PiliPlus/utils/storage.dart';

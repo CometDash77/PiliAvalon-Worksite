@@ -1,3 +1,5 @@
+// ignore_for_file: cascade_invocations
+
 import 'dart:io';
 
 import 'package:PiliPlus/features/exposure_tracker/exposure_tracker.dart';
@@ -77,7 +79,7 @@ void main() {
       ExposureTracker.instance.testStore = null;
     });
 
-    ExposureTrackerStore _storeWithBox(_MemoryExposureBox box) {
+    ExposureTrackerStore storeWithBox(_MemoryExposureBox box) {
       return ExposureTrackerStore(box: box, clock: () => base);
     }
 
@@ -85,7 +87,7 @@ void main() {
 
     test('disabled config returns same list object and writes nothing', () {
       final box = _MemoryExposureBox();
-      ExposureTracker.instance.testStore = _storeWithBox(box);
+      ExposureTracker.instance.testStore = storeWithBox(box);
 
       final items = ['BV1', 'BV2', 'BV3'];
 
@@ -104,7 +106,7 @@ void main() {
 
     test('first exposure is kept and counted', () {
       final box = _MemoryExposureBox();
-      ExposureTracker.instance.testStore = _storeWithBox(box);
+      ExposureTracker.instance.testStore = storeWithBox(box);
 
       // Enable the feature.
       GStorage.setting.put(SettingBoxKey.repeatExposureFilterEnabled, true);
@@ -124,7 +126,7 @@ void main() {
 
     test('empty BV is kept and not recorded', () {
       final box = _MemoryExposureBox();
-      ExposureTracker.instance.testStore = _storeWithBox(box);
+      ExposureTracker.instance.testStore = storeWithBox(box);
       GStorage.setting.put(SettingBoxKey.repeatExposureFilterEnabled, true);
 
       final items = ['', 'BV2'];
@@ -140,7 +142,7 @@ void main() {
 
     test('null BV is kept and not recorded', () {
       final box = _MemoryExposureBox();
-      ExposureTracker.instance.testStore = _storeWithBox(box);
+      ExposureTracker.instance.testStore = storeWithBox(box);
       GStorage.setting.put(SettingBoxKey.repeatExposureFilterEnabled, true);
 
       final items = ['missing', 'BV2'];
@@ -168,7 +170,7 @@ void main() {
           lastExposedAt: base,
         ),
       );
-      ExposureTracker.instance.testStore = _storeWithBox(box);
+      ExposureTracker.instance.testStore = storeWithBox(box);
       GStorage.setting.put(SettingBoxKey.repeatExposureFilterEnabled, true);
       GStorage.setting.put(SettingBoxKey.repeatExposureThreshold, 3);
 
@@ -199,7 +201,7 @@ void main() {
           coolingStartAt: coolingStart,
         ),
       );
-      ExposureTracker.instance.testStore = _storeWithBox(box);
+      ExposureTracker.instance.testStore = storeWithBox(box);
       GStorage.setting.put(SettingBoxKey.repeatExposureFilterEnabled, true);
 
       final items = ['BV1', 'BV2'];
@@ -226,7 +228,7 @@ void main() {
           lastExposedAt: base,
         ),
       );
-      ExposureTracker.instance.testStore = _storeWithBox(box);
+      ExposureTracker.instance.testStore = storeWithBox(box);
 
       ExposureTracker.instance.clearExposure('BV1');
 
@@ -245,7 +247,7 @@ void main() {
           coolingStartAt: base,
         ),
       );
-      ExposureTracker.instance.testStore = _storeWithBox(box);
+      ExposureTracker.instance.testStore = storeWithBox(box);
 
       ExposureTracker.instance.clearExposure('BV1');
 
@@ -270,7 +272,7 @@ void main() {
           coolingStartAt: base,
         ),
       });
-      ExposureTracker.instance.testStore = _storeWithBox(box);
+      ExposureTracker.instance.testStore = storeWithBox(box);
 
       expect(ExposureTracker.instance.cacheCount, 2);
       expect(ExposureTracker.instance.activeCoolingCount, 1);
@@ -287,7 +289,7 @@ void main() {
           lastExposedAt: base,
         ),
       });
-      ExposureTracker.instance.testStore = _storeWithBox(box);
+      ExposureTracker.instance.testStore = storeWithBox(box);
 
       ExposureTracker.instance.clearAll();
 
@@ -317,7 +319,7 @@ void main() {
           lastExposedAt: base.add(const Duration(days: 2)),
         ),
       });
-      ExposureTracker.instance.testStore = _storeWithBox(box);
+      ExposureTracker.instance.testStore = storeWithBox(box);
       GStorage.setting.put(SettingBoxKey.repeatExposureFilterEnabled, true);
       GStorage.setting.put(SettingBoxKey.repeatExposureMaxCacheSize, 2);
 

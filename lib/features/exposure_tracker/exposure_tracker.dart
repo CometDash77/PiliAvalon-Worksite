@@ -28,7 +28,7 @@ class ExposureTracker {
     try {
       _store = ExposureTrackerStore(
         box: HiveExposureTrackerBox(GStorage.exposureTracker),
-        clock: () => DateTime.now(),
+        clock: DateTime.now,
       );
     } catch (_) {
       // Box not yet open — leave _store null.

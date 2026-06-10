@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_const_declarations
+
 import 'package:PiliPlus/pages/video/channel_quiet/channel_quiet_rule.dart';
 import 'package:PiliPlus/pages/video/channel_quiet/channel_quiet_store.dart';
 import 'package:PiliPlus/pages/video/channel_quiet/channel_quiet_target.dart';

@@ -1,3 +1,5 @@
+// ignore_for_file: cascade_invocations
+
 import 'package:PiliPlus/utils/recommend_filter.dart';
 import 'package:PiliPlus/features/shielding/shielding_models.dart';
 

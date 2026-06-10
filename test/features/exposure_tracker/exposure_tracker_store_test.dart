@@ -1,3 +1,5 @@
+// ignore_for_file: cascade_invocations
+
 import 'package:PiliPlus/features/exposure_tracker/exposure_tracker_models.dart';
 import 'package:PiliPlus/features/exposure_tracker/exposure_tracker_store.dart';
 import 'package:flutter_test/flutter_test.dart';
