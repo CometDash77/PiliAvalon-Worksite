@@ -9,8 +9,8 @@ class ChannelQuietSettingsPage extends StatefulWidget {
   const ChannelQuietSettingsPage({
     super.key,
     this.showAppBar = true,
-    ChannelQuietStore? store,
-  }) : store = store;
+    this.store,
+  });
 
   final bool showAppBar;
   final ChannelQuietStore? store;
