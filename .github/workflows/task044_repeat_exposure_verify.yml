@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - task-044-repeat-exposure-prefilter
+      - task-042-repeat-exposure-prefilter-from-5122
     paths:
       - ".github/workflows/task044_repeat_exposure_verify.yml"
       - "lib/**"
