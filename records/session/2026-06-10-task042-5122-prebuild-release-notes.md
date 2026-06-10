@@ -4,7 +4,7 @@
 
 ## Purpose
 
-This GitHub prerelease is a user-installable Android validation package for the Task-042 homepage recommendation repeat-exposure prefilter rebuilt from the accepted `+5122` baseline. It is not a stable release, not latest, and not user-accepted yet.
+This GitHub prerelease is a user-installable Android validation package for the Task-042 homepage recommendation repeat-exposure prefilter rebuilt from the accepted `+5122` baseline. It is not a stable release and not latest.
 
 The previous wrong-base prerelease `task042-repeat-exposure-prebuild.27260059861` was deleted and must not be used for acceptance evidence.
 
@@ -69,7 +69,13 @@ Cover-install verification requires:
 
 ## Manual Acceptance
 
-Pending. This prerelease starts manual acceptance and must not be treated as accepted until the user explicitly reports acceptance.
+Pass. The user reported no issue after manual acceptance of this corrected `+5122` prerelease.
+
+Raw user feedback preserved verbatim:
+
+```text
+no issue
+```
 
 ## Changes
 
@@ -85,8 +91,7 @@ Pending. This prerelease starts manual acceptance and must not be treated as acc
 
 - This is a prebuild validation package, not a stable/latest release.
 - Runtime smoke only proves install/launch on the GitHub Actions emulator.
-- Real homepage recommendation behavior still requires manual account/feed validation.
-- User acceptance, technical-lead review, and parent task closure remain open gates.
+- Technical-lead review and parent task closure remain open gates.
 - GitHub reported a non-blocking Node.js 20 deprecation warning for `softprops/action-gh-release@v2`.
 
 ## Sources / License / Attribution
@@ -101,11 +106,10 @@ Do not restore or use the deleted wrong prerelease `task042-repeat-exposure-preb
 
 ## Not Covered / Still Yellow
 
-- User acceptance remains pending.
 - Parent task `task-042` remains open.
 - Stable/latest release approval is not covered.
-- Manual validation of repeat-exposure behavior on a real homepage feed is not covered by automation.
+- Technical-lead review remains open unless separately accepted.
 
 ## User Action Required
 
-Install the Android prerelease APK from `task042-5122-prebuild.27263751328` and run manual acceptance against the homepage recommendation repeat-exposure behavior. Do not use `task042-repeat-exposure-prebuild.27260059861`; it was the wrong-base prerelease and has been deleted.
+No further user action is required for this prerelease manual acceptance record unless a regression is later found. Do not use `task042-repeat-exposure-prebuild.27260059861`; it was the wrong-base prerelease and has been deleted.
