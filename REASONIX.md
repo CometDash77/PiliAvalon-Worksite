@@ -11,6 +11,9 @@ and auditor labor agent where practical. Codex is the coordinator and reviewer.
   evidence decisions, git push, workflow dispatch, prerelease authority, and
   final reports.
 - Reasonix performs implementation and verification labor as much as possible.
+- Reasonix complex/substantial work is plan-gated: it must first produce a
+  read-only plan, Codex must review and approve or revise that plan, and only
+  then may Reasonix execute side-effecting commands or edits.
 - Codex and Reasonix communicate through persisted project files, not ephemeral
   session chat.
 - Use `records/codex/coordination/` for Codex work ledgers and dispatch notes.
@@ -33,6 +36,17 @@ and auditor labor agent where practical. Codex is the coordinator and reviewer.
   pipe the prompt into `reasonix run`, for example:
   `Get-Content -Raw -Encoding UTF8 <prompt> | reasonix run --model <model>
   --max-steps <n>`.
+- The local Reasonix version supports `reasonix config auto-plan [off|on]`.
+  This repository keeps `agent.auto_plan = "on"` in `reasonix.toml`. In
+  interactive Reasonix frontends, complex-looking tasks should enter read-only
+  plan mode and wait for controller approval before edits or side-effecting
+  commands. Non-interactive `reasonix run` remains autonomous, so Codex
+  automation must emulate the gate with two explicit runs: a plan-only run that
+  writes a plan artifact, followed by a separate execution run only after Codex
+  records approval.
+- In plan-only runs, Reasonix must stop immediately after writing the requested
+  plan artifact. It must not run follow-up listing/status/self-verification
+  commands after the write; Codex verifies the artifact separately.
 - If a report-only Reasonix run repeatedly pauses before writing the artifact,
   narrow the prompt to "write the expected artifact now" before increasing
   `--max-steps`; broad prompts plus low step caps waste cycles on investigation
@@ -44,6 +58,11 @@ Every substantial Reasonix dispatch should instruct Reasonix to:
 
 - read `.reasonix/skills/worksite-reasonix-harness.md`;
 - use relevant `.reasonix/skills/*.md` skills;
+- for implementation, verification with side effects, or other substantial
+  labor, first write a plan artifact under `records/reasonix/plans/` or the
+  task-specific `records/reasonix/task-*/` directory and stop for Codex review;
+- execute only after the dispatch references a Codex-reviewed approved plan
+  artifact;
 - use subagents where the task has independent read, implementation,
   verification, or audit slices;
 - record which skills/subagents were used or why they were not used;
@@ -52,8 +71,9 @@ Every substantial Reasonix dispatch should instruct Reasonix to:
 - when a sleep/wait ends and the task is still in progress twice, double the
   next sleep/wait duration;
 - Codex sleep intervals while Reasonix works must be at least 3 minutes;
-- Reasonix dispatches should request YOLO/edit-auto-free behavior when the
-  slice scope allows edits and the forbidden-action boundary is explicit;
+- Reasonix dispatches may request YOLO/edit-auto-free behavior only in the
+  post-approval execution run, when the slice scope allows edits and the
+  forbidden-action boundary is explicit;
 - persist an artifact with reading scope, factual findings, files changed,
   commands and exit codes, risks, unknowns, and client-decision needs.
 
