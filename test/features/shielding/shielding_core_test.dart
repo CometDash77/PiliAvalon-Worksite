@@ -460,6 +460,106 @@ void main() {
       },
     );
 
+    test('new explicit scopes match only exact same scope', () {
+      final rules = ShieldRuleSet(
+        rules: [
+          _rule(
+            pattern: '搜索关键词',
+            scope: ShieldScope.search,
+            mode: ShieldMatchMode.contains,
+          ),
+        ],
+      );
+
+      expect(
+        ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.search,
+            title: '搜索关键词',
+          ),
+          rules,
+        ).visible,
+        isFalse,
+      );
+      expect(
+        ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.dynamic,
+            title: '搜索关键词',
+          ),
+          rules,
+        ).visible,
+        isTrue,
+      );
+    });
+
+    test('both scope remains recommendation and comment only', () {
+      final rules = ShieldRuleSet(
+        rules: [
+          _rule(
+            pattern: '公共关键词',
+            scope: ShieldScope.both,
+            mode: ShieldMatchMode.contains,
+          ),
+        ],
+      );
+
+      expect(
+        ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.recommendation,
+            title: '公共关键词',
+          ),
+          rules,
+        ).visible,
+        isFalse,
+      );
+      expect(
+        ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.comment,
+            body: '公共关键词',
+          ),
+          rules,
+        ).visible,
+        isFalse,
+      );
+      expect(
+        ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.search,
+            title: '公共关键词',
+          ),
+          rules,
+        ).visible,
+        isTrue,
+      );
+    });
+
+    test('global switch bypasses new scopes too', () {
+      final rules = ShieldRuleSet(
+        globalEnabled: false,
+        rules: [
+          _rule(
+            pattern: '搜索关键词',
+            scope: ShieldScope.search,
+            mode: ShieldMatchMode.contains,
+          ),
+        ],
+      );
+
+      expect(
+        ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.search,
+            title: '搜索关键词',
+          ),
+          rules,
+        ).visible,
+        isTrue,
+      );
+    });
+
     group('contains match mode', () {
       test('keyword contains matches 猫 in 可爱小猫合集', () {
         final result = ShieldMatcher.match(
@@ -694,6 +794,229 @@ void main() {
           ),
         );
         expect(result.visible, isFalse);
+      });
+    });
+
+    group('range match mode', () {
+      test('duration range 60..300 matches value 180', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.recommendation,
+            durationSeconds: 180,
+          ),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.duration,
+                mode: ShieldMatchMode.range,
+                pattern: '60..300',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isFalse);
+      });
+
+      test('duration range 60..300 does not match value 30', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.recommendation,
+            durationSeconds: 30,
+          ),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.duration,
+                mode: ShieldMatchMode.range,
+                pattern: '60..300',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isTrue);
+      });
+
+      test('range supports open bounds and exact numeric values', () {
+        final openLower = ShieldRuleSet(
+          rules: [
+            _rule(
+              type: ShieldRuleType.duration,
+              mode: ShieldMatchMode.range,
+              pattern: '..300',
+            ),
+          ],
+        );
+        final openUpper = ShieldRuleSet(
+          rules: [
+            _rule(
+              type: ShieldRuleType.duration,
+              mode: ShieldMatchMode.range,
+              pattern: '60..',
+            ),
+          ],
+        );
+        final exact = ShieldRuleSet(
+          rules: [
+            _rule(
+              type: ShieldRuleType.duration,
+              mode: ShieldMatchMode.range,
+              pattern: '180',
+            ),
+          ],
+        );
+
+        expect(
+          ShieldMatcher.match(
+            const ShieldCandidate(
+              scope: ShieldScope.recommendation,
+              durationSeconds: 30,
+            ),
+            openLower,
+          ).visible,
+          isFalse,
+        );
+        expect(
+          ShieldMatcher.match(
+            const ShieldCandidate(
+              scope: ShieldScope.recommendation,
+              durationSeconds: 9999,
+            ),
+            openUpper,
+          ).visible,
+          isFalse,
+        );
+        expect(
+          ShieldMatcher.match(
+            const ShieldCandidate(
+              scope: ShieldScope.recommendation,
+              durationSeconds: 180,
+            ),
+            exact,
+          ).visible,
+          isFalse,
+        );
+        expect(
+          ShieldMatcher.match(
+            const ShieldCandidate(
+              scope: ShieldScope.recommendation,
+              durationSeconds: 181,
+            ),
+            exact,
+          ).visible,
+          isTrue,
+        );
+      });
+
+      test('invalid range records error and does not match', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.recommendation,
+            durationSeconds: 180,
+          ),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.duration,
+                mode: ShieldMatchMode.range,
+                pattern: '300..60',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isTrue);
+        expect(result.errors, hasLength(1));
+        expect(result.errors.single.rule.pattern, '300..60');
+      });
+
+      test('missing numeric field is no-match for range rule', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(scope: ShieldScope.recommendation),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.duration,
+                mode: ShieldMatchMode.range,
+                pattern: '60..300',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isTrue);
+      });
+
+      test('playbackCount range matches numeric candidate field', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.recommendation,
+            playbackCount: 10000,
+          ),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.playbackCount,
+                mode: ShieldMatchMode.range,
+                pattern: '1000..50000',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isFalse);
+      });
+    });
+
+    group('enum match mode', () {
+      test('commentMemberSex enum matches normalized value', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.comment,
+            commentMemberSex: '女',
+          ),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.commentMemberSex,
+                mode: ShieldMatchMode.enumValue,
+                pattern: ' 女 ',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isFalse);
+      });
+
+      test('commentMemberSex enum does not match different value', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.comment,
+            commentMemberSex: '男',
+          ),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.commentMemberSex,
+                mode: ShieldMatchMode.enumValue,
+                pattern: '女',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isTrue);
+      });
+
+      test('missing enum field is no-match', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(scope: ShieldScope.comment),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.commentMemberSex,
+                mode: ShieldMatchMode.enumValue,
+                pattern: '女',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isTrue);
       });
     });
   });

@@ -198,6 +198,8 @@ void main() {
           '标签',
           '分区',
           '评论关键词',
+          '数值元数据',
+          '评论用户信息',
         ]),
       );
       expect(shieldingRuleCategoryLabels, isNot(contains('精确文本')));
@@ -289,6 +291,60 @@ void main() {
       expect(shieldingRuleCategoryFor(importedTitle), '标题关键词');
       expect(shieldingRuleCategoryFor(importedCategory), '分区');
     });
+
+    test('categorizes duration as numeric metadata', () {
+      final rule = _rule(
+        id: 'duration-rule',
+        type: ShieldRuleType.duration,
+        matchMode: ShieldMatchMode.range,
+        scope: ShieldScope.recommendation,
+        pattern: '60..300',
+      );
+
+      expect(shieldingRuleCategoryFor(rule), '数值元数据');
+    });
+
+    test('categorizes comment member fields as comment user info', () {
+      final sexRule = _rule(
+        id: 'sex-rule',
+        type: ShieldRuleType.commentMemberSex,
+        matchMode: ShieldMatchMode.enumValue,
+        scope: ShieldScope.comment,
+        pattern: '女',
+      );
+      final levelRule = _rule(
+        id: 'level-rule',
+        type: ShieldRuleType.commentMemberLevel,
+        matchMode: ShieldMatchMode.range,
+        scope: ShieldScope.comment,
+        pattern: '5..',
+      );
+
+      expect(shieldingRuleCategoryFor(sexRule), '评论用户信息');
+      expect(shieldingRuleCategoryFor(levelRule), '评论用户信息');
+    });
+
+    test('task-024 scope mode and type labels are visible', () {
+      expect(shieldScopeLabel(ShieldScope.search), '搜索');
+      expect(shieldScopeLabel(ShieldScope.dynamic), '动态');
+      expect(shieldScopeLabel(ShieldScope.live), '直播');
+      expect(shieldScopeLabel(ShieldScope.videoDetail), '视频详情');
+
+      expect(shieldMatchModeLabel(ShieldMatchMode.range), '数值范围');
+      expect(shieldMatchModeLabel(ShieldMatchMode.enumValue), '枚举值');
+
+      expect(shieldRuleTypeLabel(ShieldRuleType.duration), '时长');
+      expect(shieldRuleTypeLabel(ShieldRuleType.playbackCount), '播放数');
+      expect(shieldRuleTypeLabel(ShieldRuleType.danmakuCount), '弹幕数');
+      expect(
+        shieldRuleTypeLabel(ShieldRuleType.commentMemberSex),
+        '评论用户性别',
+      );
+      expect(
+        shieldRuleTypeLabel(ShieldRuleType.commentMemberLevel),
+        '评论用户等级',
+      );
+    });
   });
 
   group('ShieldingSettingsPage', () {
@@ -332,10 +388,12 @@ void main() {
 
       expect(find.text('包含文字'), findsWidgets);
       expect(find.text('正则匹配'), findsOneWidget);
+      expect(find.text('数值范围'), findsOneWidget);
+      expect(find.text('枚举值'), findsOneWidget);
       expect(find.text('词元匹配'), findsNothing);
     });
 
-    testWidgets('loaded legacy token rule is shown as regex in UI', (
+    testWidgets('loaded legacy token rule is shown as compatibility token', (
       tester,
     ) async {
       final seed = ShieldRuleSet(
@@ -360,8 +418,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('正则匹配'), findsOneWidget);
-      expect(find.textContaining('词元匹配'), findsNothing);
+      expect(find.textContaining('词元匹配'), findsOneWidget);
     });
 
     testWidgets('shows same-row shielding category navigation', (tester) async {

@@ -14,6 +14,7 @@ abstract final class VideoCardShieldQuickAction {
     bool showToast = true,
     String? successLabel,
     String? displayPattern,
+    ShieldScope scope = ShieldScope.recommendation,
   }) async {
     final trimmed = pattern.trim();
     if (trimmed.isEmpty) {
@@ -22,7 +23,7 @@ abstract final class VideoCardShieldQuickAction {
     final resolvedStore = store ?? ShieldSettingsStore();
     final rule = await resolvedStore.addQuickActionRule(
       type: type,
-      scope: ShieldScope.recommendation,
+      scope: scope,
       pattern: trimmed,
       matchMode: matchMode,
       displayPattern: displayPattern,
@@ -165,6 +166,7 @@ abstract final class VideoCardShieldQuickAction {
     VoidCallback? onRuleAdded,
     String? note,
     ShieldSettingsStore? store,
+    ShieldScope scope = ShieldScope.recommendation,
   }) async {
     final resolvedPattern = pattern ?? text;
     await showDialog<void>(
@@ -203,6 +205,7 @@ abstract final class VideoCardShieldQuickAction {
                 store: store,
                 type: type,
                 pattern: resolvedPattern,
+                scope: scope,
                 successLabel: _contextualRuleLabel(
                   title,
                   type,
@@ -226,8 +229,9 @@ abstract final class VideoCardShieldQuickAction {
     required String pattern,
     VoidCallback? onRuleAdded,
     ShieldSettingsStore? store,
+    ShieldScope scope = ShieldScope.recommendation,
   }) async {
-    await addRule(store: store, type: type, pattern: pattern);
+    await addRule(store: store, type: type, pattern: pattern, scope: scope);
     onRuleAdded?.call();
   }
 
@@ -239,6 +243,11 @@ abstract final class VideoCardShieldQuickAction {
         ShieldRuleType.reasonKeyword => '屏蔽推荐理由「$pattern」',
         ShieldRuleType.category => '屏蔽推荐分区「$pattern」',
         ShieldRuleType.tag => '屏蔽推荐标签「$pattern」',
+        ShieldRuleType.duration => '屏蔽推荐时长 $pattern',
+        ShieldRuleType.playbackCount => '屏蔽推荐播放数 $pattern',
+        ShieldRuleType.danmakuCount => '屏蔽推荐弹幕数 $pattern',
+        ShieldRuleType.commentMemberSex => '屏蔽评论用户性别 $pattern',
+        ShieldRuleType.commentMemberLevel => '屏蔽评论用户等级 $pattern',
       };
 
   static String _contextualRuleLabel(

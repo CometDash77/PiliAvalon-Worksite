@@ -53,7 +53,11 @@ abstract final class ShieldMatcher {
   static bool _scopeMatches(
     ShieldScope ruleScope,
     ShieldScope candidateScope,
-  ) => ruleScope == ShieldScope.both || ruleScope == candidateScope;
+  ) =>
+      ruleScope == candidateScope ||
+      (ruleScope == ShieldScope.both &&
+          (candidateScope == ShieldScope.recommendation ||
+              candidateScope == ShieldScope.comment));
 
   static bool _matches(ShieldRule rule, ShieldCandidate candidate) {
     final pattern = rule.pattern.toLowerCase();
@@ -67,6 +71,12 @@ abstract final class ShieldMatcher {
       ),
       ShieldMatchMode.regex => _matchValues(rule, candidate).any(
         RegExp(rule.pattern, caseSensitive: false).hasMatch,
+      ),
+      ShieldMatchMode.range => _matchNumbers(rule, candidate).any(
+        _rangeMatcher(rule.pattern),
+      ),
+      ShieldMatchMode.enumValue => _matchValues(rule, candidate).any(
+        (value) => _normalizeEnumValue(value) == _normalizeEnumValue(pattern),
       ),
       ShieldMatchMode.token => _tokenValues(rule, candidate).any(
         (token) => token.toLowerCase() == rule.pattern.toLowerCase(),
@@ -100,8 +110,37 @@ abstract final class ShieldMatcher {
         yield ifNullEmpty(candidate.category);
       case ShieldRuleType.tag:
         yield* candidate.tags;
+      case ShieldRuleType.commentMemberSex:
+        yield ifNullEmpty(candidate.commentMemberSex);
+      case ShieldRuleType.duration:
+      case ShieldRuleType.playbackCount:
+      case ShieldRuleType.danmakuCount:
+      case ShieldRuleType.commentMemberLevel:
+        return;
     }
   }
+
+  static Iterable<num> _matchNumbers(
+    ShieldRule rule,
+    ShieldCandidate candidate,
+  ) sync* {
+    final value = switch (rule.type) {
+      ShieldRuleType.duration => candidate.durationSeconds,
+      ShieldRuleType.playbackCount => candidate.playbackCount,
+      ShieldRuleType.danmakuCount => candidate.danmakuCount,
+      ShieldRuleType.commentMemberLevel => candidate.commentMemberLevel,
+      _ => null,
+    };
+    if (value != null) yield value;
+  }
+
+  static bool Function(num value) _rangeMatcher(String pattern) {
+    final range = _ParsedRange.parse(pattern);
+    return range.matches;
+  }
+
+  static String _normalizeEnumValue(String value) =>
+      value.trim().toLowerCase().replaceAll(RegExp(r'[\s_\-]+'), '');
 
   static Iterable<String> _tokenValues(
     ShieldRule rule,
@@ -132,3 +171,57 @@ abstract final class ShieldMatcher {
 }
 
 String ifNullEmpty(String? value) => value ?? '';
+
+class _ParsedRange {
+  const _ParsedRange({this.min, this.max});
+
+  final num? min;
+  final num? max;
+
+  static _ParsedRange parse(String pattern) {
+    final trimmed = pattern.trim();
+    if (trimmed.isEmpty) {
+      throw const FormatException('Range pattern is empty');
+    }
+
+    final match = RegExp(
+      r'^\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+)?)\s*\.\.\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+)?)\s*$',
+    ).firstMatch(trimmed);
+    if (match != null) {
+      final min = _parseBound(match.group(1));
+      final max = _parseBound(match.group(2));
+      return _validate(_ParsedRange(min: min, max: max));
+    }
+
+    final exact = num.tryParse(trimmed);
+    if (exact != null) {
+      return _ParsedRange(min: exact, max: exact);
+    }
+
+    throw FormatException('Invalid range pattern: $pattern');
+  }
+
+  bool matches(num value) {
+    final lower = min;
+    if (lower != null && value < lower) return false;
+    final upper = max;
+    if (upper != null && value > upper) return false;
+    return true;
+  }
+
+  static num? _parseBound(String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+    return num.tryParse(trimmed);
+  }
+
+  static _ParsedRange _validate(_ParsedRange range) {
+    if (range.min == null && range.max == null) {
+      throw const FormatException('Range requires at least one bound');
+    }
+    if (range.min != null && range.max != null && range.min! > range.max!) {
+      throw const FormatException('Range min is greater than max');
+    }
+    return range;
+  }
+}

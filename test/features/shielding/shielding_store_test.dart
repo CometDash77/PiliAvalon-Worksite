@@ -81,6 +81,40 @@ void main() {
       expect(decoded.displayPattern, isNull);
     });
 
+    test('serializes enum match mode as enum in persisted JSON', () {
+      final rule = ShieldRule(
+        id: 'enum-mode',
+        type: ShieldRuleType.commentMemberSex,
+        matchMode: ShieldMatchMode.enumValue,
+        scope: ShieldScope.comment,
+        action: ShieldAction.block,
+        pattern: '女',
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(100),
+      );
+
+      final json = rule.toJson();
+      expect(json['match_mode'], 'enum');
+
+      final decoded = ShieldRule.fromJson(json);
+      expect(decoded.matchMode, ShieldMatchMode.enumValue);
+      expect(decoded.type, ShieldRuleType.commentMemberSex);
+      expect(decoded.scope, ShieldScope.comment);
+    });
+
+    test('loads enumValue match mode name for internal compatibility', () {
+      final decoded = ShieldRule.fromJson({
+        'id': 'enum-mode-name',
+        'type': 'commentMemberSex',
+        'match_mode': 'enumValue',
+        'scope': 'comment',
+        'action': 'block',
+        'pattern': '女',
+        'updated_at': 100,
+      });
+
+      expect(decoded.matchMode, ShieldMatchMode.enumValue);
+    });
+
     test('damaged JSON bypasses shielding instead of throwing', () {
       final decoded = ShieldRuleSet.tryFromJson({
         'version': 'broken',
@@ -139,6 +173,46 @@ void main() {
               scope: ShieldScope.both,
               action: ShieldAction.block,
               pattern: '[',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(2),
+            ),
+          ],
+        );
+
+        expect(store.save(invalid), throwsA(isA<ShieldStoreException>()));
+        expect(box.values[ShieldSettingsStore.rulesKey], before);
+      },
+    );
+
+    test(
+      'rejects invalid range without overwriting previous payload',
+      () async {
+        final box = _MemoryBox();
+        final store = ShieldSettingsStore(box: box);
+        final valid = ShieldRuleSet(
+          rules: [
+            ShieldRule(
+              id: 'valid',
+              type: ShieldRuleType.duration,
+              matchMode: ShieldMatchMode.range,
+              scope: ShieldScope.recommendation,
+              action: ShieldAction.block,
+              pattern: '60..300',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            ),
+          ],
+        );
+        await store.save(valid);
+        final before = box.values[ShieldSettingsStore.rulesKey];
+
+        final invalid = ShieldRuleSet(
+          rules: [
+            ShieldRule(
+              id: 'invalid',
+              type: ShieldRuleType.duration,
+              matchMode: ShieldMatchMode.range,
+              scope: ShieldScope.recommendation,
+              action: ShieldAction.block,
+              pattern: '300..60',
               updatedAt: DateTime.fromMillisecondsSinceEpoch(2),
             ),
           ],
@@ -277,7 +351,7 @@ void main() {
       );
     });
 
-    test('loads persisted token rules as escaped regex rules', () async {
+    test('preserves persisted token rules for compatibility', () async {
       final seed = ShieldRuleSet(
         rules: [
           ShieldRule(
@@ -303,19 +377,16 @@ void main() {
       expect(loaded.rules, hasLength(1));
       expect(loaded.rules.single.id, 'legacy-token');
       expect(loaded.rules.single.type, ShieldRuleType.userKeyword);
-      expect(loaded.rules.single.matchMode, ShieldMatchMode.regex);
+      expect(loaded.rules.single.matchMode, ShieldMatchMode.token);
       expect(loaded.rules.single.scope, ShieldScope.recommendation);
       expect(loaded.rules.single.action, ShieldAction.block);
       expect(loaded.rules.single.enabled, isFalse);
       expect(loaded.rules.single.updatedAt.millisecondsSinceEpoch, 7);
       expect(loaded.rules.single.source, ShieldRuleSource.quickAction);
-      expect(
-        loaded.rules.single.pattern,
-        shieldTokenPatternRegex(r'UP(测试).*'),
-      );
+      expect(loaded.rules.single.pattern, r'UP(测试).*');
     });
 
-    test('dedupes persisted token rules against equivalent regex rules', () {
+    test('preserves token and regex as separate modes', () {
       final converted = shieldTokenPatternRegex('测试UP');
       final seed = ShieldRuleSet(
         rules: [
@@ -346,10 +417,12 @@ void main() {
 
       final loaded = store.snapshot();
 
-      expect(loaded.rules, hasLength(1));
-      expect(loaded.rules.single.id, 'legacy-token');
-      expect(loaded.rules.single.matchMode, ShieldMatchMode.regex);
-      expect(loaded.rules.single.pattern, converted);
+      expect(loaded.rules, hasLength(2));
+      final legacyToken = loaded.rules.firstWhere(
+        (rule) => rule.id == 'legacy-token',
+      );
+      expect(legacyToken.matchMode, ShieldMatchMode.token);
+      expect(legacyToken.pattern, '测试UP');
     });
 
     test(
@@ -598,7 +671,6 @@ void main() {
       });
 
       test('is idempotent and preserves regex and token compatibility', () {
-        final tokenPattern = shieldTokenPatternRegex('测试UP');
         final loaded = ShieldSettingsStore(
           box: _MemoryBox({
             ShieldSettingsStore.rulesKey: jsonEncode(
@@ -669,9 +741,9 @@ void main() {
                 .having(
                   (rule) => rule.matchMode,
                   'mode',
-                  ShieldMatchMode.regex,
+                  ShieldMatchMode.token,
                 )
-                .having((rule) => rule.pattern, 'pattern', tokenPattern),
+                .having((rule) => rule.pattern, 'pattern', '测试UP'),
           ),
         );
       });
@@ -712,6 +784,36 @@ void main() {
           );
           expect(rule?.matchMode, ShieldMatchMode.exact);
         }
+      });
+
+      test('numeric rule types default to range', () async {
+        final store = ShieldSettingsStore(box: _MemoryBox());
+
+        for (final type in [
+          ShieldRuleType.duration,
+          ShieldRuleType.playbackCount,
+          ShieldRuleType.danmakuCount,
+          ShieldRuleType.commentMemberLevel,
+        ]) {
+          final rule = await store.addQuickActionRule(
+            type: type,
+            scope: ShieldScope.recommendation,
+            pattern: '1..10',
+          );
+          expect(rule?.matchMode, ShieldMatchMode.range);
+        }
+      });
+
+      test('comment member sex defaults to enum mode', () async {
+        final store = ShieldSettingsStore(box: _MemoryBox());
+
+        final rule = await store.addQuickActionRule(
+          type: ShieldRuleType.commentMemberSex,
+          scope: ShieldScope.comment,
+          pattern: '女',
+        );
+
+        expect(rule?.matchMode, ShieldMatchMode.enumValue);
       });
     });
   });

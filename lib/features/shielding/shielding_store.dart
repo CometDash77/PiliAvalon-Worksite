@@ -234,14 +234,19 @@ class ShieldSettingsStore {
           errors.add('Rule ${rule.id} has invalid regex');
         }
       }
+      if (rule.matchMode == ShieldMatchMode.range) {
+        final rangeError = _rangeValidationError(rule.pattern);
+        if (rangeError != null) {
+          errors.add('Rule ${rule.id} has invalid range: $rangeError');
+        }
+      }
     }
     return errors;
   }
 
   ShieldRuleSet _normalizeRuleSet(ShieldRuleSet ruleSet) {
     final normalized = <ShieldRule>[];
-    for (final rule
-        in ruleSet.rules.map(_upgradeExactKeywordToContains).map(_deprecateTokenRule)) {
+    for (final rule in ruleSet.rules.map(_upgradeExactKeywordToContains)) {
       final exists = normalized.any(
         (item) =>
             item.type == rule.type &&
@@ -271,16 +276,37 @@ class ShieldSettingsStore {
     return switch (type) {
       ShieldRuleType.keyword || ShieldRuleType.reasonKeyword =>
         ShieldMatchMode.contains,
+      ShieldRuleType.duration ||
+      ShieldRuleType.playbackCount ||
+      ShieldRuleType.danmakuCount ||
+      ShieldRuleType.commentMemberLevel => ShieldMatchMode.range,
+      ShieldRuleType.commentMemberSex => ShieldMatchMode.enumValue,
       _ => ShieldMatchMode.exact,
     };
   }
 
-  ShieldRule _deprecateTokenRule(ShieldRule rule) {
-    if (rule.matchMode != ShieldMatchMode.token) return rule;
-    return rule.copyWith(
-      matchMode: ShieldMatchMode.regex,
-      pattern: shieldTokenPatternRegex(rule.pattern),
-    );
+  String? _rangeValidationError(String pattern) {
+    final trimmed = pattern.trim();
+    if (trimmed.isEmpty) return 'empty range';
+    final match = RegExp(
+      r'^\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+)?)\s*\.\.\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+)?)\s*$',
+    ).firstMatch(trimmed);
+    if (match != null) {
+      final min = _parseBound(match.group(1));
+      final max = _parseBound(match.group(2));
+      if (min == null && max == null) return 'missing bounds';
+      if (min != null && max != null && min > max) {
+        return 'min greater than max';
+      }
+      return null;
+    }
+    return num.tryParse(trimmed) == null ? 'expected min..max' : null;
+  }
+
+  num? _parseBound(String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+    return num.tryParse(trimmed);
   }
 
   ShieldRuleSet _withLegacyRules(ShieldRuleSet ruleSet) {

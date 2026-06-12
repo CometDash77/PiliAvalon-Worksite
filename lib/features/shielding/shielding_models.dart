@@ -5,12 +5,19 @@ enum ShieldRuleType {
   uid,
   category,
   tag,
+  duration,
+  playbackCount,
+  danmakuCount,
+  commentMemberSex,
+  commentMemberLevel,
 }
 
 enum ShieldMatchMode {
   exact,
   contains,
   regex,
+  range,
+  enumValue,
   // Deprecated visible mode: kept only for persisted-rule compatibility.
   // New user-facing rules should use regex or contains matching.
   token,
@@ -20,6 +27,10 @@ enum ShieldScope {
   recommendation,
   comment,
   both,
+  search,
+  dynamic,
+  live,
+  videoDetail,
 }
 
 enum ShieldAction {
@@ -92,7 +103,7 @@ class ShieldRule {
   Map<String, Object?> toJson() => {
     'id': id,
     'type': type.name,
-    'match_mode': matchMode.name,
+    'match_mode': matchMode._jsonName,
     'scope': scope.name,
     'action': action.name,
     'pattern': pattern,
@@ -105,10 +116,7 @@ class ShieldRule {
   factory ShieldRule.fromJson(Map<String, Object?> json) => ShieldRule(
     id: json._string('id'),
     type: _enumByName(ShieldRuleType.values, json._string('type')),
-    matchMode: _enumByName(
-      ShieldMatchMode.values,
-      json._string('match_mode'),
-    ),
+    matchMode: _shieldMatchModeFromJson(json._string('match_mode')),
     scope: _enumByName(ShieldScope.values, json._string('scope')),
     action: _enumByName(ShieldAction.values, json._string('action')),
     pattern: json._string('pattern'),
@@ -186,6 +194,10 @@ class ShieldRuleSet {
       ShieldScope.recommendation => recommendationEnabled,
       ShieldScope.comment => commentEnabled,
       ShieldScope.both => recommendationEnabled || commentEnabled,
+      ShieldScope.search ||
+      ShieldScope.dynamic ||
+      ShieldScope.live ||
+      ShieldScope.videoDetail => true,
     };
   }
 
@@ -229,6 +241,11 @@ class ShieldCandidate {
     this.category,
     this.tags = const [],
     this.tokens = const [],
+    this.durationSeconds,
+    this.playbackCount,
+    this.danmakuCount,
+    this.commentMemberSex,
+    this.commentMemberLevel,
   });
 
   final ShieldScope scope;
@@ -241,6 +258,11 @@ class ShieldCandidate {
   final String? category;
   final List<String> tags;
   final List<String> tokens;
+  final num? durationSeconds;
+  final num? playbackCount;
+  final num? danmakuCount;
+  final String? commentMemberSex;
+  final num? commentMemberLevel;
 }
 
 class ShieldMatchResult {
@@ -271,6 +293,18 @@ class ShieldMatchError {
 
 T _enumByName<T extends Enum>(List<T> values, String name) =>
     values.firstWhere((value) => value.name == name);
+
+ShieldMatchMode _shieldMatchModeFromJson(String name) => switch (name) {
+  'enum' => ShieldMatchMode.enumValue,
+  _ => _enumByName(ShieldMatchMode.values, name),
+};
+
+extension on ShieldMatchMode {
+  String get _jsonName => switch (this) {
+    ShieldMatchMode.enumValue => 'enum',
+    _ => name,
+  };
+}
 
 extension _JsonRead on Map<String, Object?> {
   String _string(String key) {

@@ -26,6 +26,8 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
     ShieldMatchMode.contains,
     ShieldMatchMode.exact,
     ShieldMatchMode.regex,
+    ShieldMatchMode.range,
+    ShieldMatchMode.enumValue,
   ];
 
   late final _store = widget.store ?? ShieldSettingsStore();
@@ -244,10 +246,7 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
     ShieldMatchMode mode = rawMode == ShieldMatchMode.token
         ? ShieldMatchMode.regex
         : rawMode ??
-            (type == ShieldRuleType.keyword ||
-                    type == ShieldRuleType.reasonKeyword
-                ? ShieldMatchMode.contains
-                : ShieldMatchMode.exact);
+            _defaultEditorMode(type);
     ShieldScope scope = rule?.scope ?? ShieldScope.both;
     ShieldAction action = rule?.action ?? ShieldAction.block;
     bool enabled = rule?.enabled ?? true;
@@ -274,7 +273,12 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
                   value: type,
                   values: ShieldRuleType.values,
                   text: shieldRuleTypeLabel,
-                  onChanged: (value) => setDialogState(() => type = value),
+                  onChanged: (value) => setDialogState(() {
+                    type = value;
+                    if (!_modeFitsType(mode, type)) {
+                      mode = _defaultEditorMode(type);
+                    }
+                  }),
                 ),
                 _dropdown(
                   label: '匹配方式',
@@ -322,6 +326,11 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
                     SmartDialog.showToast('正则表达式无效');
                     return;
                   }
+                }
+                if (mode == ShieldMatchMode.range &&
+                    !_isValidRangePattern(trimmed)) {
+                  SmartDialog.showToast('数值范围无效');
+                  return;
                 }
                 Get.back(
                   result: ShieldRule(
@@ -376,5 +385,49 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
         if (value != null) onChanged(value);
       },
     );
+  }
+
+  ShieldMatchMode _defaultEditorMode(ShieldRuleType type) {
+    return switch (type) {
+      ShieldRuleType.keyword || ShieldRuleType.reasonKeyword =>
+        ShieldMatchMode.contains,
+      ShieldRuleType.duration ||
+      ShieldRuleType.playbackCount ||
+      ShieldRuleType.danmakuCount ||
+      ShieldRuleType.commentMemberLevel => ShieldMatchMode.range,
+      ShieldRuleType.commentMemberSex => ShieldMatchMode.enumValue,
+      _ => ShieldMatchMode.exact,
+    };
+  }
+
+  bool _modeFitsType(ShieldMatchMode mode, ShieldRuleType type) {
+    return switch (mode) {
+      ShieldMatchMode.range =>
+        type == ShieldRuleType.duration ||
+            type == ShieldRuleType.playbackCount ||
+            type == ShieldRuleType.danmakuCount ||
+            type == ShieldRuleType.commentMemberLevel,
+      ShieldMatchMode.enumValue => type == ShieldRuleType.commentMemberSex,
+      _ => true,
+    };
+  }
+
+  bool _isValidRangePattern(String pattern) {
+    final match = RegExp(
+      r'^\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+)?)\s*\.\.\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+)?)\s*$',
+    ).firstMatch(pattern);
+    if (match != null) {
+      final min = _parseRangeBound(match.group(1));
+      final max = _parseRangeBound(match.group(2));
+      if (min == null && max == null) return false;
+      return min == null || max == null || min <= max;
+    }
+    return num.tryParse(pattern) != null;
+  }
+
+  num? _parseRangeBound(String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+    return num.tryParse(trimmed);
   }
 }
