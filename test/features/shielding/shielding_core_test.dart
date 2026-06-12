@@ -331,6 +331,7 @@ void main() {
         rules: [
           _rule(
             type: ShieldRuleType.reasonKeyword,
+            mode: ShieldMatchMode.contains,
             pattern: '相似内容',
             scope: ShieldScope.recommendation,
           ),
