@@ -3,7 +3,29 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('ShieldMatcher', () {
-    test('keyword exact block matches literal text contained in title', () {
+    test('keyword contains block matches literal text contained in title', () {
+      final result = ShieldMatcher.match(
+        const ShieldCandidate(
+          scope: ShieldScope.recommendation,
+          title: '猫咪睡觉合集',
+        ),
+        ShieldRuleSet(
+          rules: [
+            _rule(
+              type: ShieldRuleType.keyword,
+              mode: ShieldMatchMode.contains,
+              pattern: '睡觉',
+              scope: ShieldScope.recommendation,
+            ),
+          ],
+        ),
+      );
+
+      expect(result.visible, isFalse);
+      expect(result.blockedBy?.pattern, '睡觉');
+    });
+
+    test('keyword exact does not match partial substring in title', () {
       final result = ShieldMatcher.match(
         const ShieldCandidate(
           scope: ShieldScope.recommendation,
@@ -20,14 +42,17 @@ void main() {
         ),
       );
 
-      expect(result.visible, isFalse);
-      expect(result.blockedBy?.pattern, '睡觉');
+      expect(result.visible, isTrue);
     });
 
-    test('keyword exact is case-insensitive literal contains, not regex', () {
+    test('keyword contains is case-insensitive substring, not regex', () {
       final rules = ShieldRuleSet(
         rules: [
-          _rule(type: ShieldRuleType.keyword, pattern: 'cat.*dog'),
+          _rule(
+            type: ShieldRuleType.keyword,
+            mode: ShieldMatchMode.contains,
+            pattern: 'cat.*dog',
+          ),
         ],
       );
 
@@ -433,6 +458,243 @@ void main() {
         );
       },
     );
+
+    group('contains match mode', () {
+      test('keyword contains matches 猫 in 可爱小猫合集', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.recommendation,
+            title: '可爱小猫合集',
+          ),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.keyword,
+                mode: ShieldMatchMode.contains,
+                pattern: '猫',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isFalse);
+      });
+
+      test('keyword exact does not match 猫 in 可爱小猫合集', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.recommendation,
+            title: '可爱小猫合集',
+          ),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.keyword,
+                mode: ShieldMatchMode.exact,
+                pattern: '猫',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isTrue);
+      });
+
+      test('empty pattern does not match non-empty candidates', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.recommendation,
+            title: '可爱小猫合集',
+            uid: '123',
+            tags: ['猫'],
+          ),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.keyword,
+                mode: ShieldMatchMode.contains,
+                pattern: '',
+              ),
+              _rule(
+                type: ShieldRuleType.uid,
+                mode: ShieldMatchMode.exact,
+                pattern: '',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isTrue);
+      });
+
+      test('keyword contains matches substring in title', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.recommendation,
+            title: '这是一个关于美食的视频',
+          ),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.keyword,
+                mode: ShieldMatchMode.contains,
+                pattern: '美食',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isFalse);
+      });
+
+      test('keyword contains matches substring in body', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.comment,
+            body: '这个视频真的很好看',
+          ),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.keyword,
+                mode: ShieldMatchMode.contains,
+                pattern: '好看',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isFalse);
+      });
+
+      test('keyword contains does not match when pattern is absent', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.recommendation,
+            title: '美食探店',
+          ),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.keyword,
+                mode: ShieldMatchMode.contains,
+                pattern: '旅游',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isTrue);
+      });
+
+      test('uid contains matches substring in uid', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.comment,
+            uid: '421',
+          ),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.uid,
+                mode: ShieldMatchMode.contains,
+                pattern: '42',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isFalse);
+      });
+
+      test('category contains matches substring', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.recommendation,
+            category: '单机游戏',
+          ),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.category,
+                mode: ShieldMatchMode.contains,
+                pattern: '游戏',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isFalse);
+      });
+
+      test('tag contains matches substring', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.recommendation,
+            tags: ['攻略合集'],
+          ),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.tag,
+                mode: ShieldMatchMode.contains,
+                pattern: '攻略',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isFalse);
+      });
+
+      test('tag exact does not partially match', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.recommendation,
+            tags: ['攻略合集'],
+          ),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.tag,
+                mode: ShieldMatchMode.exact,
+                pattern: '攻略',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isTrue);
+      });
+
+      test('userKeyword contains matches substring in author name', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.recommendation,
+            authorName: 'xx说电影',
+          ),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.userKeyword,
+                mode: ShieldMatchMode.contains,
+                pattern: '电影',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isFalse);
+      });
+
+      test('reasonKeyword contains matches substring in reason', () {
+        final result = ShieldMatcher.match(
+          const ShieldCandidate(
+            scope: ShieldScope.recommendation,
+            reason: '因为你看过相似内容',
+          ),
+          ShieldRuleSet(
+            rules: [
+              _rule(
+                type: ShieldRuleType.reasonKeyword,
+                mode: ShieldMatchMode.contains,
+                pattern: '相似内容',
+              ),
+            ],
+          ),
+        );
+        expect(result.visible, isFalse);
+      });
+    });
   });
 }
 

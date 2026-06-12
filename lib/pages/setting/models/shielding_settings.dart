@@ -118,7 +118,8 @@ String shieldMatchModeLabel(
   ShieldMatchMode mode, {
   ShieldRuleType? type,
 }) => switch (mode) {
-  ShieldMatchMode.exact => type == ShieldRuleType.keyword ? '包含文字' : '完全相同',
+  ShieldMatchMode.exact => '完全相同',
+  ShieldMatchMode.contains => '包含文字',
   ShieldMatchMode.regex => '正则匹配',
   ShieldMatchMode.token => '词元匹配',
 };

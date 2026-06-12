@@ -188,7 +188,7 @@ void main() {
         expect(loaded.rules, hasLength(2));
         expect(loaded.rules.first.id, 'existing');
         expect(loaded.rules.last.type, ShieldRuleType.keyword);
-        expect(loaded.rules.last.matchMode, ShieldMatchMode.exact);
+        expect(loaded.rules.last.matchMode, ShieldMatchMode.contains);
         expect(loaded.rules.last.scope, ShieldScope.recommendation);
         expect(loaded.rules.last.action, ShieldAction.block);
         expect(loaded.rules.last.source, ShieldRuleSource.quickAction);
@@ -256,7 +256,7 @@ void main() {
       final box = _MemoryBox();
       final store = ShieldSettingsStore(box: box);
 
-      final exact = await store.addQuickActionRule(
+      final contains = await store.addQuickActionRule(
         type: ShieldRuleType.keyword,
         scope: ShieldScope.comment,
         pattern: 'same text',
@@ -268,12 +268,12 @@ void main() {
         pattern: 'same text',
       );
 
-      expect(exact, isNotNull);
+      expect(contains, isNotNull);
       expect(regex, isNotNull);
       expect(store.snapshot().rules, hasLength(2));
       expect(
         store.snapshot().rules.map((rule) => rule.matchMode),
-        containsAll([ShieldMatchMode.exact, ShieldMatchMode.regex]),
+        containsAll([ShieldMatchMode.contains, ShieldMatchMode.regex]),
       );
     });
 
@@ -416,7 +416,7 @@ void main() {
               )
               .having((rule) => rule.type, 'type', ShieldRuleType.keyword)
               .having((rule) => rule.scope, 'scope', ShieldScope.recommendation)
-              .having((rule) => rule.matchMode, 'mode', ShieldMatchMode.exact)
+              .having((rule) => rule.matchMode, 'mode', ShieldMatchMode.contains)
               .having((rule) => rule.pattern, 'pattern', '猫'),
           isA<ShieldRule>()
               .having((rule) => rule.type, 'type', ShieldRuleType.category)
@@ -503,7 +503,7 @@ void main() {
               (rule) =>
                   rule.type == ShieldRuleType.keyword &&
                   rule.scope == ShieldScope.comment &&
-                  rule.matchMode == ShieldMatchMode.exact &&
+                  rule.matchMode == ShieldMatchMode.contains &&
                   rule.pattern == '剧透',
             )
             .length,
@@ -538,8 +538,199 @@ void main() {
       expect(loaded.rules, hasLength(1));
       expect(loaded.rules.single.id, 'remaining');
     });
+
+    group('exact to contains migration', () {
+      test('loads old keyword and reason exact rules as contains', () {
+        final loaded = ShieldSettingsStore(
+          box: _MemoryBox({
+            ShieldSettingsStore.rulesKey: jsonEncode(
+              ShieldRuleSet(
+                rules: [
+                  _storeRule(
+                    id: 'keyword-exact',
+                    type: ShieldRuleType.keyword,
+                    mode: ShieldMatchMode.exact,
+                  ),
+                  _storeRule(
+                    id: 'reason-exact',
+                    type: ShieldRuleType.reasonKeyword,
+                    mode: ShieldMatchMode.exact,
+                  ),
+                ],
+              ).toJson(),
+            ),
+          }),
+        ).snapshot();
+
+        expect(
+          loaded.rules.map((rule) => rule.matchMode),
+          everyElement(ShieldMatchMode.contains),
+        );
+      });
+
+      test('keeps non-keyword exact rules as exact', () {
+        final loaded = ShieldSettingsStore(
+          box: _MemoryBox({
+            ShieldSettingsStore.rulesKey: jsonEncode(
+              ShieldRuleSet(
+                rules: [
+                  for (final type in [
+                    ShieldRuleType.uid,
+                    ShieldRuleType.category,
+                    ShieldRuleType.tag,
+                    ShieldRuleType.userKeyword,
+                  ])
+                    _storeRule(
+                      id: '${type.name}-exact',
+                      type: type,
+                      mode: ShieldMatchMode.exact,
+                    ),
+                ],
+              ).toJson(),
+            ),
+          }),
+        ).snapshot();
+
+        expect(
+          loaded.rules.map((rule) => rule.matchMode),
+          everyElement(ShieldMatchMode.exact),
+        );
+      });
+
+      test('is idempotent and preserves regex and token compatibility', () {
+        final tokenPattern = shieldTokenPatternRegex('测试UP');
+        final loaded = ShieldSettingsStore(
+          box: _MemoryBox({
+            ShieldSettingsStore.rulesKey: jsonEncode(
+              ShieldRuleSet(
+                rules: [
+                  _storeRule(
+                    id: 'keyword-exact-one',
+                    type: ShieldRuleType.keyword,
+                    mode: ShieldMatchMode.exact,
+                    pattern: '猫',
+                  ),
+                  _storeRule(
+                    id: 'keyword-exact-two',
+                    type: ShieldRuleType.keyword,
+                    mode: ShieldMatchMode.exact,
+                    pattern: '猫',
+                  ),
+                  _storeRule(
+                    id: 'regex-rule',
+                    type: ShieldRuleType.keyword,
+                    mode: ShieldMatchMode.regex,
+                    pattern: 'cat.*dog',
+                  ),
+                  _storeRule(
+                    id: 'token-rule',
+                    type: ShieldRuleType.userKeyword,
+                    mode: ShieldMatchMode.token,
+                    pattern: '测试UP',
+                  ),
+                ],
+              ).toJson(),
+            ),
+          }),
+        ).snapshot();
+
+        expect(loaded.rules, hasLength(3));
+        expect(
+          loaded.rules,
+          contains(
+            isA<ShieldRule>()
+                .having((rule) => rule.id, 'id', 'keyword-exact-one')
+                .having(
+                  (rule) => rule.matchMode,
+                  'mode',
+                  ShieldMatchMode.contains,
+                )
+                .having((rule) => rule.pattern, 'pattern', '猫'),
+          ),
+        );
+        expect(
+          loaded.rules,
+          contains(
+            isA<ShieldRule>()
+                .having((rule) => rule.id, 'id', 'regex-rule')
+                .having(
+                  (rule) => rule.matchMode,
+                  'mode',
+                  ShieldMatchMode.regex,
+                )
+                .having((rule) => rule.pattern, 'pattern', 'cat.*dog'),
+          ),
+        );
+        expect(
+          loaded.rules,
+          contains(
+            isA<ShieldRule>()
+                .having((rule) => rule.id, 'id', 'token-rule')
+                .having(
+                  (rule) => rule.matchMode,
+                  'mode',
+                  ShieldMatchMode.regex,
+                )
+                .having((rule) => rule.pattern, 'pattern', tokenPattern),
+          ),
+        );
+      });
+    });
+
+    group('new rule defaults', () {
+      test('keyword and reason keyword default to contains', () async {
+        final store = ShieldSettingsStore(box: _MemoryBox());
+
+        final keyword = await store.addQuickActionRule(
+          type: ShieldRuleType.keyword,
+          scope: ShieldScope.recommendation,
+          pattern: '猫',
+        );
+        final reason = await store.addQuickActionRule(
+          type: ShieldRuleType.reasonKeyword,
+          scope: ShieldScope.recommendation,
+          pattern: '相似',
+        );
+
+        expect(keyword?.matchMode, ShieldMatchMode.contains);
+        expect(reason?.matchMode, ShieldMatchMode.contains);
+      });
+
+      test('uid category tag and user keyword default to exact', () async {
+        final store = ShieldSettingsStore(box: _MemoryBox());
+
+        for (final type in [
+          ShieldRuleType.uid,
+          ShieldRuleType.category,
+          ShieldRuleType.tag,
+          ShieldRuleType.userKeyword,
+        ]) {
+          final rule = await store.addQuickActionRule(
+            type: type,
+            scope: ShieldScope.recommendation,
+            pattern: '${type.name}-pattern',
+          );
+          expect(rule?.matchMode, ShieldMatchMode.exact);
+        }
+      });
+    });
   });
 }
+
+ShieldRule _storeRule({
+  required String id,
+  required ShieldRuleType type,
+  required ShieldMatchMode mode,
+  String pattern = 'test',
+}) => ShieldRule(
+  id: id,
+  type: type,
+  matchMode: mode,
+  scope: ShieldScope.recommendation,
+  action: ShieldAction.block,
+  pattern: pattern,
+  updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+);
 
 class _MemoryBox implements ShieldSettingsBox {
   _MemoryBox([Map<String, Object?>? values]) : values = values ?? {};

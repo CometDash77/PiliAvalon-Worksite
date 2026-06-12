@@ -9,9 +9,10 @@ enum ShieldRuleType {
 
 enum ShieldMatchMode {
   exact,
+  contains,
   regex,
   // Deprecated visible mode: kept only for persisted-rule compatibility.
-  // New user-facing rules should use regex or exact matching.
+  // New user-facing rules should use regex or contains matching.
   token,
 }
 

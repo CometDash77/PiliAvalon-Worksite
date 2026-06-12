@@ -23,6 +23,7 @@ class ShieldingSettingsPage extends StatefulWidget {
 
 class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
   static const _visibleMatchModes = [
+    ShieldMatchMode.contains,
     ShieldMatchMode.exact,
     ShieldMatchMode.regex,
   ];
@@ -242,7 +243,11 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
     final rawMode = rule?.matchMode;
     ShieldMatchMode mode = rawMode == ShieldMatchMode.token
         ? ShieldMatchMode.regex
-        : rawMode ?? ShieldMatchMode.exact;
+        : rawMode ??
+            (type == ShieldRuleType.keyword ||
+                    type == ShieldRuleType.reasonKeyword
+                ? ShieldMatchMode.contains
+                : ShieldMatchMode.exact);
     ShieldScope scope = rule?.scope ?? ShieldScope.both;
     ShieldAction action = rule?.action ?? ShieldAction.block;
     bool enabled = rule?.enabled ?? true;

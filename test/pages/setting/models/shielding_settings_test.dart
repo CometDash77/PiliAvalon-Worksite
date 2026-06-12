@@ -123,18 +123,35 @@ void main() {
     });
 
     test(
-      'labels keyword exact semantics as contains instead of exact equality',
+      'labels keyword contains semantics correctly',
       () {
-        final rule = _rule(
-          id: 'keyword',
+        final containsRule = _rule(
+          id: 'keyword-contains',
+          type: ShieldRuleType.keyword,
+          matchMode: ShieldMatchMode.contains,
+          pattern: '猫',
+        );
+
+        expect(
+          shieldMatchModeLabel(containsRule.matchMode, type: containsRule.type),
+          '包含文字',
+        );
+        expect(shieldRuleSubtitle(containsRule), '推荐和评论 / 包含文字 / 已启用');
+
+        final exactRule = _rule(
+          id: 'keyword-exact',
           type: ShieldRuleType.keyword,
           matchMode: ShieldMatchMode.exact,
           pattern: '猫',
         );
 
-        expect(shieldMatchModeLabel(rule.matchMode, type: rule.type), '包含文字');
-        expect(shieldRuleSubtitle(rule), '推荐和评论 / 包含文字 / 已启用');
+        expect(
+          shieldMatchModeLabel(exactRule.matchMode, type: exactRule.type),
+          '完全相同',
+        );
+        expect(shieldRuleSubtitle(exactRule), '推荐和评论 / 完全相同 / 已启用');
         expect(shieldMatchModeLabel(ShieldMatchMode.exact), '完全相同');
+        expect(shieldMatchModeLabel(ShieldMatchMode.contains), '包含文字');
       },
     );
 

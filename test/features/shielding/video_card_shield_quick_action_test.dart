@@ -181,7 +181,7 @@ void main() {
       expect(rules, hasLength(1));
       expect(rules.single.type, ShieldRuleType.reasonKeyword);
       expect(rules.single.scope, ShieldScope.recommendation);
-      expect(rules.single.matchMode, ShieldMatchMode.exact);
+      expect(rules.single.matchMode, ShieldMatchMode.contains);
       expect(rules.single.pattern, '因为你看过游戏攻略');
     });
 

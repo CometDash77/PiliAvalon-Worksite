@@ -56,8 +56,15 @@ abstract final class ShieldMatcher {
   ) => ruleScope == ShieldScope.both || ruleScope == candidateScope;
 
   static bool _matches(ShieldRule rule, ShieldCandidate candidate) {
+    final pattern = rule.pattern.toLowerCase();
+    if (pattern.trim().isEmpty) return false;
     return switch (rule.matchMode) {
-      ShieldMatchMode.exact => _exactMatches(rule, candidate),
+      ShieldMatchMode.exact => _matchValues(rule, candidate).any(
+        (value) => value.toLowerCase() == pattern,
+      ),
+      ShieldMatchMode.contains => _matchValues(rule, candidate).any(
+        (value) => value.toLowerCase().contains(pattern),
+      ),
       ShieldMatchMode.regex => _matchValues(rule, candidate).any(
         RegExp(rule.pattern, caseSensitive: false).hasMatch,
       ),
@@ -65,19 +72,6 @@ abstract final class ShieldMatcher {
         (token) => token.toLowerCase() == rule.pattern.toLowerCase(),
       ),
     };
-  }
-
-  static bool _exactMatches(ShieldRule rule, ShieldCandidate candidate) {
-    final pattern = rule.pattern.toLowerCase();
-    final values = _matchValues(
-      rule,
-      candidate,
-    ).map((value) => value.toLowerCase());
-    if (rule.type == ShieldRuleType.keyword ||
-        rule.type == ShieldRuleType.reasonKeyword) {
-      return values.any((value) => value.contains(pattern));
-    }
-    return values.any((value) => value == pattern);
   }
 
   static Iterable<String> _matchValues(

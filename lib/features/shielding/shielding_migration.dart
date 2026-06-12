@@ -124,7 +124,7 @@ abstract final class RecommendFilterAnalyzer {
           oldSettingValue: '(empty)',
           feasibility: MigrationFeasibility.direct,
           description: '标题关键词过滤未启用',
-          notes: '无迁移动作。如果未来启用，每条关键词可独立迁移为 keyword+exact 规则。',
+          notes: '无迁移动作。如果未来启用，每条关键词可独立迁移为 keyword+contains 规则。',
           confidence: 0.0,
         ),
       ];
@@ -147,7 +147,7 @@ abstract final class RecommendFilterAnalyzer {
           suggestedRule: ShieldRule(
             id: 'migration-banWord-$word-${now.millisecondsSinceEpoch}',
             type: ShieldRuleType.keyword,
-            matchMode: ShieldMatchMode.exact,
+            matchMode: ShieldMatchMode.contains,
             scope: ShieldScope.recommendation,
             action: ShieldAction.block,
             pattern: word.trim(),

@@ -31,7 +31,7 @@ void main() {
           ShieldRule(
             id: 'spoiler',
             type: ShieldRuleType.keyword,
-            matchMode: ShieldMatchMode.exact,
+            matchMode: ShieldMatchMode.contains,
             scope: ShieldScope.comment,
             action: ShieldAction.block,
             pattern: '剧透',
@@ -73,7 +73,7 @@ void main() {
             ShieldRule(
               id: 'root-spoiler',
               type: ShieldRuleType.keyword,
-              matchMode: ShieldMatchMode.exact,
+              matchMode: ShieldMatchMode.contains,
               scope: ShieldScope.comment,
               action: ShieldAction.block,
               pattern: '剧透',

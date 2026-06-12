@@ -159,9 +159,10 @@ class ShieldSettingsStore {
     required ShieldRuleType type,
     required ShieldScope scope,
     required String pattern,
-    ShieldMatchMode matchMode = ShieldMatchMode.exact,
+    ShieldMatchMode? matchMode,
     String? displayPattern,
   }) async {
+    final effectiveMode = matchMode ?? _defaultMatchMode(type);
     final trimmed = pattern.trim();
     if (trimmed.isEmpty) {
       throw const ShieldStoreException('Rule pattern is empty');
@@ -173,7 +174,7 @@ class ShieldSettingsStore {
       (rule) =>
           rule.type == type &&
           rule.scope == scope &&
-          rule.matchMode == matchMode &&
+          rule.matchMode == effectiveMode &&
           rule.pattern.trim().toLowerCase() == normalized,
     );
     if (exists) return null;
@@ -181,7 +182,7 @@ class ShieldSettingsStore {
     final rule = ShieldRule(
       id: 'quickAction-${DateTime.now().microsecondsSinceEpoch}',
       type: type,
-      matchMode: matchMode,
+      matchMode: effectiveMode,
       scope: scope,
       action: ShieldAction.block,
       pattern: trimmed,
@@ -239,7 +240,8 @@ class ShieldSettingsStore {
 
   ShieldRuleSet _normalizeRuleSet(ShieldRuleSet ruleSet) {
     final normalized = <ShieldRule>[];
-    for (final rule in ruleSet.rules.map(_deprecateTokenRule)) {
+    for (final rule
+        in ruleSet.rules.map(_upgradeExactKeywordToContains).map(_deprecateTokenRule)) {
       final exists = normalized.any(
         (item) =>
             item.type == rule.type &&
@@ -254,6 +256,23 @@ class ShieldSettingsStore {
       }
     }
     return ruleSet.copyWith(rules: normalized);
+  }
+
+  ShieldRule _upgradeExactKeywordToContains(ShieldRule rule) {
+    if (rule.matchMode != ShieldMatchMode.exact) return rule;
+    if (rule.type != ShieldRuleType.keyword &&
+        rule.type != ShieldRuleType.reasonKeyword) {
+      return rule;
+    }
+    return rule.copyWith(matchMode: ShieldMatchMode.contains);
+  }
+
+  ShieldMatchMode _defaultMatchMode(ShieldRuleType type) {
+    return switch (type) {
+      ShieldRuleType.keyword || ShieldRuleType.reasonKeyword =>
+        ShieldMatchMode.contains,
+      _ => ShieldMatchMode.exact,
+    };
   }
 
   ShieldRule _deprecateTokenRule(ShieldRule rule) {

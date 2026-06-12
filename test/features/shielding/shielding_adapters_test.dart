@@ -212,7 +212,7 @@ void main() {
           ShieldRule(
             id: 'reason',
             type: ShieldRuleType.reasonKeyword,
-            matchMode: ShieldMatchMode.exact,
+            matchMode: ShieldMatchMode.contains,
             scope: ShieldScope.recommendation,
             action: ShieldAction.block,
             pattern: '相似内容',
@@ -537,7 +537,7 @@ void main() {
           ShieldRule(
             id: 'legacy-title',
             type: ShieldRuleType.keyword,
-            matchMode: ShieldMatchMode.exact,
+            matchMode: ShieldMatchMode.contains,
             scope: ShieldScope.recommendation,
             action: ShieldAction.block,
             pattern: '剧透',

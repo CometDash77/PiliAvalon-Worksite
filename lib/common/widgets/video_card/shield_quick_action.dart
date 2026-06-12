@@ -10,7 +10,7 @@ abstract final class VideoCardShieldQuickAction {
     ShieldSettingsStore? store,
     required ShieldRuleType type,
     required String pattern,
-    ShieldMatchMode matchMode = ShieldMatchMode.exact,
+    ShieldMatchMode? matchMode,
     bool showToast = true,
     String? successLabel,
     String? displayPattern,
