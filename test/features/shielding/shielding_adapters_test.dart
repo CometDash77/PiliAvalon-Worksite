@@ -693,7 +693,7 @@ void main() {
           'uri': '',
           'pic': '',
           'title': '无时长',
-          // duration not in JSON → defaults to -1 from BaseSimpleVideoItemModel
+          'duration': -1,
           'pubdate': 1,
           'owner': {'mid': 42, 'name': 'UP主'},
           'stat': {'view': 100, 'like': 10, 'danmaku': 5},
