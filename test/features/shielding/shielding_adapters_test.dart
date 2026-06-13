@@ -713,7 +713,7 @@ void main() {
     );
 
     test(
-      'app recommendation populates durationSeconds but not playbackCount or danmakuCount',
+      'app recommendation populates durationSeconds, playbackCount, danmakuCount',
       () {
         final item = RcmdVideoItemAppModel.fromJson({
           'player_args': {'aid': 1, 'cid': 2, 'duration': 840},
@@ -738,10 +738,10 @@ void main() {
 
         // duration is a direct integer from player_args
         expect(candidate.durationSeconds, 840);
-        // App stat fields come from cover_left_text display strings.
-        // They are not promoted in this task.
-        expect(candidate.playbackCount, isNull);
-        expect(candidate.danmakuCount, isNull);
+        // App stat: RcmdStat parses cover_left_text_1/2 into view/danmu.
+        // '1.2万' → 12000, '450' → 450
+        expect(candidate.playbackCount, 12000);
+        expect(candidate.danmakuCount, 450);
       },
     );
 
@@ -876,7 +876,52 @@ void main() {
     );
 
     test(
-      'danmakuCount range rule does not block when candidate danmaku is null (app model)',
+      'playbackCount range rule blocks app recommendation by stat view from cover_left_text_1',
+      () {
+        final item = RcmdVideoItemAppModel.fromJson({
+          'player_args': {'aid': 1, 'cid': 2, 'duration': 120},
+          'bvid': 'BV1',
+          'cover': '',
+          'cover_left_text_1': '999999',
+          'cover_left_text_2': '50',
+          'title': '高播放APP',
+          'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
+          'rcmd_reason': '',
+          'goto': 'av',
+          'param': '1',
+          'uri': '',
+        });
+
+        final ruleSet = ShieldRuleSet(
+          rules: [
+            ShieldRule(
+              id: 'play-app',
+              type: ShieldRuleType.playbackCount,
+              matchMode: ShieldMatchMode.range,
+              scope: ShieldScope.recommendation,
+              action: ShieldAction.block,
+              pattern: '100000..999999999',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            ),
+          ],
+        );
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(
+          item,
+          {
+            'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
+          },
+        );
+
+        // playbackCount is populated from RcmdStat parsing of cover_left_text_1.
+        expect(candidate.playbackCount, 999999);
+        // 999999 falls within range 100000..999999999, so candidate is blocked.
+        expect(ShieldingAdapters.isVisible(candidate, ruleSet), isFalse);
+      },
+    );
+
+    test(
+      'danmakuCount range rule blocks app recommendation when danmakuCount is populated from cover_left_text_2',
       () {
         final item = RcmdVideoItemAppModel.fromJson({
           'player_args': {'aid': 1, 'cid': 2, 'duration': 120},
@@ -913,10 +958,10 @@ void main() {
           },
         );
 
-        // danmakuCount is null for app model (display-string derived, not promoted)
-        expect(candidate.danmakuCount, isNull);
-        // Null field means the range matcher cannot match, so candidate is visible
-        expect(ShieldingAdapters.isVisible(candidate, ruleSet), isTrue);
+        // danmakuCount is now populated from RcmdStat's parsing of cover_left_text_2.
+        expect(candidate.danmakuCount, 50);
+        // 50 falls within range 0..100, so the candidate is blocked.
+        expect(ShieldingAdapters.isVisible(candidate, ruleSet), isFalse);
       },
     );
 

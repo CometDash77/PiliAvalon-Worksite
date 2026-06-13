@@ -1,5 +1,6 @@
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo;
+import 'package:PiliPlus/models/home/rcmd/result.dart';
 import 'package:PiliPlus/models/model_hot_video_item.dart';
 import 'package:PiliPlus/models/model_rec_video_item.dart';
 import 'package:PiliPlus/features/shielding/shielding_matcher.dart';
@@ -34,9 +35,11 @@ abstract final class ShieldingAdapters {
       // Web recommendation: stat fields are direct JSON integers.
       playbackCount = item.stat.view;
       danmakuCount = item.stat.danmu;
+    } else if (item is RcmdVideoItemAppModel) {
+      // App recommendation: RcmdStat parses cover_left_text_1/2 into view/danmu.
+      playbackCount = item.stat.view;
+      danmakuCount = item.stat.danmu;
     }
-    // App recommendation stat fields come from cover_left_text display strings.
-    // Do not promote them here.
 
     return ShieldCandidate(
       scope: ShieldScope.recommendation,
