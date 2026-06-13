@@ -1,7 +1,10 @@
 import 'package:PiliPlus/features/exposure_tracker/exposure_tracker_settings.dart';
+import 'package:PiliPlus/features/shielding/shielding_models.dart';
 import 'package:PiliPlus/features/shielding/shielding_recommend_tag_enricher.dart';
+import 'package:PiliPlus/features/shielding/shielding_store.dart';
 import 'package:PiliPlus/pages/rcmd/controller.dart';
 import 'package:PiliPlus/pages/setting/models/model.dart';
+import 'package:PiliPlus/pages/setting/recommend_range_shielding.dart';
 import 'package:PiliPlus/utils/recommend_filter.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
@@ -150,6 +153,29 @@ List<SettingsModel> get recommendSettings => [
           ],
         ),
       );
+    },
+  ),
+  NormalModel(
+    title: '推荐流范围屏蔽',
+    leading: const Icon(Icons.tune_outlined),
+    getSubtitle: () {
+      final store = ShieldSettingsStore();
+      final snapshot = store.snapshot();
+      final count = snapshot.rules
+          .where(
+            (rule) =>
+                (rule.type == ShieldRuleType.duration ||
+                    rule.type == ShieldRuleType.playbackCount ||
+                    rule.type == ShieldRuleType.danmakuCount) &&
+                rule.scope == ShieldScope.recommendation &&
+                rule.matchMode == ShieldMatchMode.range,
+          )
+          .length;
+      return count > 0 ? '$count 条范围规则已配置' : '时长、播放数、弹幕数范围屏蔽';
+    },
+    onTap: (context, setState) async {
+      await Get.to(() => const RecommendRangeShieldingPage());
+      setState();
     },
   ),
   ...exposureTrackerSettings(buildNumberInputModel: _buildNumberInputModel),

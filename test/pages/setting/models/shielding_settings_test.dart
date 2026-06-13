@@ -198,12 +198,12 @@ void main() {
           '标签',
           '分区',
           '评论关键词',
-          '数值元数据',
-          '评论用户信息',
         ]),
       );
       expect(shieldingRuleCategoryLabels, isNot(contains('精确文本')));
       expect(shieldingRuleCategoryLabels, isNot(contains('旧规则兼容')));
+      expect(shieldingRuleCategoryLabels, isNot(contains('数值元数据')));
+      expect(shieldingRuleCategoryLabels, isNot(contains('评论用户信息')));
     });
 
     test('categorizes quick recommendation keyword exact as title keyword', () {
@@ -434,8 +434,38 @@ void main() {
       expect(find.text('用户/UP'), findsOneWidget);
       expect(find.text('标题关键词'), findsOneWidget);
       expect(find.text('推荐理由'), findsOneWidget);
+      expect(find.text('标签'), findsOneWidget);
+      expect(find.text('分区'), findsOneWidget);
+      expect(find.text('评论关键词'), findsOneWidget);
       expect(find.text('精确文本'), findsNothing);
       expect(find.text('旧规则兼容'), findsNothing);
+      expect(find.text('数值元数据'), findsNothing);
+      expect(find.text('评论用户信息'), findsNothing);
+    });
+
+    testWidgets('general editor hides numeric and comment-user rule types', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        GetMaterialApp(
+          home: ShieldingSettingsPage(
+            store: ShieldSettingsStore(box: _MemoryBox()),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('新增').first);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('标题/正文关键词').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('时长'), findsNothing);
+      expect(find.text('播放数'), findsNothing);
+      expect(find.text('弹幕数'), findsNothing);
+      expect(find.text('评论用户性别'), findsNothing);
+      expect(find.text('评论用户等级'), findsNothing);
     });
   });
 }

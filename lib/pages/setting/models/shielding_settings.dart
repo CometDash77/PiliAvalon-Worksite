@@ -93,8 +93,6 @@ const shieldingRuleCategoryLabels = [
   '标签',
   '分区',
   '评论关键词',
-  '数值元数据',
-  '评论用户信息',
 ];
 
 String shieldingRuleCategoryFor(ShieldRule rule) {

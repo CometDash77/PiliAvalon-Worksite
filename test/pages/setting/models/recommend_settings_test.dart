@@ -129,7 +129,19 @@ void main() {
 
     test('total settings count includes tag enrichment entries', () {
       final list = recommendSettings;
-      expect(list.length, 17);
+      expect(list.length, 18);
+    });
+
+    test('contains recommend range shielding entry', () {
+      final list = recommendSettings;
+      final titles = list.map((e) => e.effectiveTitle).toList();
+      final entry = list.firstWhere(
+        (e) => e.effectiveTitle == '推荐流范围屏蔽',
+      );
+
+      expect(titles, contains('推荐流范围屏蔽'));
+      expect(entry.effectiveSubtitle, contains('时长、播放数、弹幕数'));
+      expect(entry.effectiveSubtitle, contains('范围屏蔽'));
     });
 
     test('contains repeat exposure filter settings', () {

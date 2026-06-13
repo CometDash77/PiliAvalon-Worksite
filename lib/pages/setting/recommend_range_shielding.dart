@@ -1,5 +1,3 @@
-// ignore_for_file: deprecated_member_use, prefer_initializing_formals, unnecessary_lambdas
-
 import 'package:PiliPlus/common/widgets/flutter/list_tile.dart' as custom;
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/pages/setting/models/shielding_settings.dart';
@@ -7,8 +5,13 @@ import 'package:flutter/material.dart' hide ListTile;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 
-class ShieldingSettingsPage extends StatefulWidget {
-  const ShieldingSettingsPage({
+/// A dedicated sub-page for managing recommendation-scope numeric range
+/// shielding rules (duration, playbackCount, danmakuCount).
+///
+/// This page is reachable from 推荐流设置 and pre-configures new rules with
+/// scope=recommendation, matchMode=range, for the numeric rule types.
+class RecommendRangeShieldingPage extends StatefulWidget {
+  const RecommendRangeShieldingPage({
     super.key,
     this.showAppBar = true,
     ShieldSettingsStore? store,
@@ -18,30 +21,20 @@ class ShieldingSettingsPage extends StatefulWidget {
   final ShieldSettingsStore? store;
 
   @override
-  State<ShieldingSettingsPage> createState() => _ShieldingSettingsPageState();
+  State<RecommendRangeShieldingPage> createState() =>
+      _RecommendRangeShieldingPageState();
 }
 
-class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
-  static const _visibleMatchModes = [
-    ShieldMatchMode.contains,
-    ShieldMatchMode.exact,
-    ShieldMatchMode.regex,
-    ShieldMatchMode.range,
-    ShieldMatchMode.enumValue,
-  ];
-
-  static const _visibleRuleTypes = [
-    ShieldRuleType.keyword,
-    ShieldRuleType.userKeyword,
-    ShieldRuleType.reasonKeyword,
-    ShieldRuleType.uid,
-    ShieldRuleType.category,
-    ShieldRuleType.tag,
+class _RecommendRangeShieldingPageState
+    extends State<RecommendRangeShieldingPage> {
+  static const _allowedTypes = [
+    ShieldRuleType.duration,
+    ShieldRuleType.playbackCount,
+    ShieldRuleType.danmakuCount,
   ];
 
   late final _store = widget.store ?? ShieldSettingsStore();
   late ShieldRuleSet _ruleSet = _store.snapshot();
-  String _selectedCategory = shieldingRuleCategoryLabels.first;
 
   @override
   void initState() {
@@ -66,15 +59,25 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
     }
   }
 
+  List<ShieldRule> get _visibleRules => _ruleSet.rules
+      .where(
+        (rule) =>
+            _allowedTypes.contains(rule.type) &&
+            rule.scope == ShieldScope.recommendation &&
+            rule.matchMode == ShieldMatchMode.range,
+      )
+      .toList()
+    ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
   @override
   Widget build(BuildContext context) {
-    final padding = MediaQuery.viewPaddingOf(context);
     final showAppBar = widget.showAppBar;
+    final padding = MediaQuery.viewPaddingOf(context);
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: showAppBar
           ? AppBar(
-              title: const Text('屏蔽规则'),
+              title: const Text('推荐流范围屏蔽'),
               actions: [
                 IconButton(
                   tooltip: '新增',
@@ -91,53 +94,19 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
           bottom: padding.bottom + 100,
         ),
         children: [
-          _buildSwitchTile(
-            icon: Icons.shield_outlined,
-            title: '启用全局屏蔽',
-            subtitle: '关闭后，推荐和评论场景都不会应用 Phase 1 屏蔽规则',
-            value: _ruleSet.globalEnabled,
-            onChanged: (value) =>
-                _save(_ruleSet.copyWith(globalEnabled: value)),
-          ),
-          _buildSwitchTile(
-            icon: Icons.explore_outlined,
-            title: '推荐流屏蔽',
-            subtitle: '在首页推荐和相关推荐场景应用规则',
-            value: _ruleSet.recommendationEnabled,
-            onChanged: (value) =>
-                _save(_ruleSet.copyWith(recommendationEnabled: value)),
-          ),
-          _buildSwitchTile(
-            icon: Icons.forum_outlined,
-            title: '评论屏蔽',
-            subtitle: '在评论场景应用规则',
-            value: _ruleSet.commentEnabled,
-            onChanged: (value) =>
-                _save(_ruleSet.copyWith(commentEnabled: value)),
-          ),
-          const Divider(height: 1),
-          SizedBox(
-            height: 48,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              itemBuilder: (context, index) {
-                final label = shieldingRuleCategoryLabels[index];
-                return ChoiceChip(
-                  label: Text(label),
-                  selected: _selectedCategory == label,
-                  onSelected: (_) => setState(
-                    () => _selectedCategory = label,
-                  ),
-                );
-              },
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemCount: shieldingRuleCategoryLabels.length,
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+              '为首页推荐流设置时长、播放数、弹幕数的范围屏蔽规则。\n'
+              '支持多条规则同时生效（如屏蔽过短和过长的视频）。\n'
+              '格式: min..max，如 0..30 或 1200..',
+              style: TextStyle(fontSize: 13),
             ),
           ),
+          const Divider(height: 1),
           custom.ListTile(
             leading: const Icon(Icons.rule_outlined),
-            title: Text('$_selectedCategory规则'),
+            title: const Text('推荐流范围规则'),
             subtitle: Text(shieldRuleSummary(_visibleRules)),
             trailing: const Icon(Icons.add),
             onTap: () => _openEditor(),
@@ -155,7 +124,7 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
               ),
               subtitle: Text(_ruleSet.loadErrors.join('\n')),
             ),
-          if (_ruleSet.rules.isEmpty)
+          if (_visibleRules.isEmpty)
             custom.ListTile(
               leading: const Icon(Icons.rule_folder_outlined),
               title: const Text('暂无规则'),
@@ -176,29 +145,6 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
     );
   }
 
-  List<ShieldRule> get _sortedRules =>
-      [..._ruleSet.rules]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-
-  List<ShieldRule> get _visibleRules => _sortedRules
-      .where((rule) => shieldingRuleCategoryFor(rule) == _selectedCategory)
-      .toList();
-
-  Widget _buildSwitchTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return SwitchListTile(
-      secondary: Icon(icon),
-      title: Text(title),
-      subtitle: Text(subtitle),
-      value: value,
-      onChanged: onChanged,
-    );
-  }
-
   Widget _buildRuleItem(ShieldRule rule) {
     return custom.ListTile(
       leading: Icon(
@@ -207,7 +153,11 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
             : Icons.block_outlined,
       ),
       title: Text(shieldRuleTitle(rule)),
-      subtitle: Text(shieldRuleSubtitle(rule)),
+      subtitle: Text(
+        '${shieldScopeLabel(rule.scope)} / '
+        '${shieldMatchModeLabel(rule.matchMode, type: rule.type)} / '
+        '${rule.enabled ? '已启用' : '已停用'}',
+      ),
       trailing: Switch(
         value: rule.enabled,
         onChanged: (value) {
@@ -250,13 +200,11 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
   }
 
   Future<void> _openEditor({ShieldRule? rule}) async {
-    ShieldRuleType type = rule?.type ?? ShieldRuleType.keyword;
-    final rawMode = rule?.matchMode;
-    ShieldMatchMode mode = rawMode == ShieldMatchMode.token
-        ? ShieldMatchMode.regex
-        : rawMode ??
-            _defaultEditorMode(type);
-    ShieldScope scope = rule?.scope ?? ShieldScope.both;
+    ShieldRuleType type = rule?.type ?? ShieldRuleType.duration;
+    // Always range for this surface.
+    const mode = ShieldMatchMode.range;
+    // Always recommendation scope.
+    const scope = ShieldScope.recommendation;
     ShieldAction action = rule?.action ?? ShieldAction.block;
     bool enabled = rule?.enabled ?? true;
     String pattern = rule?.pattern ?? '';
@@ -265,7 +213,7 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(rule == null ? '新增规则' : '编辑规则'),
+          title: Text(rule == null ? '新增范围规则' : '编辑范围规则'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -273,35 +221,19 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
                 TextFormField(
                   autofocus: true,
                   initialValue: pattern,
-                  decoration: const InputDecoration(labelText: '匹配内容'),
+                  decoration: const InputDecoration(
+                    labelText: '数值范围',
+                    hintText: '如 0..30 或 1200..',
+                  ),
                   onChanged: (value) => pattern = value,
                 ),
                 const SizedBox(height: 12),
                 _dropdown(
                   label: '类型',
                   value: type,
-                  values: _visibleRuleTypes,
+                  values: _allowedTypes,
                   text: shieldRuleTypeLabel,
-                  onChanged: (value) => setDialogState(() {
-                    type = value;
-                    if (!_modeFitsType(mode, type)) {
-                      mode = _defaultEditorMode(type);
-                    }
-                  }),
-                ),
-                _dropdown(
-                  label: '匹配方式',
-                  value: mode,
-                  values: _visibleMatchModes,
-                  text: (value) => shieldMatchModeLabel(value, type: type),
-                  onChanged: (value) => setDialogState(() => mode = value),
-                ),
-                _dropdown(
-                  label: '作用范围',
-                  value: scope,
-                  values: ShieldScope.values,
-                  text: shieldScopeLabel,
-                  onChanged: (value) => setDialogState(() => scope = value),
+                  onChanged: (value) => setDialogState(() => type = value),
                 ),
                 _dropdown(
                   label: '动作',
@@ -325,20 +257,11 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
               onPressed: () {
                 final trimmed = pattern.trim();
                 if (trimmed.isEmpty) {
-                  SmartDialog.showToast('匹配内容不能为空');
+                  SmartDialog.showToast('数值范围不能为空');
                   return;
                 }
-                if (mode == ShieldMatchMode.regex) {
-                  try {
-                    RegExp(trimmed);
-                  } catch (_) {
-                    SmartDialog.showToast('正则表达式无效');
-                    return;
-                  }
-                }
-                if (mode == ShieldMatchMode.range &&
-                    !_isValidRangePattern(trimmed)) {
-                  SmartDialog.showToast('数值范围无效');
+                if (!_isValidRangePattern(trimmed)) {
+                  SmartDialog.showToast('数值范围无效（格式: min..max）');
                   return;
                 }
                 Get.back(
@@ -394,31 +317,6 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
         if (value != null) onChanged(value);
       },
     );
-  }
-
-  ShieldMatchMode _defaultEditorMode(ShieldRuleType type) {
-    return switch (type) {
-      ShieldRuleType.keyword || ShieldRuleType.reasonKeyword =>
-        ShieldMatchMode.contains,
-      ShieldRuleType.duration ||
-      ShieldRuleType.playbackCount ||
-      ShieldRuleType.danmakuCount ||
-      ShieldRuleType.commentMemberLevel => ShieldMatchMode.range,
-      ShieldRuleType.commentMemberSex => ShieldMatchMode.enumValue,
-      _ => ShieldMatchMode.exact,
-    };
-  }
-
-  bool _modeFitsType(ShieldMatchMode mode, ShieldRuleType type) {
-    return switch (mode) {
-      ShieldMatchMode.range =>
-        type == ShieldRuleType.duration ||
-            type == ShieldRuleType.playbackCount ||
-            type == ShieldRuleType.danmakuCount ||
-            type == ShieldRuleType.commentMemberLevel,
-      ShieldMatchMode.enumValue => type == ShieldRuleType.commentMemberSex,
-      _ => true,
-    };
   }
 
   bool _isValidRangePattern(String pattern) {
