@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/pages/setting/recommend_range_shielding.dart';
-import 'package:PiliPlus/pages/setting/models/shielding_settings.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 
