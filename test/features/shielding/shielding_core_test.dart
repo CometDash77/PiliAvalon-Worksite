@@ -907,6 +907,54 @@ void main() {
         );
       });
 
+      test('multiple range rules on one numeric field block either edge', () {
+        final rules = ShieldRuleSet(
+          rules: [
+            _rule(
+              type: ShieldRuleType.duration,
+              mode: ShieldMatchMode.range,
+              pattern: '..30',
+            ),
+            _rule(
+              type: ShieldRuleType.duration,
+              mode: ShieldMatchMode.range,
+              pattern: '1200..',
+            ),
+          ],
+        );
+
+        expect(
+          ShieldMatcher.match(
+            const ShieldCandidate(
+              scope: ShieldScope.recommendation,
+              durationSeconds: 15,
+            ),
+            rules,
+          ).visible,
+          isFalse,
+        );
+        expect(
+          ShieldMatcher.match(
+            const ShieldCandidate(
+              scope: ShieldScope.recommendation,
+              durationSeconds: 300,
+            ),
+            rules,
+          ).visible,
+          isTrue,
+        );
+        expect(
+          ShieldMatcher.match(
+            const ShieldCandidate(
+              scope: ShieldScope.recommendation,
+              durationSeconds: 1800,
+            ),
+            rules,
+          ).visible,
+          isFalse,
+        );
+      });
+
       test('invalid range records error and does not match', () {
         final result = ShieldMatcher.match(
           const ShieldCandidate(

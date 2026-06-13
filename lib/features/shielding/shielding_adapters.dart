@@ -25,6 +25,19 @@ abstract final class ShieldingAdapters {
       itemReason: item.rcmdReason,
       jsonReason: json['rcmd_reason'],
     );
+    // Direct structured fields from the source model.
+    // item.duration is a direct int for both web and app models.
+    final num? durationSeconds = item.duration > 0 ? item.duration : null;
+    num? playbackCount;
+    num? danmakuCount;
+    if (item is RcmdVideoItemModel) {
+      // Web recommendation: stat fields are direct JSON integers.
+      playbackCount = item.stat.view;
+      danmakuCount = item.stat.danmu;
+    }
+    // App recommendation stat fields come from cover_left_text display strings.
+    // Do not promote them here.
+
     return ShieldCandidate(
       scope: ShieldScope.recommendation,
       title: item.title,
@@ -39,6 +52,9 @@ abstract final class ShieldingAdapters {
         reason,
         ...tags,
       ]),
+      durationSeconds: durationSeconds,
+      playbackCount: playbackCount,
+      danmakuCount: danmakuCount,
     );
   }
 
