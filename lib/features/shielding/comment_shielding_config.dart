@@ -16,6 +16,7 @@ class CommentShieldingConfig {
     this.likeThreshold,
     this.blockWithPicture = false,
     this.blockWithEmote = false,
+    this.hideHomeFeedItemsWithoutVisibleComments = false,
     this.version = 1,
   });
 
@@ -28,6 +29,7 @@ class CommentShieldingConfig {
   final int? likeThreshold;
   final bool blockWithPicture;
   final bool blockWithEmote;
+  final bool hideHomeFeedItemsWithoutVisibleComments;
   final int version;
 
   CommentShieldingConfig copyWith({
@@ -40,6 +42,7 @@ class CommentShieldingConfig {
     Object? likeThreshold = _copyWithUnset,
     bool? blockWithPicture,
     bool? blockWithEmote,
+    bool? hideHomeFeedItemsWithoutVisibleComments,
     int? version,
   }) => CommentShieldingConfig(
     levelThreshold: levelThreshold == _copyWithUnset
@@ -59,6 +62,9 @@ class CommentShieldingConfig {
         : likeThreshold as int?,
     blockWithPicture: blockWithPicture ?? this.blockWithPicture,
     blockWithEmote: blockWithEmote ?? this.blockWithEmote,
+    hideHomeFeedItemsWithoutVisibleComments:
+        hideHomeFeedItemsWithoutVisibleComments ??
+        this.hideHomeFeedItemsWithoutVisibleComments,
     version: version ?? this.version,
   );
 
@@ -73,6 +79,8 @@ class CommentShieldingConfig {
     if (likeThreshold != null) 'like_threshold': likeThreshold,
     'block_with_picture': blockWithPicture,
     'block_with_emote': blockWithEmote,
+    'hide_home_feed_items_without_visible_comments':
+        hideHomeFeedItemsWithoutVisibleComments,
   };
 
   factory CommentShieldingConfig.fromJson(Map<String, Object?> json) {
@@ -117,6 +125,9 @@ class CommentShieldingConfig {
       likeThreshold: readRangeInt('like_threshold'),
       blockWithPicture: json['block_with_picture'] as bool? ?? false,
       blockWithEmote: json['block_with_emote'] as bool? ?? false,
+      hideHomeFeedItemsWithoutVisibleComments:
+          json['hide_home_feed_items_without_visible_comments'] as bool? ??
+          false,
     );
   }
 
@@ -142,6 +153,8 @@ class CommentShieldingConfig {
           likeThreshold == other.likeThreshold &&
           blockWithPicture == other.blockWithPicture &&
           blockWithEmote == other.blockWithEmote &&
+          hideHomeFeedItemsWithoutVisibleComments ==
+              other.hideHomeFeedItemsWithoutVisibleComments &&
           version == other.version;
 
   @override
@@ -155,6 +168,7 @@ class CommentShieldingConfig {
     likeThreshold,
     blockWithPicture,
     blockWithEmote,
+    hideHomeFeedItemsWithoutVisibleComments,
     version,
   );
 

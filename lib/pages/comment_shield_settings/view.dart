@@ -264,6 +264,17 @@ class _CommentShieldSettingsPageState extends State<CommentShieldSettingsPage> {
               _config.copyWith(blockWithEmote: value),
             ),
           ),
+          SwitchListTile(
+            secondary: const Icon(Icons.forum_outlined),
+            title: const Text('隐藏无可见评论的首页推荐'),
+            subtitle: const Text('开启后，评论全部被屏蔽的推荐不会显示'),
+            value: _config.hideHomeFeedItemsWithoutVisibleComments,
+            onChanged: (value) => _updateConfig(
+              _config.copyWith(
+                hideHomeFeedItemsWithoutVisibleComments: value,
+              ),
+            ),
+          ),
         ],
       ),
     );

@@ -70,6 +70,7 @@ class ReplyItemGrpc extends StatelessWidget {
     this.onCheckReply,
     this.onToggleTop,
     this.jumpToDialogue,
+    this.shieldSettingsStore,
   });
   final ReplyInfo replyItem;
   final int replyLevel;
@@ -84,6 +85,7 @@ class ReplyItemGrpc extends StatelessWidget {
   final ValueChanged<ReplyInfo>? onCheckReply;
   final ValueChanged<ReplyInfo>? onToggleTop;
   final VoidCallback? jumpToDialogue;
+  final ShieldSettingsStore? shieldSettingsStore;
 
   static final _voteRegExp = RegExp(r"^\{vote:\d+?\}$");
   static final _timeRegExp = RegExp(r'^(?:\d+[:：])?\d+[:：]\d+$');
@@ -970,6 +972,8 @@ class ReplyItemGrpc extends StatelessWidget {
     final theme = Theme.of(context);
     final errorColor = theme.colorScheme.error;
     final style = theme.textTheme.titleSmall!;
+    final pendantValue = _firstCommentAvatarPendantValue(item);
+    final garbValue = _firstCommentGarbValue(item);
 
     return Padding(
       padding: EdgeInsets.only(
@@ -1143,6 +1147,7 @@ class ReplyItemGrpc extends StatelessWidget {
                 type: ShieldRuleType.uid,
                 pattern: _replyUid(item),
                 targetLabel: '屏蔽评论用户 UID ${_replyUid(item)}',
+                store: shieldSettingsStore,
               );
             },
             minLeadingWidth: 0,
@@ -1158,12 +1163,43 @@ class ReplyItemGrpc extends StatelessWidget {
                 matchMode: ShieldMatchMode.regex,
                 pattern: '^$escapedMessage\$',
                 targetLabel: '屏蔽整条评论文本「$message」',
+                store: shieldSettingsStore,
               );
             },
             minLeadingWidth: 0,
             leading: const Icon(CustomIcons.shield_reply, size: 19),
             title: Text('屏蔽整条评论文本', style: style),
           ),
+          if (pendantValue != null)
+            ListTile(
+              onTap: () {
+                Get.back();
+                _addCommentQuickActionRule(
+                  type: ShieldRuleType.avatarPendant,
+                  pattern: pendantValue,
+                  targetLabel: '屏蔽头像挂件',
+                  store: shieldSettingsStore,
+                );
+              },
+              minLeadingWidth: 0,
+              leading: const Icon(Icons.workspace_premium_outlined, size: 19),
+              title: Text('屏蔽头像挂件', style: style),
+            ),
+          if (garbValue != null)
+            ListTile(
+              onTap: () {
+                Get.back();
+                _addCommentQuickActionRule(
+                  type: ShieldRuleType.garb,
+                  pattern: garbValue,
+                  targetLabel: '屏蔽装扮卡片',
+                  store: shieldSettingsStore,
+                );
+              },
+              minLeadingWidth: 0,
+              leading: const Icon(Icons.badge_outlined, size: 19),
+              title: Text('屏蔽装扮卡片', style: style),
+            ),
           if (replyLevel == 1 && !isSubReply && ownerMid == upMid)
             ListTile(
               onTap: () {
@@ -1274,9 +1310,10 @@ class ReplyItemGrpc extends StatelessWidget {
     required String targetLabel,
     ShieldMatchMode matchMode = ShieldMatchMode.exact,
     bool showDuplicateToast = true,
+    ShieldSettingsStore? store,
   }) async {
     try {
-      final rule = await ShieldSettingsStore().addQuickActionRule(
+      final rule = await (store ?? ShieldSettingsStore()).addQuickActionRule(
         type: type,
         scope: ShieldScope.comment,
         pattern: pattern,
@@ -1298,5 +1335,40 @@ class ReplyItemGrpc extends StatelessWidget {
     if (item.hasMid()) return item.mid.toString();
     if (item.hasMember()) return item.member.mid.toString();
     return item.mid.toString();
+  }
+
+  static String? _firstCommentAvatarPendantValue(ReplyInfo item) {
+    if (item.hasMember() && item.member.garbPendantImage.isNotEmpty) {
+      return item.member.garbPendantImage;
+    }
+    if (item.hasMemberV2() &&
+        item.memberV2.hasGarb() &&
+        item.memberV2.garb.pendantImage.isNotEmpty) {
+      return item.memberV2.garb.pendantImage;
+    }
+    return null;
+  }
+
+  static String? _firstCommentGarbValue(ReplyInfo item) {
+    if (item.hasMember()) {
+      for (final value in [
+        item.member.garbCardNumber,
+        item.member.garbCardImage,
+        item.member.garbCardJumpUrl,
+      ]) {
+        if (value.isNotEmpty) return value;
+      }
+    }
+    if (item.hasMemberV2() && item.memberV2.hasGarb()) {
+      final garb = item.memberV2.garb;
+      for (final value in [
+        garb.cardNumber,
+        garb.cardImage,
+        garb.cardJumpUrl,
+      ]) {
+        if (value.isNotEmpty) return value;
+      }
+    }
+    return null;
   }
 }

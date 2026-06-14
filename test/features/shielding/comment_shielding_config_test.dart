@@ -16,6 +16,7 @@ void main() {
       expect(config.likeThreshold, isNull);
       expect(config.blockWithPicture, isFalse);
       expect(config.blockWithEmote, isFalse);
+      expect(config.hideHomeFeedItemsWithoutVisibleComments, isFalse);
       expect(config.version, 1);
     });
 
@@ -30,6 +31,7 @@ void main() {
         likeThreshold: 10,
         blockWithPicture: true,
         blockWithEmote: true,
+        hideHomeFeedItemsWithoutVisibleComments: true,
         version: 1,
       );
 
@@ -44,6 +46,7 @@ void main() {
       expect(decoded.likeThreshold, 10);
       expect(decoded.blockWithPicture, isTrue);
       expect(decoded.blockWithEmote, isTrue);
+      expect(decoded.hideHomeFeedItemsWithoutVisibleComments, isTrue);
       expect(decoded.version, 1);
     });
 
@@ -70,6 +73,15 @@ void main() {
       expect(decoded.minCharCount, isNull);
       expect(decoded.maxCharCount, isNull);
       expect(decoded.likeThreshold, isNull);
+    });
+
+    test('missing home feed comment gate flag defaults off', () {
+      final decoded = CommentShieldingConfig.fromJson({
+        'block_with_picture': true,
+      });
+
+      expect(decoded.blockWithPicture, isTrue);
+      expect(decoded.hideHomeFeedItemsWithoutVisibleComments, isFalse);
     });
 
     test('persisted min greater than max clears both char bounds', () {
@@ -147,6 +159,7 @@ void main() {
       expect(config.likeThreshold, isNull);
       expect(config.blockWithPicture, isFalse);
       expect(config.blockWithEmote, isFalse);
+      expect(config.hideHomeFeedItemsWithoutVisibleComments, isFalse);
     });
 
     test('save and load round trips', () async {
@@ -163,6 +176,7 @@ void main() {
         likeThreshold: 10,
         blockWithPicture: true,
         blockWithEmote: true,
+        hideHomeFeedItemsWithoutVisibleComments: true,
       );
 
       await store.save(config);
@@ -177,6 +191,7 @@ void main() {
       expect(loaded.likeThreshold, 10);
       expect(loaded.blockWithPicture, isTrue);
       expect(loaded.blockWithEmote, isTrue);
+      expect(loaded.hideHomeFeedItemsWithoutVisibleComments, isTrue);
     });
 
     test('damaged payload falls back to default config', () {
