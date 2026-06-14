@@ -99,6 +99,8 @@ jobs:
             - name: Set and Extract version
               if: ${{ github.event_name == 'workflow_dispatch' }}
               shell: pwsh
+              env:
+                  PILI_VERSION_CODE_FLOOR: 5150
               run: lib/scripts/build.ps1 android
 
             - name: Flutter Build Release Apk

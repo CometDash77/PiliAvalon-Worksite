@@ -6,6 +6,12 @@ try {
     $versionName = $null
 
     $versionCode = [int](git rev-list --count HEAD).Trim()
+    if ($env:PILI_VERSION_CODE_FLOOR) {
+        $versionCodeFloor = [int]$env:PILI_VERSION_CODE_FLOOR
+        if ($versionCode -lt $versionCodeFloor) {
+            $versionCode = $versionCodeFloor
+        }
+    }
 
     $commitHash = (git rev-parse HEAD).Trim()
 
