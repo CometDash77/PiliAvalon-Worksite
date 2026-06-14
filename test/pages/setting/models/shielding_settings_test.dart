@@ -123,18 +123,35 @@ void main() {
     });
 
     test(
-      'labels keyword exact semantics as contains instead of exact equality',
+      'labels keyword contains semantics correctly',
       () {
-        final rule = _rule(
-          id: 'keyword',
+        final containsRule = _rule(
+          id: 'keyword-contains',
+          type: ShieldRuleType.keyword,
+          matchMode: ShieldMatchMode.contains,
+          pattern: '猫',
+        );
+
+        expect(
+          shieldMatchModeLabel(containsRule.matchMode, type: containsRule.type),
+          '包含文字',
+        );
+        expect(shieldRuleSubtitle(containsRule), '推荐和评论 / 包含文字 / 已启用');
+
+        final exactRule = _rule(
+          id: 'keyword-exact',
           type: ShieldRuleType.keyword,
           matchMode: ShieldMatchMode.exact,
           pattern: '猫',
         );
 
-        expect(shieldMatchModeLabel(rule.matchMode, type: rule.type), '包含文字');
-        expect(shieldRuleSubtitle(rule), '推荐和评论 / 包含文字 / 已启用');
+        expect(
+          shieldMatchModeLabel(exactRule.matchMode, type: exactRule.type),
+          '完全相同',
+        );
+        expect(shieldRuleSubtitle(exactRule), '推荐和评论 / 完全相同 / 已启用');
         expect(shieldMatchModeLabel(ShieldMatchMode.exact), '完全相同');
+        expect(shieldMatchModeLabel(ShieldMatchMode.contains), '包含文字');
       },
     );
 
@@ -185,6 +202,8 @@ void main() {
       );
       expect(shieldingRuleCategoryLabels, isNot(contains('精确文本')));
       expect(shieldingRuleCategoryLabels, isNot(contains('旧规则兼容')));
+      expect(shieldingRuleCategoryLabels, isNot(contains('数值元数据')));
+      expect(shieldingRuleCategoryLabels, isNot(contains('评论用户信息')));
     });
 
     test('categorizes quick recommendation keyword exact as title keyword', () {
@@ -302,6 +321,60 @@ void main() {
         containsAll(['头像挂件', '装扮卡片']),
       );
     });
+
+    test('categorizes duration as numeric metadata', () {
+      final rule = _rule(
+        id: 'duration-rule',
+        type: ShieldRuleType.duration,
+        matchMode: ShieldMatchMode.range,
+        scope: ShieldScope.recommendation,
+        pattern: '60..300',
+      );
+
+      expect(shieldingRuleCategoryFor(rule), '数值元数据');
+    });
+
+    test('categorizes comment member fields as comment user info', () {
+      final sexRule = _rule(
+        id: 'sex-rule',
+        type: ShieldRuleType.commentMemberSex,
+        matchMode: ShieldMatchMode.enumValue,
+        scope: ShieldScope.comment,
+        pattern: '女',
+      );
+      final levelRule = _rule(
+        id: 'level-rule',
+        type: ShieldRuleType.commentMemberLevel,
+        matchMode: ShieldMatchMode.range,
+        scope: ShieldScope.comment,
+        pattern: '5..',
+      );
+
+      expect(shieldingRuleCategoryFor(sexRule), '评论用户信息');
+      expect(shieldingRuleCategoryFor(levelRule), '评论用户信息');
+    });
+
+    test('task-024 scope mode and type labels are visible', () {
+      expect(shieldScopeLabel(ShieldScope.search), '搜索');
+      expect(shieldScopeLabel(ShieldScope.dynamic), '动态');
+      expect(shieldScopeLabel(ShieldScope.live), '直播');
+      expect(shieldScopeLabel(ShieldScope.videoDetail), '视频详情');
+
+      expect(shieldMatchModeLabel(ShieldMatchMode.range), '数值范围');
+      expect(shieldMatchModeLabel(ShieldMatchMode.enumValue), '枚举值');
+
+      expect(shieldRuleTypeLabel(ShieldRuleType.duration), '时长');
+      expect(shieldRuleTypeLabel(ShieldRuleType.playbackCount), '播放数');
+      expect(shieldRuleTypeLabel(ShieldRuleType.danmakuCount), '弹幕数');
+      expect(
+        shieldRuleTypeLabel(ShieldRuleType.commentMemberSex),
+        '评论用户性别',
+      );
+      expect(
+        shieldRuleTypeLabel(ShieldRuleType.commentMemberLevel),
+        '评论用户等级',
+      );
+    });
   });
 
   group('ShieldingSettingsPage', () {
@@ -345,10 +418,12 @@ void main() {
 
       expect(find.text('包含文字'), findsWidgets);
       expect(find.text('正则匹配'), findsOneWidget);
+      expect(find.text('数值范围'), findsOneWidget);
+      expect(find.text('枚举值'), findsOneWidget);
       expect(find.text('词元匹配'), findsNothing);
     });
 
-    testWidgets('loaded legacy token rule is shown as regex in UI', (
+    testWidgets('loaded legacy token rule is shown as compatibility token', (
       tester,
     ) async {
       final seed = ShieldRuleSet(
@@ -373,8 +448,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('正则匹配'), findsOneWidget);
-      expect(find.textContaining('词元匹配'), findsNothing);
+      expect(find.textContaining('词元匹配'), findsOneWidget);
     });
 
     testWidgets('shows same-row shielding category navigation', (tester) async {
@@ -390,8 +464,38 @@ void main() {
       expect(find.text('用户/UP'), findsOneWidget);
       expect(find.text('标题关键词'), findsOneWidget);
       expect(find.text('推荐理由'), findsOneWidget);
+      expect(find.text('标签'), findsOneWidget);
+      expect(find.text('分区'), findsOneWidget);
+      expect(find.text('评论关键词'), findsOneWidget);
       expect(find.text('精确文本'), findsNothing);
       expect(find.text('旧规则兼容'), findsNothing);
+      expect(find.text('数值元数据'), findsNothing);
+      expect(find.text('评论用户信息'), findsNothing);
+    });
+
+    testWidgets('general editor hides numeric and comment-user rule types', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        GetMaterialApp(
+          home: ShieldingSettingsPage(
+            store: ShieldSettingsStore(box: _MemoryBox()),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('新增').first);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('标题/正文关键词').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('时长'), findsNothing);
+      expect(find.text('播放数'), findsNothing);
+      expect(find.text('弹幕数'), findsNothing);
+      expect(find.text('评论用户性别'), findsNothing);
+      expect(find.text('评论用户等级'), findsNothing);
     });
 
     testWidgets('category chips include decoration types', (tester) async {
@@ -428,9 +532,8 @@ void main() {
       await tester.tap(find.text('标题/正文关键词'));
       await tester.pumpAndSettle();
 
-      // The dropdown shows items - the chip also shows labels so we hit at least 2
-      expect(find.text('头像挂件'), findsAtLeast(2));
-      expect(find.text('装扮卡片'), findsAtLeast(2));
+      expect(find.text('头像挂件'), findsWidgets);
+      expect(find.text('装扮卡片'), findsWidgets);
     });
   });
 }

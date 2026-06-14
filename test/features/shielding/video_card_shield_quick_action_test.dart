@@ -43,6 +43,23 @@ void main() {
       expect((await store.load()).rules, isEmpty);
     });
 
+    test('quickRule accepts explicit approved scope', () async {
+      final store = ShieldSettingsStore(box: _MemoryBox());
+
+      await VideoCardShieldQuickAction.quickRule(
+        type: ShieldRuleType.keyword,
+        pattern: '动态关键词',
+        scope: ShieldScope.dynamic,
+        store: store,
+      );
+
+      final rules = (await store.load()).rules;
+      expect(rules, hasLength(1));
+      expect(rules.single.scope, ShieldScope.dynamic);
+      expect(rules.single.matchMode, ShieldMatchMode.contains);
+      expect(rules.single.pattern, '动态关键词');
+    });
+
     testWidgets('recommendation dialog shows editable title and UP inputs', (
       tester,
     ) async {
@@ -198,7 +215,7 @@ void main() {
       expect(rules, hasLength(1));
       expect(rules.single.type, ShieldRuleType.reasonKeyword);
       expect(rules.single.scope, ShieldScope.recommendation);
-      expect(rules.single.matchMode, ShieldMatchMode.exact);
+      expect(rules.single.matchMode, ShieldMatchMode.contains);
       expect(rules.single.pattern, '因为你看过游戏攻略');
     });
 

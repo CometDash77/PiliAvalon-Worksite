@@ -81,6 +81,11 @@ String shieldRuleTypeLabel(ShieldRuleType type) => switch (type) {
   ShieldRuleType.tag => '标签',
   ShieldRuleType.avatarPendant => '头像挂件',
   ShieldRuleType.garb => '装扮卡片',
+  ShieldRuleType.duration => '时长',
+  ShieldRuleType.playbackCount => '播放数',
+  ShieldRuleType.danmakuCount => '弹幕数',
+  ShieldRuleType.commentMemberSex => '评论用户性别',
+  ShieldRuleType.commentMemberLevel => '评论用户等级',
 };
 
 const shieldingRuleCategoryLabels = [
@@ -109,6 +114,15 @@ String shieldingRuleCategoryFor(ShieldRule rule) {
           rule.scope == ShieldScope.both)) {
     return '标题关键词';
   }
+  if (rule.type == ShieldRuleType.duration ||
+      rule.type == ShieldRuleType.playbackCount ||
+      rule.type == ShieldRuleType.danmakuCount) {
+    return '数值元数据';
+  }
+  if (rule.type == ShieldRuleType.commentMemberSex ||
+      rule.type == ShieldRuleType.commentMemberLevel) {
+    return '评论用户信息';
+  }
   return switch (rule.type) {
     ShieldRuleType.keyword => '标题关键词',
     ShieldRuleType.userKeyword || ShieldRuleType.uid => '用户/UP',
@@ -117,6 +131,11 @@ String shieldingRuleCategoryFor(ShieldRule rule) {
     ShieldRuleType.tag => '标签',
     ShieldRuleType.avatarPendant => '头像挂件',
     ShieldRuleType.garb => '装扮卡片',
+    ShieldRuleType.duration ||
+    ShieldRuleType.playbackCount ||
+    ShieldRuleType.danmakuCount => '数值元数据',
+    ShieldRuleType.commentMemberSex ||
+    ShieldRuleType.commentMemberLevel => '评论用户信息',
   };
 }
 
@@ -124,8 +143,11 @@ String shieldMatchModeLabel(
   ShieldMatchMode mode, {
   ShieldRuleType? type,
 }) => switch (mode) {
-  ShieldMatchMode.exact => type == ShieldRuleType.keyword ? '包含文字' : '完全相同',
+  ShieldMatchMode.exact => '完全相同',
+  ShieldMatchMode.contains => '包含文字',
   ShieldMatchMode.regex => '正则匹配',
+  ShieldMatchMode.range => '数值范围',
+  ShieldMatchMode.enumValue => '枚举值',
   ShieldMatchMode.token => '词元匹配',
 };
 
@@ -133,6 +155,10 @@ String shieldScopeLabel(ShieldScope scope) => switch (scope) {
   ShieldScope.recommendation => '推荐',
   ShieldScope.comment => '评论',
   ShieldScope.both => '推荐和评论',
+  ShieldScope.search => '搜索',
+  ShieldScope.dynamic => '动态',
+  ShieldScope.live => '直播',
+  ShieldScope.videoDetail => '视频详情',
 };
 
 String shieldActionLabel(ShieldAction action) => switch (action) {

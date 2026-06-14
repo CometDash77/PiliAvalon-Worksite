@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:PiliPlus/features/shielding/shielding_models.dart';
+import 'package:PiliPlus/features/shielding/shielding_store.dart';
 import 'package:PiliPlus/pages/setting/models/recommend_settings.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
@@ -17,7 +19,7 @@ void main() {
     }
   });
 
-  setUp(() {
+  setUp(() async {
     // Reset settings to defaults between tests.
     GStorage.setting.delete(SettingBoxKey.tagEnrichConcurrency);
     GStorage.setting.delete(SettingBoxKey.tagEnrichTimeout);
@@ -27,6 +29,11 @@ void main() {
     GStorage.setting.delete(SettingBoxKey.repeatExposureThreshold);
     GStorage.setting.delete(SettingBoxKey.repeatExposureCoolingDays);
     GStorage.setting.delete(SettingBoxKey.repeatExposureMaxCacheSize);
+    await ShieldSettingsStore().clear();
+  });
+
+  tearDown(() async {
+    await ShieldSettingsStore().clear();
   });
 
   group('recommendSettings', () {
@@ -127,9 +134,60 @@ void main() {
       expect(entry.effectiveSubtitle, contains('/ 25 MB'));
     });
 
-    test('total settings count includes tag enrichment entries', () {
+    test(
+      'total settings count includes new inline range filtering entries',
+      () {
+        final list = recommendSettings;
+        expect(list.length, 17);
+      },
+    );
+
+    test('contains inline range filtering entries', () {
       final list = recommendSettings;
-      expect(list.length, 17);
+      final titles = list.map((e) => e.effectiveTitle).toList();
+
+      expect(titles, contains('时长过滤'));
+      expect(titles, contains('播放量过滤'));
+      expect(titles, contains('弹幕量过滤'));
+    });
+
+    test('range filtering entries show default subtitle', () {
+      final list = recommendSettings;
+
+      for (final title in ['时长过滤', '播放量过滤', '弹幕量过滤']) {
+        final entry = list.firstWhere((e) => e.effectiveTitle == title);
+        expect(entry.effectiveSubtitle, '未设置');
+      }
+    });
+
+    test('upstream filter entries are hidden from UI', () {
+      final list = recommendSettings;
+      final titles = list.map((e) => e.effectiveTitle).toList();
+
+      expect(titles, isNot(contains('点赞率')));
+      expect(titles, isNot(contains('视频时长')));
+      expect(titles, isNot(contains('播放量')));
+    });
+
+    test('old recommend range shielding sub-page entry is removed', () {
+      final list = recommendSettings;
+      final titles = list.map((e) => e.effectiveTitle).toList();
+      expect(titles, isNot(contains('推荐流范围屏蔽')));
+    });
+
+    test('range filtering entries appear before exposure tracker', () {
+      final list = recommendSettings;
+
+      final rangeIdx = list.indexWhere(
+        (e) => e.effectiveTitle == '时长过滤',
+      );
+      expect(rangeIdx, isNot(-1));
+
+      final exposureIdx = list.indexWhere(
+        (e) => e.effectiveTitle == '启用重复曝光过滤',
+      );
+      expect(exposureIdx, isNot(-1));
+      expect(rangeIdx, lessThan(exposureIdx));
     });
 
     test('contains repeat exposure filter settings', () {
@@ -153,17 +211,123 @@ void main() {
         contains('当前: 7天'),
       );
       expect(
-        list
-            .firstWhere((e) => e.effectiveTitle == '重复曝光阈值')
-            .effectiveSubtitle,
+        list.firstWhere((e) => e.effectiveTitle == '重复曝光阈值').effectiveSubtitle,
         contains('当前: 10次'),
       );
       expect(
-        list
-            .firstWhere((e) => e.effectiveTitle == '重复曝光冷却期')
-            .effectiveSubtitle,
+        list.firstWhere((e) => e.effectiveTitle == '重复曝光冷却期').effectiveSubtitle,
         contains('当前: 30天'),
       );
+    });
+  });
+
+  group('range shielding boundary semantics', () {
+    late ShieldSettingsStore store;
+
+    setUp(() async {
+      store = ShieldSettingsStore();
+      final empty = ShieldRuleSet(rules: []);
+      await store.save(empty);
+    });
+
+    tearDown(() async {
+      final empty = ShieldRuleSet(rules: []);
+      await store.save(empty);
+    });
+
+    test('lower-only rule shows lower-than subtitle', () async {
+      final ruleSet = await store.load();
+      final rule = ShieldRule(
+        id: 'test-lo',
+        type: ShieldRuleType.duration,
+        matchMode: ShieldMatchMode.range,
+        scope: ShieldScope.recommendation,
+        action: ShieldAction.block,
+        pattern: '..30',
+        enabled: true,
+        updatedAt: DateTime.now(),
+      );
+      await store.save(ruleSet.copyWith(rules: [rule]));
+
+      final list = recommendSettings;
+      final entry = list.firstWhere((e) => e.effectiveTitle == '时长过滤');
+      expect(entry.effectiveSubtitle, '屏蔽 ≤ 30');
+    });
+
+    test('upper-only rule shows higher-than subtitle', () async {
+      final ruleSet = await store.load();
+      final rule = ShieldRule(
+        id: 'test-hi',
+        type: ShieldRuleType.playbackCount,
+        matchMode: ShieldMatchMode.range,
+        scope: ShieldScope.recommendation,
+        action: ShieldAction.block,
+        pattern: '500..',
+        enabled: true,
+        updatedAt: DateTime.now(),
+      );
+      await store.save(ruleSet.copyWith(rules: [rule]));
+
+      final list = recommendSettings;
+      final entry = list.firstWhere((e) => e.effectiveTitle == '播放量过滤');
+      expect(entry.effectiveSubtitle, '屏蔽 ≥ 500');
+    });
+
+    test('both rules aggregate to combined subtitle', () async {
+      final ruleSet = await store.load();
+      final lo = ShieldRule(
+        id: 'test-lo',
+        type: ShieldRuleType.danmakuCount,
+        matchMode: ShieldMatchMode.range,
+        scope: ShieldScope.recommendation,
+        action: ShieldAction.block,
+        pattern: '..30',
+        enabled: true,
+        updatedAt: DateTime.now(),
+      );
+      final hi = ShieldRule(
+        id: 'test-hi',
+        type: ShieldRuleType.danmakuCount,
+        matchMode: ShieldMatchMode.range,
+        scope: ShieldScope.recommendation,
+        action: ShieldAction.block,
+        pattern: '200..',
+        enabled: true,
+        updatedAt: DateTime.now(),
+      );
+      await store.save(ruleSet.copyWith(rules: [lo, hi]));
+
+      final list = recommendSettings;
+      final entry = list.firstWhere((e) => e.effectiveTitle == '弹幕量过滤');
+      expect(entry.effectiveSubtitle, '屏蔽 ≤ 30 及 ≥ 200');
+    });
+
+    test('empty rules default to 未设置', () {
+      final list = recommendSettings;
+      for (final title in ['时长过滤', '播放量过滤', '弹幕量过滤']) {
+        final entry = list.firstWhere((e) => e.effectiveTitle == title);
+        expect(entry.effectiveSubtitle, '未设置');
+      }
+    });
+
+    test('non-range rules for same type do not affect subtitle', () async {
+      final ruleSet = await store.load();
+      final nonRange = ShieldRule(
+        id: 'test-keyword',
+        type: ShieldRuleType.duration,
+        matchMode: ShieldMatchMode.contains,
+        scope: ShieldScope.recommendation,
+        action: ShieldAction.block,
+        pattern: 'test',
+        enabled: true,
+        updatedAt: DateTime.now(),
+      );
+      await store.save(ruleSet.copyWith(rules: [nonRange]));
+
+      final list = recommendSettings;
+      final entry = list.firstWhere((e) => e.effectiveTitle == '时长过滤');
+      // Non-range rule should be ignored by _findRangeThresholds.
+      expect(entry.effectiveSubtitle, '未设置');
     });
   });
 }

@@ -1,5 +1,6 @@
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo;
+import 'package:PiliPlus/models/home/rcmd/result.dart';
 import 'package:PiliPlus/models/model_hot_video_item.dart';
 import 'package:PiliPlus/models/model_rec_video_item.dart';
 import 'package:PiliPlus/features/shielding/shielding_matcher.dart';
@@ -25,6 +26,21 @@ abstract final class ShieldingAdapters {
       itemReason: item.rcmdReason,
       jsonReason: json['rcmd_reason'],
     );
+    // Direct structured fields from the source model.
+    // item.duration is a direct int for both web and app models.
+    final num? durationSeconds = item.duration > 0 ? item.duration : null;
+    num? playbackCount;
+    num? danmakuCount;
+    if (item is RcmdVideoItemModel) {
+      // Web recommendation: stat fields are direct JSON integers.
+      playbackCount = item.stat.view;
+      danmakuCount = item.stat.danmu;
+    } else if (item is RcmdVideoItemAppModel) {
+      // App recommendation: RcmdStat parses cover_left_text_1/2 into view/danmu.
+      playbackCount = item.stat.view;
+      danmakuCount = item.stat.danmu;
+    }
+
     return ShieldCandidate(
       scope: ShieldScope.recommendation,
       title: item.title,
@@ -39,6 +55,9 @@ abstract final class ShieldingAdapters {
         reason,
         ...tags,
       ]),
+      durationSeconds: durationSeconds,
+      playbackCount: playbackCount,
+      danmakuCount: danmakuCount,
     );
   }
 
@@ -60,10 +79,8 @@ abstract final class ShieldingAdapters {
 
     final garbValues = <String>[
       if (reply.hasMember()) ...[
-        if (reply.member.garbCardNumber.isNotEmpty)
-          reply.member.garbCardNumber,
-        if (reply.member.garbCardImage.isNotEmpty)
-          reply.member.garbCardImage,
+        if (reply.member.garbCardNumber.isNotEmpty) reply.member.garbCardNumber,
+        if (reply.member.garbCardImage.isNotEmpty) reply.member.garbCardImage,
         if (reply.member.garbCardJumpUrl.isNotEmpty)
           reply.member.garbCardJumpUrl,
       ],

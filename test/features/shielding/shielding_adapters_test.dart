@@ -212,7 +212,7 @@ void main() {
           ShieldRule(
             id: 'reason',
             type: ShieldRuleType.reasonKeyword,
-            matchMode: ShieldMatchMode.exact,
+            matchMode: ShieldMatchMode.contains,
             scope: ShieldScope.recommendation,
             action: ShieldAction.block,
             pattern: '相似内容',
@@ -594,7 +594,7 @@ void main() {
           ShieldRule(
             id: 'legacy-title',
             type: ShieldRuleType.keyword,
-            matchMode: ShieldMatchMode.exact,
+            matchMode: ShieldMatchMode.contains,
             scope: ShieldScope.recommendation,
             action: ShieldAction.block,
             pattern: '剧透',
@@ -702,6 +702,355 @@ void main() {
       expect(controller.index.value, 1);
       expect(replies.map((reply) => reply.id.toInt()), [1]);
     });
+
+    // task-065: Direct structured fields on homepage recommendation.
+
+    test(
+      'web recommendation populates durationSeconds, playbackCount, danmakuCount from direct stat fields',
+      () {
+        final item = RcmdVideoItemModel.fromJson({
+          'id': 1,
+          'bvid': 'BV1',
+          'cid': 2,
+          'goto': 'av',
+          'uri': '',
+          'pic': '',
+          'title': '游戏攻略',
+          'duration': 600,
+          'pubdate': 1,
+          'owner': {'mid': 42, 'name': 'UP主'},
+          'stat': {'view': 50000, 'like': 1200, 'danmaku': 300},
+          'tname': '游戏',
+          'rcmd_reason': {'content': '推荐'},
+        });
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(
+          item,
+          {
+            'owner': {'mid': 42, 'name': 'UP主'},
+            'tname': '游戏',
+            'rcmd_reason': {'content': '推荐'},
+          },
+        );
+
+        expect(candidate.durationSeconds, 600);
+        expect(candidate.playbackCount, 50000);
+        expect(candidate.danmakuCount, 300);
+      },
+    );
+
+    test(
+      'web recommendation leaves durationSeconds null when duration is default -1',
+      () {
+        final item = RcmdVideoItemModel.fromJson({
+          'id': 1,
+          'bvid': 'BV1',
+          'cid': 2,
+          'goto': 'av',
+          'uri': '',
+          'pic': '',
+          'title': '无时长',
+          'duration': -1,
+          'pubdate': 1,
+          'owner': {'mid': 42, 'name': 'UP主'},
+          'stat': {'view': 100, 'like': 10, 'danmaku': 5},
+          'tname': '其他',
+        });
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(
+          item,
+          {
+            'owner': {'mid': 42, 'name': 'UP主'},
+            'tname': '其他',
+          },
+        );
+
+        expect(candidate.durationSeconds, isNull);
+      },
+    );
+
+    test(
+      'app recommendation populates durationSeconds, playbackCount, danmakuCount',
+      () {
+        final item = RcmdVideoItemAppModel.fromJson({
+          'player_args': {'aid': 1, 'cid': 2, 'duration': 840},
+          'bvid': 'BV1',
+          'cover': '',
+          'cover_left_text_1': '1.2万',
+          'cover_left_text_2': '450',
+          'title': 'App视频',
+          'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
+          'rcmd_reason': '',
+          'goto': 'av',
+          'param': '1',
+          'uri': '',
+        });
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(
+          item,
+          {
+            'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
+          },
+        );
+
+        // duration is a direct integer from player_args
+        expect(candidate.durationSeconds, 840);
+        // App stat: RcmdStat parses cover_left_text_1/2 into view/danmu.
+        // '1.2万' → 12000, '450' → 450
+        expect(candidate.playbackCount, 12000);
+        expect(candidate.danmakuCount, 450);
+      },
+    );
+
+    test(
+      'web recommendation direct fields survive existing string-field mapping',
+      () {
+        final item = RcmdVideoItemModel.fromJson({
+          'id': 1,
+          'bvid': 'BV1',
+          'cid': 2,
+          'goto': 'av',
+          'uri': '',
+          'pic': '',
+          'title': '综合测试',
+          'duration': 300,
+          'pubdate': 1,
+          'owner': {'mid': 99, 'name': '测试君'},
+          'stat': {'view': 9999, 'like': 500, 'danmaku': 200},
+          'tname': '综合',
+          'tag': ['标签1', '标签2'],
+        });
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(
+          item,
+          {
+            'owner': {'mid': 99, 'name': '测试君'},
+            'tname': '综合',
+            'tag': ['标签1', '标签2'],
+          },
+        );
+
+        // Existing string fields still present
+        expect(candidate.title, '综合测试');
+        expect(candidate.uid, '99');
+        expect(candidate.authorName, '测试君');
+        expect(candidate.category, '综合');
+        expect(candidate.tags, ['标签1', '标签2']);
+
+        // New direct numeric fields populated
+        expect(candidate.durationSeconds, 300);
+        expect(candidate.playbackCount, 9999);
+        expect(candidate.danmakuCount, 200);
+      },
+    );
+
+    test(
+      'duration range rule blocks web recommendation by durationSeconds',
+      () {
+        final item = RcmdVideoItemModel.fromJson({
+          'id': 1,
+          'bvid': 'BV1',
+          'cid': 2,
+          'goto': 'av',
+          'uri': '',
+          'pic': '',
+          'title': '长视频',
+          'duration': 6000,
+          'pubdate': 1,
+          'owner': {'mid': 42, 'name': 'UP主'},
+          'stat': {'view': 100, 'like': 10, 'danmaku': 5},
+          'tname': '其他',
+        });
+
+        final ruleSet = ShieldRuleSet(
+          rules: [
+            ShieldRule(
+              id: 'dur',
+              type: ShieldRuleType.duration,
+              matchMode: ShieldMatchMode.range,
+              scope: ShieldScope.recommendation,
+              action: ShieldAction.block,
+              pattern: '3000..99999',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            ),
+          ],
+        );
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(
+          item,
+          {
+            'owner': {'mid': 42, 'name': 'UP主'},
+            'tname': '其他',
+          },
+        );
+
+        expect(ShieldingAdapters.isVisible(candidate, ruleSet), isFalse);
+      },
+    );
+
+    test(
+      'playbackCount range rule blocks web recommendation by stat view',
+      () {
+        final item = RcmdVideoItemModel.fromJson({
+          'id': 1,
+          'bvid': 'BV1',
+          'cid': 2,
+          'goto': 'av',
+          'uri': '',
+          'pic': '',
+          'title': '高播放',
+          'duration': 300,
+          'pubdate': 1,
+          'owner': {'mid': 42, 'name': 'UP主'},
+          'stat': {'view': 999999, 'like': 10, 'danmaku': 5},
+          'tname': '其他',
+        });
+
+        final ruleSet = ShieldRuleSet(
+          rules: [
+            ShieldRule(
+              id: 'play',
+              type: ShieldRuleType.playbackCount,
+              matchMode: ShieldMatchMode.range,
+              scope: ShieldScope.recommendation,
+              action: ShieldAction.block,
+              pattern: '100000..999999999',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            ),
+          ],
+        );
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(
+          item,
+          {
+            'owner': {'mid': 42, 'name': 'UP主'},
+            'tname': '其他',
+          },
+        );
+
+        expect(ShieldingAdapters.isVisible(candidate, ruleSet), isFalse);
+      },
+    );
+
+    test(
+      'playbackCount range rule blocks app recommendation by stat view from cover_left_text_1',
+      () {
+        final item = RcmdVideoItemAppModel.fromJson({
+          'player_args': {'aid': 1, 'cid': 2, 'duration': 120},
+          'bvid': 'BV1',
+          'cover': '',
+          'cover_left_text_1': '999999',
+          'cover_left_text_2': '50',
+          'title': '高播放APP',
+          'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
+          'rcmd_reason': '',
+          'goto': 'av',
+          'param': '1',
+          'uri': '',
+        });
+
+        final ruleSet = ShieldRuleSet(
+          rules: [
+            ShieldRule(
+              id: 'play-app',
+              type: ShieldRuleType.playbackCount,
+              matchMode: ShieldMatchMode.range,
+              scope: ShieldScope.recommendation,
+              action: ShieldAction.block,
+              pattern: '100000..999999999',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            ),
+          ],
+        );
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(
+          item,
+          {
+            'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
+          },
+        );
+
+        // playbackCount is populated from RcmdStat parsing of cover_left_text_1.
+        expect(candidate.playbackCount, 999999);
+        // 999999 falls within range 100000..999999999, so candidate is blocked.
+        expect(ShieldingAdapters.isVisible(candidate, ruleSet), isFalse);
+      },
+    );
+
+    test(
+      'danmakuCount range rule blocks app recommendation when danmakuCount is populated from cover_left_text_2',
+      () {
+        final item = RcmdVideoItemAppModel.fromJson({
+          'player_args': {'aid': 1, 'cid': 2, 'duration': 120},
+          'bvid': 'BV1',
+          'cover': '',
+          'cover_left_text_1': '100',
+          'cover_left_text_2': '50',
+          'title': '弹幕测试',
+          'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
+          'rcmd_reason': '',
+          'goto': 'av',
+          'param': '1',
+          'uri': '',
+        });
+
+        final ruleSet = ShieldRuleSet(
+          rules: [
+            ShieldRule(
+              id: 'dan',
+              type: ShieldRuleType.danmakuCount,
+              matchMode: ShieldMatchMode.range,
+              scope: ShieldScope.recommendation,
+              action: ShieldAction.block,
+              pattern: '0..100',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            ),
+          ],
+        );
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(
+          item,
+          {
+            'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
+          },
+        );
+
+        // danmakuCount is now populated from RcmdStat's parsing of cover_left_text_2.
+        expect(candidate.danmakuCount, 50);
+        // 50 falls within range 0..100, so the candidate is blocked.
+        expect(ShieldingAdapters.isVisible(candidate, ruleSet), isFalse);
+      },
+    );
+
+    test(
+      'web recommendation durationSeconds, playbackCount, danmakuCount leave fromRelatedVideo unchanged',
+      () {
+        final video = HotVideoItemModel.fromJson({
+          'aid': 1,
+          'cid': 2,
+          'bvid': 'BV1',
+          'videos': 1,
+          'tid': 17,
+          'tname': '游戏',
+          'copyright': 1,
+          'pic': '',
+          'title': '相关视频',
+          'pubdate': 1,
+          'ctime': 1,
+          'desc': '',
+          'duration': 300,
+          'owner': {'mid': 42, 'name': '玩家UP'},
+          'stat': {'view': 5000, 'like': 100, 'danmaku': 50},
+        });
+
+        final candidate = ShieldingAdapters.fromRelatedVideo(video);
+
+        // fromRelatedVideo does not populate numeric candidate fields
+        expect(candidate.durationSeconds, isNull);
+        expect(candidate.playbackCount, isNull);
+        expect(candidate.danmakuCount, isNull);
+      },
+    );
   });
 }
 
