@@ -90,33 +90,43 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
 
   List<ReplyInfo> applyShielding(List<ReplyInfo> replies) {
     final ruleSet = shieldingRuleSet;
-    final enabled = ruleSet.globalEnabled && ruleSet.commentEnabled;
-    final visibleReplies = ShieldingAdapters.filterList(
-      replies,
-      enabled: enabled,
-      ruleSet: ruleSet,
-      toCandidate: ShieldingAdapters.fromReplyInfo,
-    );
-    if (enabled) {
-      for (final reply in visibleReplies) {
-        if (reply.replies.isEmpty) continue;
-        final visibleChildReplies = ShieldingAdapters.filterList(
-          reply.replies,
-          enabled: true,
-          ruleSet: ruleSet,
-          toCandidate: ShieldingAdapters.fromReplyInfo,
-        );
-        if (!identical(visibleChildReplies, reply.replies)) {
-          reply.replies
-            ..clear()
-            ..addAll(visibleChildReplies);
-        }
+    final commentConfig = commentShieldingConfig;
+    final rulesEnabled = ruleSet.globalEnabled && ruleSet.commentEnabled;
+
+    final visibleReplies = replies.where((reply) {
+      if (!CommentShieldMatcher.match(reply, commentConfig).visible) {
+        return false;
       }
+      if (!rulesEnabled) return true;
+      return ShieldingAdapters.isVisible(
+        ShieldingAdapters.fromReplyInfo(reply),
+        ruleSet,
+      );
+    }).toList();
+
+    for (final reply in visibleReplies) {
+      if (reply.replies.isEmpty) continue;
+      final visibleChildReplies = reply.replies.where((child) {
+        if (!CommentShieldMatcher.match(child, commentConfig).visible) {
+          return false;
+        }
+        if (!rulesEnabled) return true;
+        return ShieldingAdapters.isVisible(
+          ShieldingAdapters.fromReplyInfo(child),
+          ruleSet,
+        );
+      }).toList();
+      reply.replies
+        ..clear()
+        ..addAll(visibleChildReplies);
     }
     return visibleReplies;
   }
 
   ShieldRuleSet get shieldingRuleSet => ShieldSettingsStore().snapshot();
+
+  CommentShieldingConfig get commentShieldingConfig =>
+      CommentShieldingStore().snapshot();
 
   @override
   Future<void> onRefresh() {

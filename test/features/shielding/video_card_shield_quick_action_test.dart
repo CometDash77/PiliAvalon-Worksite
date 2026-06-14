@@ -26,6 +26,23 @@ void main() {
       expect(options, isEmpty);
     });
 
+    test('rejects comment decoration rule types', () async {
+      final store = ShieldSettingsStore(box: _MemoryBox());
+
+      await VideoCardShieldQuickAction.quickRule(
+        type: ShieldRuleType.avatarPendant,
+        pattern: 'https://i0.hdslb.com/pendant.png',
+        store: store,
+      );
+      await VideoCardShieldQuickAction.quickRule(
+        type: ShieldRuleType.garb,
+        pattern: 'NO.0001',
+        store: store,
+      );
+
+      expect((await store.load()).rules, isEmpty);
+    });
+
     testWidgets('recommendation dialog shows editable title and UP inputs', (
       tester,
     ) async {

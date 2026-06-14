@@ -272,6 +272,36 @@ void main() {
       expect(shieldingRuleCategoryFor(importedTitle), '标题关键词');
       expect(shieldingRuleCategoryFor(importedCategory), '分区');
     });
+
+    test('labels avatar pendant and garb rule types', () {
+      expect(shieldRuleTypeLabel(ShieldRuleType.avatarPendant), '头像挂件');
+      expect(shieldRuleTypeLabel(ShieldRuleType.garb), '装扮卡片');
+    });
+
+    test('categorizes avatar pendant and garb as decoration', () {
+      final pendantRule = _rule(
+        id: 'pendant-1',
+        type: ShieldRuleType.avatarPendant,
+        scope: ShieldScope.comment,
+        pattern: 'https://example.com/pendant.png',
+      );
+      final garbRule = _rule(
+        id: 'garb-1',
+        type: ShieldRuleType.garb,
+        scope: ShieldScope.comment,
+        pattern: r'NO\.\d+',
+      );
+
+      expect(shieldingRuleCategoryFor(pendantRule), '头像挂件');
+      expect(shieldingRuleCategoryFor(garbRule), '装扮卡片');
+    });
+
+    test('category labels include decoration types', () {
+      expect(
+        shieldingRuleCategoryLabels,
+        containsAll(['头像挂件', '装扮卡片']),
+      );
+    });
   });
 
   group('ShieldingSettingsPage', () {
@@ -362,6 +392,45 @@ void main() {
       expect(find.text('推荐理由'), findsOneWidget);
       expect(find.text('精确文本'), findsNothing);
       expect(find.text('旧规则兼容'), findsNothing);
+    });
+
+    testWidgets('category chips include decoration types', (tester) async {
+      await tester.pumpWidget(
+        GetMaterialApp(
+          home: ShieldingSettingsPage(
+            store: ShieldSettingsStore(box: _MemoryBox()),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Scroll the horizontal chip list to see all labels
+      expect(find.text('头像挂件'), findsOneWidget);
+      expect(find.text('装扮卡片'), findsOneWidget);
+    });
+
+    testWidgets('new-rule dialog type dropdown includes decoration types', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        GetMaterialApp(
+          home: ShieldingSettingsPage(
+            store: ShieldSettingsStore(box: _MemoryBox()),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('新增').first);
+      await tester.pumpAndSettle();
+
+      // Tap the type dropdown to see options
+      await tester.tap(find.text('标题/正文关键词'));
+      await tester.pumpAndSettle();
+
+      // The dropdown shows items - the chip also shows labels so we hit at least 2
+      expect(find.text('头像挂件'), findsAtLeast(2));
+      expect(find.text('装扮卡片'), findsAtLeast(2));
     });
   });
 }

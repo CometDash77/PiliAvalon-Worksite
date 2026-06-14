@@ -93,6 +93,39 @@ void main() {
       expect(decoded.rules, isEmpty);
       expect(decoded.loadErrors, isNotEmpty);
     });
+
+    test('round trips avatarPendant and garb rule types in JSON', () {
+      final ruleSet = ShieldRuleSet(
+        rules: [
+          ShieldRule(
+            id: 'pendant-1',
+            type: ShieldRuleType.avatarPendant,
+            matchMode: ShieldMatchMode.exact,
+            scope: ShieldScope.comment,
+            action: ShieldAction.block,
+            pattern: 'https://example.com/pendant.png',
+            updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+          ),
+          ShieldRule(
+            id: 'garb-1',
+            type: ShieldRuleType.garb,
+            matchMode: ShieldMatchMode.regex,
+            scope: ShieldScope.comment,
+            action: ShieldAction.block,
+            pattern: r'NO\.\d+',
+            updatedAt: DateTime.fromMillisecondsSinceEpoch(2),
+          ),
+        ],
+      );
+
+      final decoded = ShieldRuleSet.fromJson(ruleSet.toJson());
+
+      expect(decoded.rules, hasLength(2));
+      expect(decoded.rules[0].type, ShieldRuleType.avatarPendant);
+      expect(decoded.rules[1].type, ShieldRuleType.garb);
+      expect(decoded.rules[0].pattern, 'https://example.com/pendant.png');
+      expect(decoded.rules[1].pattern, r'NO\.\d+');
+    });
   });
 
   group('ShieldSettingsStore', () {

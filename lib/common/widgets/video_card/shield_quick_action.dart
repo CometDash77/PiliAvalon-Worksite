@@ -15,6 +15,9 @@ abstract final class VideoCardShieldQuickAction {
     String? successLabel,
     String? displayPattern,
   }) async {
+    if (!_isRecommendationQuickActionType(type)) {
+      return;
+    }
     final trimmed = pattern.trim();
     if (trimmed.isEmpty) {
       return;
@@ -239,6 +242,18 @@ abstract final class VideoCardShieldQuickAction {
         ShieldRuleType.reasonKeyword => '屏蔽推荐理由「$pattern」',
         ShieldRuleType.category => '屏蔽推荐分区「$pattern」',
         ShieldRuleType.tag => '屏蔽推荐标签「$pattern」',
+        ShieldRuleType.avatarPendant || ShieldRuleType.garb => '',
+      };
+
+  static bool _isRecommendationQuickActionType(ShieldRuleType type) =>
+      switch (type) {
+        ShieldRuleType.keyword ||
+        ShieldRuleType.userKeyword ||
+        ShieldRuleType.reasonKeyword ||
+        ShieldRuleType.uid ||
+        ShieldRuleType.category ||
+        ShieldRuleType.tag => true,
+        ShieldRuleType.avatarPendant || ShieldRuleType.garb => false,
       };
 
   static String _contextualRuleLabel(

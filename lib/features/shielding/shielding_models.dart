@@ -5,6 +5,8 @@ enum ShieldRuleType {
   uid,
   category,
   tag,
+  avatarPendant,
+  garb,
 }
 
 enum ShieldMatchMode {
@@ -228,6 +230,8 @@ class ShieldCandidate {
     this.category,
     this.tags = const [],
     this.tokens = const [],
+    this.avatarPendantValues = const [],
+    this.garbValues = const [],
   });
 
   final ShieldScope scope;
@@ -240,6 +244,8 @@ class ShieldCandidate {
   final String? category;
   final List<String> tags;
   final List<String> tokens;
+  final List<String> avatarPendantValues;
+  final List<String> garbValues;
 }
 
 class ShieldMatchResult {

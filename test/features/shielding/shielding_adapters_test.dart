@@ -240,6 +240,63 @@ void main() {
       expect(candidate.authorName, '评论者');
     });
 
+    test('maps decoration values from ReplyInfo pendant and garb fields', () {
+      final reply = ReplyInfo(
+        mid: Int64(42),
+        content: Content(message: '装扮评论'),
+        member: Member(
+          mid: Int64(42),
+          name: '评论者',
+          garbPendantImage: 'https://i0.hdslb.com/pendant.png',
+          garbCardNumber: 'NO.0001',
+          garbCardImage: 'https://i0.hdslb.com/card.png',
+          garbCardJumpUrl: 'https://i0.hdslb.com/jump',
+        ),
+        memberV2: MemberV2(
+          garb: MemberV2_Garb(
+            pendantImage: 'https://i0.hdslb.com/v2-pendant.png',
+            cardImage: 'https://i0.hdslb.com/v2-card.png',
+            cardNumber: 'NO.0002',
+            cardJumpUrl: 'https://i0.hdslb.com/v2-jump',
+          ),
+        ),
+      );
+
+      final candidate = ShieldingAdapters.fromReplyInfo(reply);
+
+      expect(
+        candidate.avatarPendantValues,
+        containsAll([
+          'https://i0.hdslb.com/pendant.png',
+          'https://i0.hdslb.com/v2-pendant.png',
+        ]),
+      );
+      expect(
+        candidate.garbValues,
+        containsAll([
+          'NO.0001',
+          'https://i0.hdslb.com/card.png',
+          'https://i0.hdslb.com/jump',
+          'https://i0.hdslb.com/v2-card.png',
+          'NO.0002',
+          'https://i0.hdslb.com/v2-jump',
+        ]),
+      );
+    });
+
+    test('maps decoration values as empty when pendant and garb are missing', () {
+      final reply = ReplyInfo(
+        mid: Int64(42),
+        content: Content(message: '普通评论'),
+        member: Member(mid: Int64(42), name: '用户'),
+      );
+
+      final candidate = ShieldingAdapters.fromReplyInfo(reply);
+
+      expect(candidate.avatarPendantValues, isEmpty);
+      expect(candidate.garbValues, isEmpty);
+    });
+
     test('maps related video title owner and category fields', () {
       final video = HotVideoItemModel.fromJson({
         'aid': 1,

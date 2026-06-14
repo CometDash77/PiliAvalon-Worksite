@@ -106,6 +106,10 @@ abstract final class ShieldMatcher {
         yield ifNullEmpty(candidate.category);
       case ShieldRuleType.tag:
         yield* candidate.tags;
+      case ShieldRuleType.avatarPendant:
+        yield* candidate.avatarPendantValues;
+      case ShieldRuleType.garb:
+        yield* candidate.garbValues;
     }
   }
 

@@ -79,6 +79,8 @@ String shieldRuleTypeLabel(ShieldRuleType type) => switch (type) {
   ShieldRuleType.uid => '用户 UID',
   ShieldRuleType.category => '分区',
   ShieldRuleType.tag => '标签',
+  ShieldRuleType.avatarPendant => '头像挂件',
+  ShieldRuleType.garb => '装扮卡片',
 };
 
 const shieldingRuleCategoryLabels = [
@@ -88,6 +90,8 @@ const shieldingRuleCategoryLabels = [
   '标签',
   '分区',
   '评论关键词',
+  '头像挂件',
+  '装扮卡片',
 ];
 
 String shieldingRuleCategoryFor(ShieldRule rule) {
@@ -111,6 +115,8 @@ String shieldingRuleCategoryFor(ShieldRule rule) {
     ShieldRuleType.reasonKeyword => '推荐理由',
     ShieldRuleType.category => '分区',
     ShieldRuleType.tag => '标签',
+    ShieldRuleType.avatarPendant => '头像挂件',
+    ShieldRuleType.garb => '装扮卡片',
   };
 }
 

@@ -2,6 +2,7 @@ enum SettingType {
   privacySetting('隐私设置'),
   shieldingSetting('屏蔽规则'),
   channelQuietSetting('频道屏蔽'),
+  commentShieldSetting('评论区屏蔽设置'),
   recommendSetting('推荐流设置'),
   videoSetting('音视频设置'),
   playSetting('播放器设置'),
