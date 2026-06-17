@@ -269,6 +269,34 @@ void main() {
       expect(candidate.tags, isEmpty);
     });
 
+    test('fromRelatedVideo accepts explicit video detail scope', () {
+      final video = HotVideoItemModel.fromJson({
+        'aid': 1,
+        'cid': 2,
+        'bvid': 'BV1',
+        'videos': 1,
+        'tid': 17,
+        'tname': '单机游戏',
+        'copyright': 1,
+        'pic': '',
+        'title': '硬核攻略',
+        'pubdate': 1,
+        'ctime': 1,
+        'desc': '',
+        'duration': 60,
+        'owner': {'mid': 42, 'name': '玩家UP'},
+        'stat': {'view': 1, 'like': 1, 'danmaku': 1},
+      });
+
+      final candidate = ShieldingAdapters.fromRelatedVideo(
+        video,
+        scope: ShieldScope.videoDetail,
+      );
+
+      expect(candidate.scope, ShieldScope.videoDetail);
+      expect(candidate.title, '硬核攻略');
+    });
+
     test(
       'filterList handles all-blocked list without requesting more data',
       () {

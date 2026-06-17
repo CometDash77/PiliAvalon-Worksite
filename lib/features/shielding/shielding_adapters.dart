@@ -94,9 +94,12 @@ abstract final class ShieldingAdapters {
     );
   }
 
-  static ShieldCandidate fromRelatedVideo(HotVideoItemModel item) =>
+  static ShieldCandidate fromRelatedVideo(
+    HotVideoItemModel item, {
+    ShieldScope scope = ShieldScope.recommendation,
+  }) =>
       ShieldCandidate(
-        scope: ShieldScope.recommendation,
+        scope: scope,
         title: item.title,
         uid: item.owner.mid?.toString(),
         authorName: item.owner.name,
@@ -148,7 +151,7 @@ abstract final class ShieldingAdapters {
   ///
   /// Uses the independent [ShieldRuleSet.relatedVideoEnabled] switch
   /// (not [recommendationEnabled]) and scopes candidates as
-  /// [ShieldScope.videoDetail] via a thin wrapper over [fromRelatedVideo].
+  /// [ShieldScope.videoDetail].
   /// The legacy [filterRecommendationVideos] remains unchanged for
   /// homepage and ranking call sites.
   static List<HotVideoItemModel> filterRelatedVideos(
@@ -158,23 +161,8 @@ abstract final class ShieldingAdapters {
     items,
     enabled: ruleSet.relatedVideoEnabled,
     ruleSet: ruleSet,
-    toCandidate: (item) {
-      final base = fromRelatedVideo(item);
-      return ShieldCandidate(
-        scope: ShieldScope.videoDetail,
-        title: base.title,
-        uid: base.uid,
-        authorName: base.authorName,
-        authorTokens: base.authorTokens,
-        category: base.category,
-        tags: base.tags,
-        tokens: base.tokens,
-        description: base.description,
-        pubdate: base.pubdate,
-        staffNames: base.staffNames,
-        isUpowerExclusive: base.isUpowerExclusive,
-      );
-    },
+    toCandidate: (item) =>
+        fromRelatedVideo(item, scope: ShieldScope.videoDetail),
   );
 
   static List<String> _tags(Map<String, dynamic> json) {
