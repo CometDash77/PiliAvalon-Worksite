@@ -267,6 +267,7 @@ abstract final class ShieldBoxKey {
       globalEnabled = 'piliavalon.shielding.v1.global_enabled',
       recommendationEnabled = 'piliavalon.shielding.v1.recommendation_enabled',
       commentEnabled = 'piliavalon.shielding.v1.comment_enabled',
+      relatedVideoEnabled = 'piliavalon.shielding.v1.related_video_enabled',
       version = 'piliavalon.shielding.v1.version',
       lastLoadedAt = 'piliavalon.shielding.v1.last_loaded_at';
 }

@@ -10,6 +10,9 @@ enum ShieldRuleType {
   danmakuCount,
   commentMemberSex,
   commentMemberLevel,
+  descriptionKeyword,
+  publishTime,
+  isUpowerExclusive,
 }
 
 enum ShieldMatchMode {
@@ -138,6 +141,7 @@ class ShieldRuleSet {
     this.globalEnabled = true,
     this.recommendationEnabled = true,
     this.commentEnabled = true,
+    this.relatedVideoEnabled = true,
     this.version = 1,
     this.lastLoadedAt,
     this.loadErrors = const [],
@@ -159,6 +163,7 @@ class ShieldRuleSet {
       globalEnabled: json['global_enabled'] as bool? ?? true,
       recommendationEnabled: json['recommendation_enabled'] as bool? ?? true,
       commentEnabled: json['comment_enabled'] as bool? ?? true,
+      relatedVideoEnabled: json['related_video_enabled'] as bool? ?? true,
       version: json['version'] as int? ?? 1,
       lastLoadedAt: json['last_loaded_at'] == null
           ? null
@@ -184,6 +189,7 @@ class ShieldRuleSet {
   final bool globalEnabled;
   final bool recommendationEnabled;
   final bool commentEnabled;
+  final bool relatedVideoEnabled;
   final int version;
   final DateTime? lastLoadedAt;
   final List<String> loadErrors;
@@ -196,8 +202,8 @@ class ShieldRuleSet {
       ShieldScope.both => recommendationEnabled || commentEnabled,
       ShieldScope.search ||
       ShieldScope.dynamic ||
-      ShieldScope.live ||
-      ShieldScope.videoDetail => true,
+      ShieldScope.live => true,
+      ShieldScope.videoDetail => relatedVideoEnabled,
     };
   }
 
@@ -206,6 +212,7 @@ class ShieldRuleSet {
     bool? globalEnabled,
     bool? recommendationEnabled,
     bool? commentEnabled,
+    bool? relatedVideoEnabled,
     int? version,
     DateTime? lastLoadedAt,
     List<String>? loadErrors,
@@ -214,6 +221,7 @@ class ShieldRuleSet {
     globalEnabled: globalEnabled ?? this.globalEnabled,
     recommendationEnabled: recommendationEnabled ?? this.recommendationEnabled,
     commentEnabled: commentEnabled ?? this.commentEnabled,
+    relatedVideoEnabled: relatedVideoEnabled ?? this.relatedVideoEnabled,
     version: version ?? this.version,
     lastLoadedAt: lastLoadedAt ?? this.lastLoadedAt,
     loadErrors: loadErrors ?? this.loadErrors,
@@ -224,6 +232,7 @@ class ShieldRuleSet {
     'global_enabled': globalEnabled,
     'recommendation_enabled': recommendationEnabled,
     'comment_enabled': commentEnabled,
+    'related_video_enabled': relatedVideoEnabled,
     'last_loaded_at': lastLoadedAt?.millisecondsSinceEpoch,
     'rules': rules.map((rule) => rule.toJson()).toList(),
   };
@@ -246,6 +255,10 @@ class ShieldCandidate {
     this.danmakuCount,
     this.commentMemberSex,
     this.commentMemberLevel,
+    this.description,
+    this.pubdate,
+    this.staffNames = const [],
+    this.isUpowerExclusive,
   });
 
   final ShieldScope scope;
@@ -263,6 +276,11 @@ class ShieldCandidate {
   final num? danmakuCount;
   final String? commentMemberSex;
   final num? commentMemberLevel;
+  // task-066 detail-introduction candidate metadata
+  final String? description;
+  final int? pubdate;
+  final List<String> staffNames;
+  final bool? isUpowerExclusive;
 }
 
 class ShieldMatchResult {
