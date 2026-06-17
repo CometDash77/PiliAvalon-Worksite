@@ -96,6 +96,7 @@ const shieldingRuleCategoryLabels = [
   '推荐理由',
   '标签',
   '分区',
+  '视频详情信息',
   '评论关键词',
 ];
 
@@ -140,6 +141,10 @@ String shieldingRuleCategoryFor(ShieldRule rule) {
     ShieldRuleType.danmakuCount => '数值元数据',
     ShieldRuleType.commentMemberSex ||
     ShieldRuleType.commentMemberLevel => '评论用户信息',
+    ShieldRuleType.descriptionKeyword ||
+    ShieldRuleType.publishTime ||
+    ShieldRuleType.isUpowerExclusive ||
+    ShieldRuleType.staffKeyword => '视频详情信息',
   };
 }
 
