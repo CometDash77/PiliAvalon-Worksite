@@ -92,6 +92,14 @@ List<SettingsModel> get recommendSettings => [
     defaultVal: true,
     onChanged: (value) => RecommendFilter.applyFilterToRelatedVideos = value,
   ),
+  SwitchModel(
+    title: '相关视频屏蔽',
+    subtitle: '独立控制视频详情页相关视频的屏蔽规则是否生效',
+    leading: const Icon(Icons.shield_outlined),
+    setKey: ShieldBoxKey.relatedVideoEnabled,
+    defaultVal: true,
+    onChanged: (value) => ShieldSettingsStore().setRelatedVideoEnabled(value),
+  ),
   _buildNumberInputModel(
     title: '标签获取并发数',
     icon: Icons.memory_outlined,

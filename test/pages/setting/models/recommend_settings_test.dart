@@ -54,7 +54,7 @@ void main() {
       final list = recommendSettings;
 
       final filterIdx = list.indexWhere(
-        (e) => e.effectiveTitle == '过滤器也应用于相关视频',
+        (e) => e.effectiveTitle == '相关视频屏蔽',
       );
       expect(filterIdx, isNot(-1));
 
@@ -62,6 +62,34 @@ void main() {
         (e) => e.effectiveTitle == '标签获取并发数',
       );
       expect(tagIdx1, greaterThan(filterIdx));
+    });
+
+    test('old applyFilterToRelatedVideos and new relatedVideoEnabled are independent', () {
+      final list = recommendSettings;
+
+      final oldIdx = list.indexWhere(
+        (e) => e.effectiveTitle == '过滤器也应用于相关视频',
+      );
+      final newIdx = list.indexWhere(
+        (e) => e.effectiveTitle == '相关视频屏蔽',
+      );
+
+      expect(oldIdx, isNot(-1));
+      expect(newIdx, isNot(-1));
+      expect(oldIdx, isNot(equals(newIdx)));
+    });
+
+    test('new 相关视频屏蔽 switch appears after old filter switch', () {
+      final list = recommendSettings;
+
+      final oldIdx = list.indexWhere(
+        (e) => e.effectiveTitle == '过滤器也应用于相关视频',
+      );
+      final newIdx = list.indexWhere(
+        (e) => e.effectiveTitle == '相关视频屏蔽',
+      );
+
+      expect(newIdx, greaterThan(oldIdx));
     });
 
     test('concurrency entry shows default value of 5', () {
@@ -136,7 +164,7 @@ void main() {
 
     test('total settings count includes new inline range filtering entries', () {
       final list = recommendSettings;
-      expect(list.length, 17);
+      expect(list.length, 18);
     });
 
     test('contains inline range filtering entries', () {

@@ -345,6 +345,69 @@ void main() {
         '评论用户等级',
       );
     });
+
+    test('task-066 detail-introduction rule type labels are visible', () {
+      expect(
+        shieldRuleTypeLabel(ShieldRuleType.descriptionKeyword),
+        '视频简介',
+      );
+      expect(
+        shieldRuleTypeLabel(ShieldRuleType.publishTime),
+        '发布时间',
+      );
+      expect(
+        shieldRuleTypeLabel(ShieldRuleType.isUpowerExclusive),
+        '充电专属',
+      );
+      expect(
+        shieldRuleTypeLabel(ShieldRuleType.staffKeyword),
+        '制作人员',
+      );
+    });
+
+    test('task-066 rule types categorize under 视频详情信息', () {
+      final descRule = ShieldRule(
+        id: 'desc-1',
+        type: ShieldRuleType.descriptionKeyword,
+        matchMode: ShieldMatchMode.contains,
+        scope: ShieldScope.recommendation,
+        action: ShieldAction.block,
+        pattern: '测试',
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+      );
+      final pubtimeRule = ShieldRule(
+        id: 'pubtime-1',
+        type: ShieldRuleType.publishTime,
+        matchMode: ShieldMatchMode.range,
+        scope: ShieldScope.recommendation,
+        action: ShieldAction.block,
+        pattern: '..1000',
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+      );
+      final upowerRule = ShieldRule(
+        id: 'upower-1',
+        type: ShieldRuleType.isUpowerExclusive,
+        matchMode: ShieldMatchMode.enumValue,
+        scope: ShieldScope.recommendation,
+        action: ShieldAction.block,
+        pattern: 'true',
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+      );
+      final staffRule = ShieldRule(
+        id: 'staff-1',
+        type: ShieldRuleType.staffKeyword,
+        matchMode: ShieldMatchMode.contains,
+        scope: ShieldScope.recommendation,
+        action: ShieldAction.block,
+        pattern: '张三',
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+      );
+
+      expect(shieldingRuleCategoryFor(descRule), '视频详情信息');
+      expect(shieldingRuleCategoryFor(pubtimeRule), '视频详情信息');
+      expect(shieldingRuleCategoryFor(upowerRule), '视频详情信息');
+      expect(shieldingRuleCategoryFor(staffRule), '视频详情信息');
+    });
   });
 
   group('ShieldingSettingsPage', () {

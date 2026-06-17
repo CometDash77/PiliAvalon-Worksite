@@ -41,6 +41,15 @@ abstract final class ShieldingAdapters {
       danmakuCount = item.stat.danmu;
     }
 
+    // task-066 detail-introduction candidate metadata from homepage.
+    final description = _nonEmpty(item.desc) ??
+        _nonEmpty(json['desc']?.toString());
+    final pubdate = item.pubdate ?? json['pubdate'] as int?;
+    final isUpowerExclusive =
+        json['charging_pay'] is Map && json['charging_pay']['level'] != null
+            ? true
+            : null;
+
     return ShieldCandidate(
       scope: ShieldScope.recommendation,
       title: item.title,
@@ -58,6 +67,10 @@ abstract final class ShieldingAdapters {
       durationSeconds: durationSeconds,
       playbackCount: playbackCount,
       danmakuCount: danmakuCount,
+      description: description,
+      pubdate: pubdate,
+      staffNames: const [],
+      isUpowerExclusive: isUpowerExclusive,
     );
   }
 
@@ -93,6 +106,13 @@ abstract final class ShieldingAdapters {
           item.title,
           item.tname,
         ]),
+        // task-066: populate detail-introduction fields from related-video model.
+        description: item.desc,
+        pubdate: item.pubdate,
+        staffNames: const [],
+        isUpowerExclusive: item.badge == '充电专属' ? true : (
+          item.badge == null ? null : false
+        ),
       );
 
   static List<T> filterList<T>(
@@ -122,6 +142,39 @@ abstract final class ShieldingAdapters {
     enabled: ruleSet.recommendationEnabled,
     ruleSet: ruleSet,
     toCandidate: fromRelatedVideo,
+  );
+
+  /// Applies related-video shielding to a list of [HotVideoItemModel] items.
+  ///
+  /// Uses the independent [ShieldRuleSet.relatedVideoEnabled] switch
+  /// (not [recommendationEnabled]) and scopes candidates as
+  /// [ShieldScope.videoDetail] via a thin wrapper over [fromRelatedVideo].
+  /// The legacy [filterRecommendationVideos] remains unchanged for
+  /// homepage and ranking call sites.
+  static List<HotVideoItemModel> filterRelatedVideos(
+    List<HotVideoItemModel> items,
+    ShieldRuleSet ruleSet,
+  ) => filterList(
+    items,
+    enabled: ruleSet.relatedVideoEnabled,
+    ruleSet: ruleSet,
+    toCandidate: (item) {
+      final base = fromRelatedVideo(item);
+      return ShieldCandidate(
+        scope: ShieldScope.videoDetail,
+        title: base.title,
+        uid: base.uid,
+        authorName: base.authorName,
+        authorTokens: base.authorTokens,
+        category: base.category,
+        tags: base.tags,
+        tokens: base.tokens,
+        description: base.description,
+        pubdate: base.pubdate,
+        staffNames: base.staffNames,
+        isUpowerExclusive: base.isUpowerExclusive,
+      );
+    },
   );
 
   static List<String> _tags(Map<String, dynamic> json) {

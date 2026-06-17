@@ -13,6 +13,7 @@ enum ShieldRuleType {
   descriptionKeyword,
   publishTime,
   isUpowerExclusive,
+  staffKeyword,
 }
 
 enum ShieldMatchMode {

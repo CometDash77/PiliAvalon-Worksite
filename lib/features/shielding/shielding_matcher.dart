@@ -118,6 +118,8 @@ abstract final class ShieldMatcher {
         yield candidate.isUpowerExclusive == true ? 'true' : (
           candidate.isUpowerExclusive == false ? 'false' : ''
         );
+      case ShieldRuleType.staffKeyword:
+        yield* candidate.staffNames;
       case ShieldRuleType.duration:
       case ShieldRuleType.playbackCount:
       case ShieldRuleType.danmakuCount:

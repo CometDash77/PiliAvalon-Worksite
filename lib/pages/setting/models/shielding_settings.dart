@@ -84,6 +84,10 @@ String shieldRuleTypeLabel(ShieldRuleType type) => switch (type) {
   ShieldRuleType.danmakuCount => '弹幕数',
   ShieldRuleType.commentMemberSex => '评论用户性别',
   ShieldRuleType.commentMemberLevel => '评论用户等级',
+  ShieldRuleType.descriptionKeyword => '视频简介',
+  ShieldRuleType.publishTime => '发布时间',
+  ShieldRuleType.isUpowerExclusive => '充电专属',
+  ShieldRuleType.staffKeyword => '制作人员',
 };
 
 const shieldingRuleCategoryLabels = [
@@ -118,6 +122,12 @@ String shieldingRuleCategoryFor(ShieldRule rule) {
   if (rule.type == ShieldRuleType.commentMemberSex ||
       rule.type == ShieldRuleType.commentMemberLevel) {
     return '评论用户信息';
+  }
+  if (rule.type == ShieldRuleType.descriptionKeyword ||
+      rule.type == ShieldRuleType.publishTime ||
+      rule.type == ShieldRuleType.isUpowerExclusive ||
+      rule.type == ShieldRuleType.staffKeyword) {
+    return '视频详情信息';
   }
   return switch (rule.type) {
     ShieldRuleType.keyword => '标题关键词',
