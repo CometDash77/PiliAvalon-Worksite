@@ -43,6 +43,40 @@ void main() {
       expect(rules.single.pattern, '动态关键词');
     });
 
+    testWidgets('text dialog creates video detail description rule', (
+      tester,
+    ) async {
+      final store = ShieldSettingsStore(box: _MemoryBox());
+
+      await _pumpLauncher(
+        tester,
+        onTap: (context) => VideoCardShieldQuickAction.showTextDialog(
+          context: context,
+          title: '视频简介',
+          text: '这是一段视频简介',
+          type: ShieldRuleType.descriptionKeyword,
+          scope: ShieldScope.videoDetail,
+          store: store,
+        ),
+      );
+
+      await tester.tap(find.text('打开'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('视频简介'), findsOneWidget);
+      expect(find.text('这是一段视频简介'), findsOneWidget);
+
+      await tester.tap(find.text('屏蔽'));
+      await tester.pumpAndSettle();
+
+      final rules = (await store.load()).rules;
+      expect(rules, hasLength(1));
+      expect(rules.single.type, ShieldRuleType.descriptionKeyword);
+      expect(rules.single.scope, ShieldScope.videoDetail);
+      expect(rules.single.matchMode, ShieldMatchMode.contains);
+      expect(rules.single.pattern, '这是一段视频简介');
+    });
+
     testWidgets('recommendation dialog shows editable title and UP inputs', (
       tester,
     ) async {
