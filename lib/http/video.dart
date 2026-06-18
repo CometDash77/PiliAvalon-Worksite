@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:PiliPlus/common/constants.dart';
+import 'package:PiliPlus/features/shielding/home_feed_comment_gate.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/features/shielding/shielding_recommend_tag_enricher.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
@@ -97,7 +98,18 @@ abstract final class VideoHttp {
         getBvid: (item) => item.bvid,
         getCid: (item) => item.cid,
       );
-      return Success(ExposureTracker.instance.filterAndRecord(list, getBvid: (item) => item.bvid));
+      final gatedList = await HomeFeedCommentGate.filter(
+        list,
+        config: CommentShieldingStore().snapshot(),
+        ruleSet: shieldRuleSet,
+        getAid: (item) => item.aid,
+      );
+      return Success(
+        ExposureTracker.instance.filterAndRecord(
+          gatedList,
+          getBvid: (item) => item.bvid,
+        ),
+      );
     } else {
       return Error(res.data['message']);
     }
@@ -193,7 +205,18 @@ abstract final class VideoHttp {
         getBvid: (item) => item.bvid,
         getCid: (item) => item.cid,
       );
-      return Success(ExposureTracker.instance.filterAndRecord(list, getBvid: (item) => item.bvid));
+      final gatedList = await HomeFeedCommentGate.filter(
+        list,
+        config: CommentShieldingStore().snapshot(),
+        ruleSet: shieldRuleSet,
+        getAid: (item) => item.aid,
+      );
+      return Success(
+        ExposureTracker.instance.filterAndRecord(
+          gatedList,
+          getBvid: (item) => item.bvid,
+        ),
+      );
     } else {
       return Error(res.data['message']);
     }

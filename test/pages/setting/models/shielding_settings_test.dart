@@ -197,14 +197,15 @@ void main() {
           '推荐理由',
           '标签',
           '分区',
+          '数值元数据',
+          '评论用户信息',
+          '评论装饰',
           '视频详情信息',
           '评论关键词',
         ]),
       );
       expect(shieldingRuleCategoryLabels, isNot(contains('精确文本')));
       expect(shieldingRuleCategoryLabels, isNot(contains('旧规则兼容')));
-      expect(shieldingRuleCategoryLabels, isNot(contains('数值元数据')));
-      expect(shieldingRuleCategoryLabels, isNot(contains('评论用户信息')));
     });
 
     test('categorizes quick recommendation keyword exact as title keyword', () {
@@ -500,14 +501,16 @@ void main() {
       expect(find.text('推荐理由'), findsOneWidget);
       expect(find.text('标签'), findsOneWidget);
       expect(find.text('分区'), findsOneWidget);
+      expect(find.text('数值元数据'), findsOneWidget);
+      expect(find.text('评论用户信息'), findsOneWidget);
+      expect(find.text('评论装饰'), findsOneWidget);
+      expect(find.text('视频详情信息'), findsOneWidget);
       expect(find.text('评论关键词'), findsOneWidget);
       expect(find.text('精确文本'), findsNothing);
       expect(find.text('旧规则兼容'), findsNothing);
-      expect(find.text('数值元数据'), findsNothing);
-      expect(find.text('评论用户信息'), findsNothing);
     });
 
-    testWidgets('general editor hides numeric and comment-user rule types', (
+    testWidgets('general editor shows full rule type set', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -525,11 +528,17 @@ void main() {
       await tester.tap(find.text('标题/正文关键词').last);
       await tester.pumpAndSettle();
 
-      expect(find.text('时长'), findsNothing);
-      expect(find.text('播放数'), findsNothing);
-      expect(find.text('弹幕数'), findsNothing);
-      expect(find.text('评论用户性别'), findsNothing);
-      expect(find.text('评论用户等级'), findsNothing);
+      expect(find.text('时长'), findsOneWidget);
+      expect(find.text('播放数'), findsOneWidget);
+      expect(find.text('弹幕数'), findsOneWidget);
+      expect(find.text('评论用户性别'), findsOneWidget);
+      expect(find.text('评论用户等级'), findsOneWidget);
+      expect(find.text('头像挂件'), findsOneWidget);
+      expect(find.text('装扮卡片'), findsOneWidget);
+      expect(find.text('视频简介'), findsOneWidget);
+      expect(find.text('发布时间'), findsOneWidget);
+      expect(find.text('充电专属'), findsOneWidget);
+      expect(find.text('制作人员'), findsOneWidget);
     });
   });
 }

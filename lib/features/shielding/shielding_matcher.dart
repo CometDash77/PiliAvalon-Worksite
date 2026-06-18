@@ -110,6 +110,10 @@ abstract final class ShieldMatcher {
         yield ifNullEmpty(candidate.category);
       case ShieldRuleType.tag:
         yield* candidate.tags;
+      case ShieldRuleType.avatarPendant:
+        yield* candidate.avatarPendantValues;
+      case ShieldRuleType.garb:
+        yield* candidate.garbValues;
       case ShieldRuleType.commentMemberSex:
         yield ifNullEmpty(candidate.commentMemberSex);
       case ShieldRuleType.descriptionKeyword:

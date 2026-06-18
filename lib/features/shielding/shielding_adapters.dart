@@ -80,6 +80,30 @@ abstract final class ShieldingAdapters {
         : reply.hasMember()
         ? reply.member.mid.toString()
         : null;
+    final pendantValues = <String>[
+      if (reply.hasMember() && reply.member.garbPendantImage.isNotEmpty)
+        reply.member.garbPendantImage,
+      if (reply.hasMemberV2() &&
+          reply.memberV2.hasGarb() &&
+          reply.memberV2.garb.pendantImage.isNotEmpty)
+        reply.memberV2.garb.pendantImage,
+    ];
+    final garbValues = <String>[
+      if (reply.hasMember()) ...[
+        if (reply.member.garbCardNumber.isNotEmpty) reply.member.garbCardNumber,
+        if (reply.member.garbCardImage.isNotEmpty) reply.member.garbCardImage,
+        if (reply.member.garbCardJumpUrl.isNotEmpty)
+          reply.member.garbCardJumpUrl,
+      ],
+      if (reply.hasMemberV2() && reply.memberV2.hasGarb()) ...[
+        if (reply.memberV2.garb.cardNumber.isNotEmpty)
+          reply.memberV2.garb.cardNumber,
+        if (reply.memberV2.garb.cardImage.isNotEmpty)
+          reply.memberV2.garb.cardImage,
+        if (reply.memberV2.garb.cardJumpUrl.isNotEmpty)
+          reply.memberV2.garb.cardJumpUrl,
+      ],
+    ];
     return ShieldCandidate(
       scope: ShieldScope.comment,
       body: reply.hasContent() ? reply.content.message : null,
@@ -91,6 +115,8 @@ abstract final class ShieldingAdapters {
       tokens: _tokens([
         if (reply.hasContent()) reply.content.message,
       ]),
+      avatarPendantValues: pendantValues,
+      garbValues: garbValues,
     );
   }
 

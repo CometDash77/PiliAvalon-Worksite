@@ -248,6 +248,8 @@ abstract final class VideoCardShieldQuickAction {
         ShieldRuleType.danmakuCount => '屏蔽推荐弹幕数 $pattern',
         ShieldRuleType.commentMemberSex => '屏蔽评论用户性别 $pattern',
         ShieldRuleType.commentMemberLevel => '屏蔽评论用户等级 $pattern',
+        ShieldRuleType.avatarPendant => '屏蔽评论头像挂件 $pattern',
+        ShieldRuleType.garb => '屏蔽评论装扮卡片 $pattern',
         ShieldRuleType.descriptionKeyword => '屏蔽视频简介关键词「$pattern」',
         ShieldRuleType.publishTime => '屏蔽视频发布时间 $pattern',
         ShieldRuleType.isUpowerExclusive => '屏蔽充电专属状态 $pattern',

@@ -5,6 +5,8 @@ enum ShieldRuleType {
   uid,
   category,
   tag,
+  avatarPendant,
+  garb,
   duration,
   playbackCount,
   danmakuCount,
@@ -251,6 +253,8 @@ class ShieldCandidate {
     this.category,
     this.tags = const [],
     this.tokens = const [],
+    this.avatarPendantValues = const [],
+    this.garbValues = const [],
     this.durationSeconds,
     this.playbackCount,
     this.danmakuCount,
@@ -272,6 +276,8 @@ class ShieldCandidate {
   final String? category;
   final List<String> tags;
   final List<String> tokens;
+  final List<String> avatarPendantValues;
+  final List<String> garbValues;
   final num? durationSeconds;
   final num? playbackCount;
   final num? danmakuCount;

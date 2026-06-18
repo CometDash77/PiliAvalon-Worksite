@@ -79,6 +79,8 @@ String shieldRuleTypeLabel(ShieldRuleType type) => switch (type) {
   ShieldRuleType.uid => '用户 UID',
   ShieldRuleType.category => '分区',
   ShieldRuleType.tag => '标签',
+  ShieldRuleType.avatarPendant => '头像挂件',
+  ShieldRuleType.garb => '装扮卡片',
   ShieldRuleType.duration => '时长',
   ShieldRuleType.playbackCount => '播放数',
   ShieldRuleType.danmakuCount => '弹幕数',
@@ -96,6 +98,9 @@ const shieldingRuleCategoryLabels = [
   '推荐理由',
   '标签',
   '分区',
+  '数值元数据',
+  '评论用户信息',
+  '评论装饰',
   '视频详情信息',
   '评论关键词',
 ];
@@ -124,6 +129,10 @@ String shieldingRuleCategoryFor(ShieldRule rule) {
       rule.type == ShieldRuleType.commentMemberLevel) {
     return '评论用户信息';
   }
+  if (rule.type == ShieldRuleType.avatarPendant ||
+      rule.type == ShieldRuleType.garb) {
+    return '评论装饰';
+  }
   if (rule.type == ShieldRuleType.descriptionKeyword ||
       rule.type == ShieldRuleType.publishTime ||
       rule.type == ShieldRuleType.isUpowerExclusive ||
@@ -136,6 +145,7 @@ String shieldingRuleCategoryFor(ShieldRule rule) {
     ShieldRuleType.reasonKeyword => '推荐理由',
     ShieldRuleType.category => '分区',
     ShieldRuleType.tag => '标签',
+    ShieldRuleType.avatarPendant || ShieldRuleType.garb => '评论装饰',
     ShieldRuleType.duration ||
     ShieldRuleType.playbackCount ||
     ShieldRuleType.danmakuCount => '数值元数据',
