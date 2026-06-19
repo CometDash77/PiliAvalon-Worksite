@@ -1,0 +1,66 @@
+name: Restore Release Assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: "GitHub Actions run ID that already contains the APK artifacts"
+        required: true
+        type: string
+      release_tag:
+        description: "Release tag to receive the restored APK assets"
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  restore:
+    name: Restore APK artifacts to prerelease
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Download original APK artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p restored
+          gh run download "$SOURCE_RUN_ID" \
+            -R "$GITHUB_REPOSITORY" \
+            -D restored \
+            -n 'PiliAvalon_android_2.0.8-f96a0e1d7+5162_arm64-v8a.apk' \
+            -n 'PiliAvalon_android_2.0.8-f96a0e1d7+5162_armeabi-v7a.apk' \
+            -n 'PiliAvalon_android_2.0.8-f96a0e1d7+5162_x86_64.apk'
+          find restored -type f -name '*.apk' -maxdepth 3 -print -exec cp '{}' . ';'
+          test -f 'PiliAvalon_android_2.0.8-f96a0e1d7+5162_arm64-v8a.apk'
+          test -f 'PiliAvalon_android_2.0.8-f96a0e1d7+5162_armeabi-v7a.apk'
+          test -f 'PiliAvalon_android_2.0.8-f96a0e1d7+5162_x86_64.apk'
+
+      - name: Upload APKs to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" \
+            -R "$GITHUB_REPOSITORY" \
+            --clobber \
+            PiliAvalon_android_2.0.8-f96a0e1d7+5162_arm64-v8a.apk \
+            PiliAvalon_android_2.0.8-f96a0e1d7+5162_armeabi-v7a.apk \
+            PiliAvalon_android_2.0.8-f96a0e1d7+5162_x86_64.apk
+
+      - name: Verify release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" \
+            -R "$GITHUB_REPOSITORY" \
+            --json tagName,isPrerelease,isDraft,targetCommitish,assets \
+            --jq '{tagName,isPrerelease,isDraft,targetCommitish,assets:[.assets[].name]}'
