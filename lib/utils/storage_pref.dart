@@ -643,6 +643,36 @@ abstract final class Pref {
   static int get minLikeRatioForRecommend =>
       _setting.get(SettingBoxKey.minLikeRatioForRecommend, defaultValue: 0);
 
+  static bool get filterInteractionRateForRecommend => _setting.get(
+    SettingBoxKey.filterInteractionRateForRecommend,
+    defaultValue: false,
+  );
+
+  static double get minInteractionRateForRecommend => _setting.get(
+    SettingBoxKey.minInteractionRateForRecommend,
+    defaultValue: 1.0,
+  );
+
+  static bool get filterTripleRateForRecommend => _setting.get(
+    SettingBoxKey.filterTripleRateForRecommend,
+    defaultValue: false,
+  );
+
+  static double get minTripleRateForRecommend => _setting.get(
+    SettingBoxKey.minTripleRateForRecommend,
+    defaultValue: 3.0,
+  );
+
+  static bool get filterContentValueForRecommend => _setting.get(
+    SettingBoxKey.filterContentValueForRecommend,
+    defaultValue: false,
+  );
+
+  static double get minContentValueForRecommend => _setting.get(
+    SettingBoxKey.minContentValueForRecommend,
+    defaultValue: 10.0,
+  );
+
   static bool get exemptFilterForFollowed =>
       _setting.get(SettingBoxKey.exemptFilterForFollowed, defaultValue: true);
 

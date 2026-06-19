@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:PiliPlus/features/shielding/shielding_models.dart';
 import 'package:PiliPlus/features/shielding/shielding_store.dart';
+import 'package:PiliPlus/pages/setting/models/model.dart';
 import 'package:PiliPlus/pages/setting/models/recommend_settings.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
@@ -29,6 +30,12 @@ void main() {
     GStorage.setting.delete(SettingBoxKey.repeatExposureThreshold);
     GStorage.setting.delete(SettingBoxKey.repeatExposureCoolingDays);
     GStorage.setting.delete(SettingBoxKey.repeatExposureMaxCacheSize);
+    GStorage.setting.delete(SettingBoxKey.filterInteractionRateForRecommend);
+    GStorage.setting.delete(SettingBoxKey.minInteractionRateForRecommend);
+    GStorage.setting.delete(SettingBoxKey.filterTripleRateForRecommend);
+    GStorage.setting.delete(SettingBoxKey.minTripleRateForRecommend);
+    GStorage.setting.delete(SettingBoxKey.filterContentValueForRecommend);
+    GStorage.setting.delete(SettingBoxKey.minContentValueForRecommend);
     await ShieldSettingsStore().clear();
   });
 
@@ -64,20 +71,23 @@ void main() {
       expect(tagIdx1, greaterThan(filterIdx));
     });
 
-    test('old applyFilterToRelatedVideos and new relatedVideoEnabled are independent', () {
-      final list = recommendSettings;
+    test(
+      'old applyFilterToRelatedVideos and new relatedVideoEnabled are independent',
+      () {
+        final list = recommendSettings;
 
-      final oldIdx = list.indexWhere(
-        (e) => e.effectiveTitle == '过滤器也应用于相关视频',
-      );
-      final newIdx = list.indexWhere(
-        (e) => e.effectiveTitle == '相关视频屏蔽',
-      );
+        final oldIdx = list.indexWhere(
+          (e) => e.effectiveTitle == '过滤器也应用于相关视频',
+        );
+        final newIdx = list.indexWhere(
+          (e) => e.effectiveTitle == '相关视频屏蔽',
+        );
 
-      expect(oldIdx, isNot(-1));
-      expect(newIdx, isNot(-1));
-      expect(oldIdx, isNot(equals(newIdx)));
-    });
+        expect(oldIdx, isNot(-1));
+        expect(newIdx, isNot(-1));
+        expect(oldIdx, isNot(equals(newIdx)));
+      },
+    );
 
     test('new 相关视频屏蔽 switch appears after old filter switch', () {
       final list = recommendSettings;
@@ -162,9 +172,89 @@ void main() {
       expect(entry.effectiveSubtitle, contains('/ 25 MB'));
     });
 
-    test('total settings count includes new inline range filtering entries', () {
+    test(
+      'total settings count includes new inline range filtering entries',
+      () {
+        final list = recommendSettings;
+        expect(list.length, 21);
+      },
+    );
+
+    test('contains derived metric filtering entries', () {
       final list = recommendSettings;
-      expect(list.length, 18);
+      final titles = list.map((e) => e.effectiveTitle).toList();
+
+      expect(titles, contains('互动率过滤'));
+      expect(titles, contains('三连率过滤'));
+      expect(titles, contains('内容价值过滤'));
+    });
+
+    test('derived metric filtering entries default to disabled switches', () {
+      final list = recommendSettings;
+
+      final interaction = list.whereType<SplitModel>().firstWhere(
+        (e) => e.effectiveTitle == '互动率过滤',
+      );
+      final triple = list.whereType<SplitModel>().firstWhere(
+        (e) => e.effectiveTitle == '三连率过滤',
+      );
+      final contentValue = list.whereType<SplitModel>().firstWhere(
+        (e) => e.effectiveTitle == '内容价值过滤',
+      );
+
+      expect(
+        interaction.switchModel.setKey,
+        SettingBoxKey.filterInteractionRateForRecommend,
+      );
+      expect(interaction.switchModel.defaultVal, isFalse);
+      expect(
+        triple.switchModel.setKey,
+        SettingBoxKey.filterTripleRateForRecommend,
+      );
+      expect(triple.switchModel.defaultVal, isFalse);
+      expect(
+        contentValue.switchModel.setKey,
+        SettingBoxKey.filterContentValueForRecommend,
+      );
+      expect(contentValue.switchModel.defaultVal, isFalse);
+    });
+
+    test('derived metric entries show default thresholds', () {
+      final list = recommendSettings;
+
+      expect(
+        list.firstWhere((e) => e.effectiveTitle == '互动率过滤').effectiveSubtitle,
+        contains('当前: 1.0%'),
+      );
+      expect(
+        list.firstWhere((e) => e.effectiveTitle == '三连率过滤').effectiveSubtitle,
+        contains('当前: 3.0%'),
+      );
+      expect(
+        list.firstWhere((e) => e.effectiveTitle == '内容价值过滤').effectiveSubtitle,
+        contains('当前: 10.0%'),
+      );
+    });
+
+    test('derived metric entries reflect stored thresholds', () {
+      GStorage.setting.put(SettingBoxKey.minInteractionRateForRecommend, 2.5);
+      GStorage.setting.put(SettingBoxKey.minTripleRateForRecommend, 4.5);
+      GStorage.setting.put(SettingBoxKey.minContentValueForRecommend, 12.5);
+
+      final list = recommendSettings;
+
+      expect(
+        list.firstWhere((e) => e.effectiveTitle == '互动率过滤').effectiveSubtitle,
+        contains('当前: 2.5%'),
+      );
+      expect(
+        list.firstWhere((e) => e.effectiveTitle == '三连率过滤').effectiveSubtitle,
+        contains('当前: 4.5%'),
+      );
+      expect(
+        list.firstWhere((e) => e.effectiveTitle == '内容价值过滤').effectiveSubtitle,
+        contains('当前: 12.5%'),
+      );
     });
 
     test('contains inline range filtering entries', () {
@@ -236,15 +326,11 @@ void main() {
         contains('当前: 7天'),
       );
       expect(
-        list
-            .firstWhere((e) => e.effectiveTitle == '重复曝光阈值')
-            .effectiveSubtitle,
+        list.firstWhere((e) => e.effectiveTitle == '重复曝光阈值').effectiveSubtitle,
         contains('当前: 10次'),
       );
       expect(
-        list
-            .firstWhere((e) => e.effectiveTitle == '重复曝光冷却期')
-            .effectiveSubtitle,
+        list.firstWhere((e) => e.effectiveTitle == '重复曝光冷却期').effectiveSubtitle,
         contains('当前: 30天'),
       );
     });
@@ -298,8 +384,7 @@ void main() {
       await store.save(ruleSet.copyWith(rules: [rule]));
 
       final list = recommendSettings;
-      final entry =
-          list.firstWhere((e) => e.effectiveTitle == '播放量过滤');
+      final entry = list.firstWhere((e) => e.effectiveTitle == '播放量过滤');
       expect(entry.effectiveSubtitle, '屏蔽 ≥ 500');
     });
 
@@ -328,8 +413,7 @@ void main() {
       await store.save(ruleSet.copyWith(rules: [lo, hi]));
 
       final list = recommendSettings;
-      final entry =
-          list.firstWhere((e) => e.effectiveTitle == '弹幕量过滤');
+      final entry = list.firstWhere((e) => e.effectiveTitle == '弹幕量过滤');
       expect(entry.effectiveSubtitle, '屏蔽 ≤ 30 及 ≥ 200');
     });
 

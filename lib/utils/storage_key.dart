@@ -49,6 +49,12 @@ abstract final class SettingBoxKey {
       minDurationForRcmd = 'minDurationForRcmd',
       minPlayForRcmd = 'minPlayForRcmd',
       minLikeRatioForRecommend = 'minLikeRatioForRecommend',
+      filterInteractionRateForRecommend = 'filterInteractionRateForRecommend',
+      minInteractionRateForRecommend = 'minInteractionRateForRecommend',
+      filterTripleRateForRecommend = 'filterTripleRateForRecommend',
+      minTripleRateForRecommend = 'minTripleRateForRecommend',
+      filterContentValueForRecommend = 'filterContentValueForRecommend',
+      minContentValueForRecommend = 'minContentValueForRecommend',
       exemptFilterForFollowed = 'exemptFilterForFollowed',
       banWordForRecommend = 'banWordForRecommend',
       applyFilterToRelatedVideos = 'applyFilterToRelatedVideos',
@@ -157,7 +163,8 @@ abstract final class SettingBoxKey {
       removeSafeArea = 'removeSafeArea',
       angleDegrees = 'angleDegrees';
 
-  static const String repeatExposureFilterEnabled = 'repeatExposureFilterEnabled',
+  static const String repeatExposureFilterEnabled =
+          'repeatExposureFilterEnabled',
       repeatExposureWindowDays = 'repeatExposureWindowDays',
       repeatExposureThreshold = 'repeatExposureThreshold',
       repeatExposureCoolingDays = 'repeatExposureCoolingDays',

@@ -42,13 +42,14 @@ abstract final class ShieldingAdapters {
     }
 
     // task-066 detail-introduction candidate metadata from homepage.
-    final description = _nonEmpty(item.desc) ??
-        _nonEmpty(json['desc']?.toString());
+    final description =
+        _nonEmpty(item.desc) ?? _nonEmpty(json['desc']?.toString());
     final pubdate = item.pubdate ?? json['pubdate'] as int?;
     final isUpowerExclusive =
         json['charging_pay'] is Map && json['charging_pay']['level'] != null
-            ? true
-            : null;
+        ? true
+        : null;
+    final staffNames = _staffNames(json['staff']);
 
     return ShieldCandidate(
       scope: ShieldScope.recommendation,
@@ -69,7 +70,7 @@ abstract final class ShieldingAdapters {
       danmakuCount: danmakuCount,
       description: description,
       pubdate: pubdate,
-      staffNames: const [],
+      staffNames: staffNames,
       isUpowerExclusive: isUpowerExclusive,
     );
   }
@@ -123,26 +124,25 @@ abstract final class ShieldingAdapters {
   static ShieldCandidate fromRelatedVideo(
     HotVideoItemModel item, {
     ShieldScope scope = ShieldScope.recommendation,
-  }) =>
-      ShieldCandidate(
-        scope: scope,
-        title: item.title,
-        uid: item.owner.mid?.toString(),
-        authorName: item.owner.name,
-        authorTokens: _tokens([item.owner.name]),
-        category: item.tname,
-        tokens: _tokens([
-          item.title,
-          item.tname,
-        ]),
-        // task-066: populate detail-introduction fields from related-video model.
-        description: item.desc,
-        pubdate: item.pubdate,
-        staffNames: const [],
-        isUpowerExclusive: item.badge == '充电专属' ? true : (
-          item.badge == null ? null : false
-        ),
-      );
+  }) => ShieldCandidate(
+    scope: scope,
+    title: item.title,
+    uid: item.owner.mid?.toString(),
+    authorName: item.owner.name,
+    authorTokens: _tokens([item.owner.name]),
+    category: item.tname,
+    tokens: _tokens([
+      item.title,
+      item.tname,
+    ]),
+    // task-066: populate detail-introduction fields from related-video model.
+    description: item.desc,
+    pubdate: item.pubdate,
+    staffNames: item.staffNames,
+    isUpowerExclusive: item.badge == '充电专属'
+        ? true
+        : (item.badge == null ? null : false),
+  );
 
   static List<T> filterList<T>(
     List<T> items, {
@@ -235,3 +235,20 @@ String? _recommendationReason({
 }
 
 String? _nonEmpty(String? value) => value?.isNotEmpty == true ? value : null;
+
+List<String> _staffNames(Object? raw) {
+  if (raw is! Iterable) return const [];
+  final values = <String>[];
+  for (final item in raw) {
+    if (item is Map) {
+      for (final key in const ['name', 'title']) {
+        final value = _nonEmpty(item[key]?.toString().trim());
+        if (value != null) values.add(value);
+      }
+    } else {
+      final value = _nonEmpty(item?.toString().trim());
+      if (value != null) values.add(value);
+    }
+  }
+  return List.unmodifiable(values);
+}

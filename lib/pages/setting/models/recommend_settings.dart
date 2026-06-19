@@ -76,6 +76,42 @@ List<SettingsModel> get recommendSettings => [
   //   values: [0, 50, 100, 500, 1000],
   //   onChanged: (value) => RecommendFilter.minPlayForRcmd = value,
   // ),
+  _buildDerivedMetricModel(
+    title: '互动率过滤',
+    icon: Icons.forum_outlined,
+    switchKey: SettingBoxKey.filterInteractionRateForRecommend,
+    thresholdKey: SettingBoxKey.minInteractionRateForRecommend,
+    defaultThreshold: 1.0,
+    getThreshold: () => RecommendFilter.minInteractionRateForRecommend,
+    onSwitchChanged: (value) =>
+        RecommendFilter.filterInteractionRateForRecommend = value,
+    onThresholdChanged: (value) =>
+        RecommendFilter.minInteractionRateForRecommend = value,
+  ),
+  _buildDerivedMetricModel(
+    title: '三连率过滤',
+    icon: Icons.recommend_outlined,
+    switchKey: SettingBoxKey.filterTripleRateForRecommend,
+    thresholdKey: SettingBoxKey.minTripleRateForRecommend,
+    defaultThreshold: 3.0,
+    getThreshold: () => RecommendFilter.minTripleRateForRecommend,
+    onSwitchChanged: (value) =>
+        RecommendFilter.filterTripleRateForRecommend = value,
+    onThresholdChanged: (value) =>
+        RecommendFilter.minTripleRateForRecommend = value,
+  ),
+  _buildDerivedMetricModel(
+    title: '内容价值过滤',
+    icon: Icons.workspace_premium_outlined,
+    switchKey: SettingBoxKey.filterContentValueForRecommend,
+    thresholdKey: SettingBoxKey.minContentValueForRecommend,
+    defaultThreshold: 10.0,
+    getThreshold: () => RecommendFilter.minContentValueForRecommend,
+    onSwitchChanged: (value) =>
+        RecommendFilter.filterContentValueForRecommend = value,
+    onThresholdChanged: (value) =>
+        RecommendFilter.minContentValueForRecommend = value,
+  ),
   SwitchModel(
     title: '已关注UP豁免推荐过滤',
     subtitle: '推荐中已关注用户发布的内容不会被过滤',
@@ -182,6 +218,80 @@ List<SettingsModel> get recommendSettings => [
   ...exposureTrackerSettings(buildNumberInputModel: _buildNumberInputModel),
 ];
 
+SettingsModel _buildDerivedMetricModel({
+  required String title,
+  required IconData icon,
+  required String switchKey,
+  required String thresholdKey,
+  required double defaultThreshold,
+  required ValueGetter<double> getThreshold,
+  required ValueChanged<bool> onSwitchChanged,
+  required ValueChanged<double> onThresholdChanged,
+}) {
+  double value = GStorage.setting.get(
+    thresholdKey,
+    defaultValue: defaultThreshold,
+  );
+  return SplitModel(
+    normalModel: NormalModel.split(
+      title: title,
+      leading: Icon(icon),
+      getSubtitle: () =>
+          '当前: ${value.toStringAsFixed(1)}%（默认${defaultThreshold.toStringAsFixed(1)}%）',
+    ),
+    switchModel: SwitchModel.split(
+      setKey: switchKey,
+      defaultVal: false,
+      onChanged: onSwitchChanged,
+      onTap: (context) async {
+        String valueStr = getThreshold().toStringAsFixed(1);
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(title),
+            content: TextField(
+              autofocus: true,
+              controller: TextEditingController(text: valueStr),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
+              decoration: const InputDecoration(suffixText: '%'),
+              onChanged: (v) => valueStr = v,
+            ),
+            actions: [
+              TextButton(
+                onPressed: Get.back,
+                child: Text(
+                  '取消',
+                  style: TextStyle(color: ColorScheme.of(ctx).outline),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  final parsed = double.tryParse(valueStr);
+                  if (parsed == null || parsed < 0) {
+                    SmartDialog.showToast('请输入有效百分比');
+                    return;
+                  }
+                  value = parsed;
+                  onThresholdChanged(value);
+                  GStorage.setting.put(thresholdKey, value);
+                  Get.back();
+                  SmartDialog.showToast('已保存: ${value.toStringAsFixed(1)}%');
+                },
+                child: const Text('确定'),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
 SettingsModel _buildNumberInputModel({
   required String title,
   required IconData icon,
@@ -284,12 +394,13 @@ SettingsModel _buildRangeShieldingModel({
   }
 
   String formatSubtitle(String? lower, String? upper) {
-    if ((lower == null || lower.isEmpty) &&
-        (upper == null || upper.isEmpty)) {
+    if ((lower == null || lower.isEmpty) && (upper == null || upper.isEmpty)) {
       return '未设置';
     }
-    if (lower != null && lower.isNotEmpty &&
-        upper != null && upper.isNotEmpty) {
+    if (lower != null &&
+        lower.isNotEmpty &&
+        upper != null &&
+        upper.isNotEmpty) {
       return '屏蔽 ≤ $lower 及 ≥ $upper';
     }
     if (lower != null && lower.isNotEmpty) return '屏蔽 ≤ $lower';
@@ -305,8 +416,13 @@ SettingsModel _buildRangeShieldingModel({
     },
     onTap: (context, setState) async {
       final t = findRangeThresholds();
-      await _openRangeShieldingDialog(context, type, store,
-          lowerInit: t.lower, upperInit: t.upper);
+      await _openRangeShieldingDialog(
+        context,
+        type,
+        store,
+        lowerInit: t.lower,
+        upperInit: t.upper,
+      );
       setState();
     },
   );
@@ -436,31 +552,35 @@ Future<void> _openRangeShieldingDialog(
             // Persist the lower-side threshold as "..X"; range matching is
             // inclusive, so this blocks values <= X.
             if (min.isNotEmpty) {
-              newRules.add(ShieldRule(
-                id: max.isEmpty ? baseId : '$baseId-lo',
-                type: type,
-                matchMode: ShieldMatchMode.range,
-                scope: ShieldScope.recommendation,
-                action: ShieldAction.block,
-                pattern: '..$min',
-                enabled: true,
-                updatedAt: now,
-              ));
+              newRules.add(
+                ShieldRule(
+                  id: max.isEmpty ? baseId : '$baseId-lo',
+                  type: type,
+                  matchMode: ShieldMatchMode.range,
+                  scope: ShieldScope.recommendation,
+                  action: ShieldAction.block,
+                  pattern: '..$min',
+                  enabled: true,
+                  updatedAt: now,
+                ),
+              );
             }
 
             // Persist the upper-side threshold as "Y.."; range matching is
             // inclusive, so this blocks values >= Y.
             if (max.isNotEmpty) {
-              newRules.add(ShieldRule(
-                id: min.isEmpty ? baseId : '$baseId-hi',
-                type: type,
-                matchMode: ShieldMatchMode.range,
-                scope: ShieldScope.recommendation,
-                action: ShieldAction.block,
-                pattern: '$max..',
-                enabled: true,
-                updatedAt: now,
-              ));
+              newRules.add(
+                ShieldRule(
+                  id: min.isEmpty ? baseId : '$baseId-hi',
+                  type: type,
+                  matchMode: ShieldMatchMode.range,
+                  scope: ShieldScope.recommendation,
+                  action: ShieldAction.block,
+                  pattern: '$max..',
+                  enabled: true,
+                  updatedAt: now,
+                ),
+              );
             }
 
             try {

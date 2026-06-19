@@ -14,6 +14,7 @@ class HotVideoItemModel extends HorizontalVideoModel with MultiSelectData {
   int? state;
   String? firstFrame;
   String? pubLocation;
+  List<String> staffNames = const [];
 
   HotVideoItemModel.fromJson(Map<String, dynamic> json) {
     aid = json["aid"];
@@ -39,6 +40,7 @@ class HotVideoItemModel extends HorizontalVideoModel with MultiSelectData {
     pubLocation = json["pub_location"];
     redirectUrl = json['redirect_url'];
     progress = json['progress'];
+    staffNames = _staffNames(json['staff']);
     if (json['charging_pay']?['level'] != null) {
       badge = '充电专属';
     } else if (json['rights']?['is_cooperation'] == 1) {
@@ -49,10 +51,24 @@ class HotVideoItemModel extends HorizontalVideoModel with MultiSelectData {
   }
 }
 
+List<String> _staffNames(Object? raw) {
+  if (raw is! Iterable) return const [];
+  final values = <String>[];
+  for (final item in raw) {
+    if (item is Map) {
+      for (final key in const ['name', 'title']) {
+        final value = item[key]?.toString().trim();
+        if (value != null && value.isNotEmpty) values.add(value);
+      }
+    } else {
+      final value = item?.toString().trim();
+      if (value != null && value.isNotEmpty) values.add(value);
+    }
+  }
+  return List.unmodifiable(values);
+}
+
 class HotStat extends Stat {
-  int? reply;
-  int? favorite;
-  num? coin;
   int? share;
   int? nowRank;
   int? hisRank;

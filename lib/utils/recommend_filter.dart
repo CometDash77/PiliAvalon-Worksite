@@ -6,6 +6,15 @@ abstract final class RecommendFilter {
   static int minDurationForRcmd = Pref.minDurationForRcmd;
   static int minPlayForRcmd = Pref.minPlayForRcmd;
   static int minLikeRatioForRecommend = Pref.minLikeRatioForRecommend;
+  static bool filterInteractionRateForRecommend =
+      Pref.filterInteractionRateForRecommend;
+  static double minInteractionRateForRecommend =
+      Pref.minInteractionRateForRecommend;
+  static bool filterTripleRateForRecommend = Pref.filterTripleRateForRecommend;
+  static double minTripleRateForRecommend = Pref.minTripleRateForRecommend;
+  static bool filterContentValueForRecommend =
+      Pref.filterContentValueForRecommend;
+  static double minContentValueForRecommend = Pref.minContentValueForRecommend;
   static bool exemptFilterForFollowed = Pref.exemptFilterForFollowed;
   static bool applyFilterToRelatedVideos = Pref.applyFilterToRelatedVideos;
   static RegExp rcmdRegExp = RegExp(
@@ -46,6 +55,35 @@ abstract final class RecommendFilter {
     return false;
   }
 
+  static bool filterDerivedMetrics(BaseVideoItemModel videoItem) {
+    if (!legacyRecommendationEnabled) {
+      return false;
+    }
+    if (videoItem.isFollowed && exemptFilterForFollowed) {
+      return false;
+    }
+
+    final stat = videoItem.stat;
+    return _filterMetric(
+          enabled: filterInteractionRateForRecommend,
+          numerator: (stat.danmu ?? 0) + (stat.reply ?? 0),
+          denominator: stat.view,
+          threshold: minInteractionRateForRecommend,
+        ) ||
+        _filterMetric(
+          enabled: filterTripleRateForRecommend,
+          numerator: (stat.like ?? 0) + (stat.coin ?? 0) + (stat.favorite ?? 0),
+          denominator: stat.view,
+          threshold: minTripleRateForRecommend,
+        ) ||
+        _filterMetric(
+          enabled: filterContentValueForRecommend,
+          numerator: stat.coin ?? 0,
+          denominator: stat.like,
+          threshold: minContentValueForRecommend,
+        );
+  }
+
   static bool filterTitle(String title) {
     if (!legacyRecommendationEnabled) {
       return false;
@@ -63,6 +101,24 @@ abstract final class RecommendFilter {
     return (videoItem.duration > 0 &&
             videoItem.duration < minDurationForRcmd) ||
         filterLikeRatio(videoItem.stat.like, videoItem.stat.view) ||
+        filterDerivedMetrics(videoItem) ||
         filterTitle(videoItem.title);
+  }
+
+  static bool _filterMetric({
+    required bool enabled,
+    required num numerator,
+    required num? denominator,
+    required double threshold,
+  }) {
+    if (!enabled) {
+      return false;
+    }
+    final denominatorValue = denominator?.toDouble();
+    if (denominatorValue == null || denominatorValue <= 0) {
+      return false;
+    }
+    final metricValue = numerator.toDouble() / denominatorValue * 100;
+    return metricValue < threshold;
   }
 }

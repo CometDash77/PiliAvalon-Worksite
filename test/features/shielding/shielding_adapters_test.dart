@@ -1025,57 +1025,63 @@ void main() {
   });
 
   group('task-066 detail-introduction candidate fields', () {
-    test('fromRelatedVideo populates description, pubdate, isUpowerExclusive', () {
-      final video = HotVideoItemModel.fromJson({
-        'aid': 1,
-        'cid': 2,
-        'bvid': 'BV1',
-        'videos': 1,
-        'tid': 17,
-        'tname': '游戏',
-        'copyright': 1,
-        'pic': '',
-        'title': '简介测试视频',
-        'pubdate': 1718000000,
-        'ctime': 1718000000,
-        'desc': '这是一段视频简介文字',
-        'duration': 300,
-        'owner': {'mid': 42, 'name': '玩家UP'},
-        'stat': {'view': 5000, 'like': 100, 'danmaku': 50},
-        'charging_pay': {'level': 1},
-      });
+    test(
+      'fromRelatedVideo populates description, pubdate, isUpowerExclusive',
+      () {
+        final video = HotVideoItemModel.fromJson({
+          'aid': 1,
+          'cid': 2,
+          'bvid': 'BV1',
+          'videos': 1,
+          'tid': 17,
+          'tname': '游戏',
+          'copyright': 1,
+          'pic': '',
+          'title': '简介测试视频',
+          'pubdate': 1718000000,
+          'ctime': 1718000000,
+          'desc': '这是一段视频简介文字',
+          'duration': 300,
+          'owner': {'mid': 42, 'name': '玩家UP'},
+          'stat': {'view': 5000, 'like': 100, 'danmaku': 50},
+          'charging_pay': {'level': 1},
+        });
 
-      final candidate = ShieldingAdapters.fromRelatedVideo(video);
+        final candidate = ShieldingAdapters.fromRelatedVideo(video);
 
-      expect(candidate.description, '这是一段视频简介文字');
-      expect(candidate.pubdate, 1718000000);
-      expect(candidate.isUpowerExclusive, isTrue);
-    });
+        expect(candidate.description, '这是一段视频简介文字');
+        expect(candidate.pubdate, 1718000000);
+        expect(candidate.isUpowerExclusive, isTrue);
+      },
+    );
 
-    test('fromRelatedVideo isUpowerExclusive is false for non-charging badge', () {
-      final video = HotVideoItemModel.fromJson({
-        'aid': 2,
-        'cid': 3,
-        'bvid': 'BV2',
-        'videos': 1,
-        'tid': 17,
-        'tname': '合作视频',
-        'copyright': 1,
-        'pic': '',
-        'title': '合作视频',
-        'pubdate': 1,
-        'ctime': 1,
-        'desc': '',
-        'duration': 300,
-        'owner': {'mid': 42, 'name': 'UP'},
-        'stat': {'view': 5000, 'like': 100, 'danmaku': 50},
-        'rights': {'is_cooperation': 1},
-      });
+    test(
+      'fromRelatedVideo isUpowerExclusive is false for non-charging badge',
+      () {
+        final video = HotVideoItemModel.fromJson({
+          'aid': 2,
+          'cid': 3,
+          'bvid': 'BV2',
+          'videos': 1,
+          'tid': 17,
+          'tname': '合作视频',
+          'copyright': 1,
+          'pic': '',
+          'title': '合作视频',
+          'pubdate': 1,
+          'ctime': 1,
+          'desc': '',
+          'duration': 300,
+          'owner': {'mid': 42, 'name': 'UP'},
+          'stat': {'view': 5000, 'like': 100, 'danmaku': 50},
+          'rights': {'is_cooperation': 1},
+        });
 
-      final candidate = ShieldingAdapters.fromRelatedVideo(video);
+        final candidate = ShieldingAdapters.fromRelatedVideo(video);
 
-      expect(candidate.isUpowerExclusive, isFalse);
-    });
+        expect(candidate.isUpowerExclusive, isFalse);
+      },
+    );
 
     test('fromRelatedVideo isUpowerExclusive is null when badge is null', () {
       final video = HotVideoItemModel.fromJson({
@@ -1101,7 +1107,7 @@ void main() {
       expect(candidate.isUpowerExclusive, isNull);
     });
 
-    test('fromRelatedVideo staffNames is empty', () {
+    test('fromRelatedVideo staffNames is empty when source has no staff', () {
       final video = HotVideoItemModel.fromJson({
         'aid': 4,
         'cid': 5,
@@ -1125,59 +1131,96 @@ void main() {
       expect(candidate.staffNames, isEmpty);
     });
 
-    test('fromRecommendationJson populates description and pubdate from web model', () {
-      final item = RcmdVideoItemModel.fromJson({
-        'id': 1,
-        'bvid': 'BV1',
-        'cid': 2,
+    test('fromRelatedVideo populates staffNames from source staff', () {
+      final video = HotVideoItemModel.fromJson({
+        'aid': 4,
+        'cid': 5,
+        'bvid': 'BV4',
+        'videos': 1,
+        'tid': 17,
+        'tname': '测试',
+        'copyright': 1,
         'pic': '',
-        'title': '测试标题',
-        'duration': 120,
-        'pubdate': 1718000000,
-        'owner': {'mid': 42, 'name': 'UP主'},
+        'title': '测试',
+        'pubdate': 1,
+        'ctime': 1,
+        'desc': '',
+        'duration': 300,
+        'owner': {'mid': 42, 'name': 'UP'},
         'stat': {'view': 5000, 'like': 100, 'danmaku': 50},
-        'is_followed': 0,
-        'rcmd_reason': {'content': '热门推荐'},
+        'staff': [
+          {'name': '张三', 'title': '导演'},
+          {'name': '李四'},
+        ],
       });
 
-      final candidate = ShieldingAdapters.fromRecommendationJson(item, {
-        'owner': {'mid': 42, 'name': 'UP主'},
-        'desc': '测试视频简介',
-      });
+      final candidate = ShieldingAdapters.fromRelatedVideo(video);
 
-      // Web model: pubdate comes from item.pubdate.
-      expect(candidate.pubdate, 1718000000);
-      // desc comes from JSON since web RcmdVideoItemModel doesn't set desc.
-      expect(candidate.description, '测试视频简介');
-      // Not available from homepage recommendation.
-      expect(candidate.staffNames, isEmpty);
-      expect(candidate.isUpowerExclusive, isNull);
+      expect(candidate.staffNames, ['张三', '导演', '李四']);
     });
 
-    test('fromRecommendationJson populates description from app model item.desc', () {
-      final item = RcmdVideoItemAppModel.fromJson({
-        'player_args': {'aid': 1, 'cid': 2, 'duration': 120},
-        'bvid': 'BV1',
-        'cover': '',
-        'cover_left_text_1': '100',
-        'cover_left_text_2': '50',
-        'title': 'app测试',
-        'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
-        'rcmd_reason': '',
-        'goto': 'av',
-        'param': '1',
-        'uri': '',
-        'desc': 'app端简介',
-      });
+    test(
+      'fromRecommendationJson populates description and pubdate from web model',
+      () {
+        final item = RcmdVideoItemModel.fromJson({
+          'id': 1,
+          'bvid': 'BV1',
+          'cid': 2,
+          'pic': '',
+          'title': '测试标题',
+          'duration': 120,
+          'pubdate': 1718000000,
+          'owner': {'mid': 42, 'name': 'UP主'},
+          'stat': {'view': 5000, 'like': 100, 'danmaku': 50},
+          'is_followed': 0,
+          'rcmd_reason': {'content': '热门推荐'},
+        });
 
-      final candidate = ShieldingAdapters.fromRecommendationJson(item, {
-        'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
-      });
+        final candidate = ShieldingAdapters.fromRecommendationJson(item, {
+          'owner': {'mid': 42, 'name': 'UP主'},
+          'desc': '测试视频简介',
+          'staff': [
+            {'name': '张三', 'title': '导演'},
+            {'name': '李四'},
+          ],
+        });
 
-      // App model sets desc from json['desc'] in its constructor.
-      expect(candidate.description, 'app端简介');
-      expect(candidate.pubdate, isNull);
-    });
+        // Web model: pubdate comes from item.pubdate.
+        expect(candidate.pubdate, 1718000000);
+        // desc comes from JSON since web RcmdVideoItemModel doesn't set desc.
+        expect(candidate.description, '测试视频简介');
+        expect(candidate.staffNames, ['张三', '导演', '李四']);
+        expect(candidate.isUpowerExclusive, isNull);
+      },
+    );
+
+    test(
+      'fromRecommendationJson populates description from app model item.desc',
+      () {
+        final item = RcmdVideoItemAppModel.fromJson({
+          'player_args': {'aid': 1, 'cid': 2, 'duration': 120},
+          'bvid': 'BV1',
+          'cover': '',
+          'cover_left_text_1': '100',
+          'cover_left_text_2': '50',
+          'title': 'app测试',
+          'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
+          'rcmd_reason': '',
+          'goto': 'av',
+          'param': '1',
+          'uri': '',
+          'desc': 'app端简介',
+        });
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(item, {
+          'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
+        });
+
+        // App model sets desc from json['desc'] in its constructor.
+        expect(candidate.description, 'app端简介');
+        expect(candidate.pubdate, isNull);
+      },
+    );
 
     test('fromRecommendationJson isUpowerExclusive from charging_pay', () {
       final item = RcmdVideoItemModel.fromJson({
@@ -1203,46 +1246,51 @@ void main() {
   });
 
   group('task-066 filterRelatedVideos independent switch', () {
-    test('filterRelatedVideos uses relatedVideoEnabled, not recommendationEnabled', () {
-      final video = HotVideoItemModel.fromJson({
-        'aid': 1,
-        'cid': 2,
-        'bvid': 'BV1',
-        'videos': 1,
-        'tid': 17,
-        'tname': '游戏',
-        'copyright': 1,
-        'pic': '',
-        'title': '被屏蔽视频',
-        'pubdate': 1,
-        'ctime': 1,
-        'desc': '',
-        'duration': 300,
-        'owner': {'mid': 42, 'name': '玩家UP'},
-        'stat': {'view': 100, 'like': 10, 'danmaku': 5},
-      });
+    test(
+      'filterRelatedVideos uses relatedVideoEnabled, not recommendationEnabled',
+      () {
+        final video = HotVideoItemModel.fromJson({
+          'aid': 1,
+          'cid': 2,
+          'bvid': 'BV1',
+          'videos': 1,
+          'tid': 17,
+          'tname': '游戏',
+          'copyright': 1,
+          'pic': '',
+          'title': '被屏蔽视频',
+          'pubdate': 1,
+          'ctime': 1,
+          'desc': '',
+          'duration': 300,
+          'owner': {'mid': 42, 'name': '玩家UP'},
+          'stat': {'view': 100, 'like': 10, 'danmaku': 5},
+        });
 
-      final blockRule = ShieldRuleSet(
-        globalEnabled: true,
-        recommendationEnabled: true,
-        relatedVideoEnabled: false,
-        rules: [
-          ShieldRule(
-            id: 'block-all',
-            type: ShieldRuleType.userKeyword,
-            matchMode: ShieldMatchMode.contains,
-            scope: ShieldScope.videoDetail,
-            action: ShieldAction.block,
-            pattern: '玩家',
-            updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
-          ),
-        ],
-      );
+        final blockRule = ShieldRuleSet(
+          globalEnabled: true,
+          recommendationEnabled: true,
+          relatedVideoEnabled: false,
+          rules: [
+            ShieldRule(
+              id: 'block-all',
+              type: ShieldRuleType.userKeyword,
+              matchMode: ShieldMatchMode.contains,
+              scope: ShieldScope.videoDetail,
+              action: ShieldAction.block,
+              pattern: '玩家',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            ),
+          ],
+        );
 
-      // relatedVideoEnabled = false → filterRelatedVideos should be no-op.
-      final result = ShieldingAdapters.filterRelatedVideos([video], blockRule);
-      expect(result.length, 1); // Not filtered — switch is off.
-    });
+        // relatedVideoEnabled = false → filterRelatedVideos should be no-op.
+        final result = ShieldingAdapters.filterRelatedVideos([
+          video,
+        ], blockRule);
+        expect(result.length, 1); // Not filtered — switch is off.
+      },
+    );
 
     test('filterRelatedVideos blocks when relatedVideoEnabled is true', () {
       final video = HotVideoItemModel.fromJson({
@@ -1285,47 +1333,54 @@ void main() {
       expect(result, isEmpty);
     });
 
-    test('filterRecommendationVideos still uses recommendationEnabled (unchanged)', () {
-      final video = HotVideoItemModel.fromJson({
-        'aid': 1,
-        'cid': 2,
-        'bvid': 'BV1',
-        'videos': 1,
-        'tid': 17,
-        'tname': '游戏',
-        'copyright': 1,
-        'pic': '',
-        'title': '测试视频',
-        'pubdate': 1,
-        'ctime': 1,
-        'desc': '',
-        'duration': 300,
-        'owner': {'mid': 42, 'name': '玩家UP'},
-        'stat': {'view': 100, 'like': 10, 'danmaku': 5},
-      });
+    test(
+      'filterRecommendationVideos still uses recommendationEnabled (unchanged)',
+      () {
+        final video = HotVideoItemModel.fromJson({
+          'aid': 1,
+          'cid': 2,
+          'bvid': 'BV1',
+          'videos': 1,
+          'tid': 17,
+          'tname': '游戏',
+          'copyright': 1,
+          'pic': '',
+          'title': '测试视频',
+          'pubdate': 1,
+          'ctime': 1,
+          'desc': '',
+          'duration': 300,
+          'owner': {'mid': 42, 'name': '玩家UP'},
+          'stat': {'view': 100, 'like': 10, 'danmaku': 5},
+        });
 
-      // recommendationEnabled = false → filterRecommendationVideos no-op.
-      final offRuleSet = ShieldRuleSet(
-        globalEnabled: true,
-        recommendationEnabled: false,
-        relatedVideoEnabled: true,
-        rules: [
-          ShieldRule(
-            id: 'block-all',
-            type: ShieldRuleType.userKeyword,
-            matchMode: ShieldMatchMode.contains,
-            scope: ShieldScope.recommendation,
-            action: ShieldAction.block,
-            pattern: '玩家',
-            updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
-          ),
-        ],
-      );
+        // recommendationEnabled = false → filterRecommendationVideos no-op.
+        final offRuleSet = ShieldRuleSet(
+          globalEnabled: true,
+          recommendationEnabled: false,
+          relatedVideoEnabled: true,
+          rules: [
+            ShieldRule(
+              id: 'block-all',
+              type: ShieldRuleType.userKeyword,
+              matchMode: ShieldMatchMode.contains,
+              scope: ShieldScope.recommendation,
+              action: ShieldAction.block,
+              pattern: '玩家',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            ),
+          ],
+        );
 
-      final result =
-          ShieldingAdapters.filterRecommendationVideos([video], offRuleSet);
-      expect(result.length, 1); // Not filtered — recommendationEnabled is off.
-    });
+        final result = ShieldingAdapters.filterRecommendationVideos([
+          video,
+        ], offRuleSet);
+        expect(
+          result.length,
+          1,
+        ); // Not filtered — recommendationEnabled is off.
+      },
+    );
   });
 
   group('task-066 new rule type matching', () {
@@ -1353,29 +1408,32 @@ void main() {
       expect(ShieldingAdapters.isVisible(candidate, ruleSet), isFalse);
     });
 
-    test('descriptionKeyword allows when description does not contain keyword', () {
-      const candidate = ShieldCandidate(
-        scope: ShieldScope.recommendation,
-        title: '测试',
-        description: '这是一个原创视频',
-      );
+    test(
+      'descriptionKeyword allows when description does not contain keyword',
+      () {
+        const candidate = ShieldCandidate(
+          scope: ShieldScope.recommendation,
+          title: '测试',
+          description: '这是一个原创视频',
+        );
 
-      final ruleSet = ShieldRuleSet(
-        rules: [
-          ShieldRule(
-            id: 'desc-kw',
-            type: ShieldRuleType.descriptionKeyword,
-            matchMode: ShieldMatchMode.contains,
-            scope: ShieldScope.recommendation,
-            action: ShieldAction.block,
-            pattern: '搬运',
-            updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
-          ),
-        ],
-      );
+        final ruleSet = ShieldRuleSet(
+          rules: [
+            ShieldRule(
+              id: 'desc-kw',
+              type: ShieldRuleType.descriptionKeyword,
+              matchMode: ShieldMatchMode.contains,
+              scope: ShieldScope.recommendation,
+              action: ShieldAction.block,
+              pattern: '搬运',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            ),
+          ],
+        );
 
-      expect(ShieldingAdapters.isVisible(candidate, ruleSet), isTrue);
-    });
+        expect(ShieldingAdapters.isVisible(candidate, ruleSet), isTrue);
+      },
+    );
 
     test('publishTime range blocks candidate within range', () {
       const candidate = ShieldCandidate(
