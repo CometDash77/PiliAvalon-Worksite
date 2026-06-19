@@ -14,8 +14,8 @@ class RecommendRangeShieldingPage extends StatefulWidget {
   const RecommendRangeShieldingPage({
     super.key,
     this.showAppBar = true,
-    ShieldSettingsStore? store,
-  }) : store = store;
+    this.store,
+  });
 
   final bool showAppBar;
   final ShieldSettingsStore? store;
@@ -81,7 +81,7 @@ class _RecommendRangeShieldingPageState
               actions: [
                 IconButton(
                   tooltip: '新增',
-                  onPressed: () => _openEditor(),
+                  onPressed: _openEditor,
                   icon: const Icon(Icons.add),
                 ),
               ],
@@ -109,7 +109,7 @@ class _RecommendRangeShieldingPageState
             title: const Text('推荐流范围规则'),
             subtitle: Text(shieldRuleSummary(_visibleRules)),
             trailing: const Icon(Icons.add),
-            onTap: () => _openEditor(),
+            onTap: _openEditor,
           ),
           if (_ruleSet.loadErrors.isNotEmpty)
             custom.ListTile(
@@ -129,7 +129,7 @@ class _RecommendRangeShieldingPageState
               leading: const Icon(Icons.rule_folder_outlined),
               title: const Text('暂无规则'),
               subtitle: const Text('点击右上角或规则入口添加'),
-              onTap: () => _openEditor(),
+              onTap: _openEditor,
             )
           else
             ..._visibleRules.map(_buildRuleItem),
@@ -138,7 +138,7 @@ class _RecommendRangeShieldingPageState
       floatingActionButton: showAppBar
           ? FloatingActionButton(
               tooltip: '新增规则',
-              onPressed: () => _openEditor(),
+              onPressed: _openEditor,
               child: const Icon(Icons.add),
             )
           : null,
@@ -303,7 +303,7 @@ class _RecommendRangeShieldingPageState
     required ValueChanged<T> onChanged,
   }) {
     return DropdownButtonFormField<T>(
-      value: value,
+      initialValue: value,
       decoration: InputDecoration(labelText: label),
       items: values
           .map(

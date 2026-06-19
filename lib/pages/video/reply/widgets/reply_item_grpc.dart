@@ -70,6 +70,7 @@ class ReplyItemGrpc extends StatelessWidget {
     this.onCheckReply,
     this.onToggleTop,
     this.jumpToDialogue,
+    this.shieldSettingsStore,
   });
   final ReplyInfo replyItem;
   final int replyLevel;
@@ -84,6 +85,7 @@ class ReplyItemGrpc extends StatelessWidget {
   final ValueChanged<ReplyInfo>? onCheckReply;
   final ValueChanged<ReplyInfo>? onToggleTop;
   final VoidCallback? jumpToDialogue;
+  final ShieldSettingsStore? shieldSettingsStore;
 
   static final _voteRegExp = RegExp(r"^\{vote:\d+?\}$");
   static final _timeRegExp = RegExp(r'^(?:\d+[:：])?\d+[:：]\d+$');
@@ -107,6 +109,7 @@ class ReplyItemGrpc extends StatelessWidget {
           item: replyItem,
           onDelete: () => onDelete?.call(replyItem, null),
           isSubReply: false,
+          shieldSettingsStore: shieldSettingsStore,
         );
       },
     );
@@ -575,6 +578,7 @@ class ReplyItemGrpc extends StatelessWidget {
                       item: childReply,
                       onDelete: () => onDelete?.call(replyItem, index),
                       isSubReply: true,
+                      shieldSettingsStore: shieldSettingsStore,
                     );
                   },
                 );
@@ -964,6 +968,7 @@ class ReplyItemGrpc extends StatelessWidget {
     required ReplyInfo item,
     required VoidCallback onDelete,
     required bool isSubReply,
+    ShieldSettingsStore? shieldSettingsStore,
   }) {
     late String message = item.content.message;
     final ownerMid = Int64(Accounts.main.mid);
@@ -1145,6 +1150,7 @@ class ReplyItemGrpc extends StatelessWidget {
                 type: ShieldRuleType.uid,
                 pattern: _replyUid(item),
                 targetLabel: '屏蔽评论用户 UID ${_replyUid(item)}',
+                store: shieldSettingsStore,
               );
             },
             minLeadingWidth: 0,
@@ -1160,6 +1166,7 @@ class ReplyItemGrpc extends StatelessWidget {
                 matchMode: ShieldMatchMode.regex,
                 pattern: '^$escapedMessage\$',
                 targetLabel: '屏蔽整条评论文本「$message」',
+                store: shieldSettingsStore,
               );
             },
             minLeadingWidth: 0,
@@ -1174,6 +1181,7 @@ class ReplyItemGrpc extends StatelessWidget {
                   type: ShieldRuleType.avatarPendant,
                   pattern: pendantValue,
                   targetLabel: '屏蔽头像挂件',
+                  store: shieldSettingsStore,
                 );
               },
               minLeadingWidth: 0,
@@ -1188,6 +1196,7 @@ class ReplyItemGrpc extends StatelessWidget {
                   type: ShieldRuleType.garb,
                   pattern: garbValue,
                   targetLabel: '屏蔽装扮卡片',
+                  store: shieldSettingsStore,
                 );
               },
               minLeadingWidth: 0,
@@ -1304,9 +1313,10 @@ class ReplyItemGrpc extends StatelessWidget {
     required String targetLabel,
     ShieldMatchMode matchMode = ShieldMatchMode.exact,
     bool showDuplicateToast = true,
+    ShieldSettingsStore? store,
   }) async {
     try {
-      final rule = await ShieldSettingsStore().addQuickActionRule(
+      final rule = await (store ?? ShieldSettingsStore()).addQuickActionRule(
         type: type,
         scope: ShieldScope.comment,
         pattern: pattern,

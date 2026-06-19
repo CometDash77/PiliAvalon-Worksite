@@ -1330,7 +1330,7 @@ void main() {
 
   group('task-066 new rule type matching', () {
     test('descriptionKeyword blocks when description contains keyword', () {
-      final candidate = ShieldCandidate(
+      const candidate = ShieldCandidate(
         scope: ShieldScope.recommendation,
         title: '测试',
         description: '这是一个搬运视频，原视频来自YouTube',
@@ -1354,7 +1354,7 @@ void main() {
     });
 
     test('descriptionKeyword allows when description does not contain keyword', () {
-      final candidate = ShieldCandidate(
+      const candidate = ShieldCandidate(
         scope: ShieldScope.recommendation,
         title: '测试',
         description: '这是一个原创视频',
@@ -1378,7 +1378,7 @@ void main() {
     });
 
     test('publishTime range blocks candidate within range', () {
-      final candidate = ShieldCandidate(
+      const candidate = ShieldCandidate(
         scope: ShieldScope.recommendation,
         title: '旧视频',
         pubdate: 1600000000, // Before 2021
@@ -1402,7 +1402,7 @@ void main() {
     });
 
     test('publishTime allows candidate outside range', () {
-      final candidate = ShieldCandidate(
+      const candidate = ShieldCandidate(
         scope: ShieldScope.recommendation,
         title: '新视频',
         pubdate: 1700000000, // After 2023
@@ -1426,7 +1426,7 @@ void main() {
     });
 
     test('isUpowerExclusive enum blocks charged videos', () {
-      final candidate = ShieldCandidate(
+      const candidate = ShieldCandidate(
         scope: ShieldScope.recommendation,
         title: '充电视频',
         isUpowerExclusive: true,
@@ -1450,7 +1450,7 @@ void main() {
     });
 
     test('isUpowerExclusive enum allows non-charged videos', () {
-      final candidate = ShieldCandidate(
+      const candidate = ShieldCandidate(
         scope: ShieldScope.recommendation,
         title: '免费视频',
         isUpowerExclusive: false,
@@ -1474,7 +1474,7 @@ void main() {
     });
 
     test('staffKeyword blocks when staffName matches', () {
-      final candidate = ShieldCandidate(
+      const candidate = ShieldCandidate(
         scope: ShieldScope.recommendation,
         title: '测试',
         staffNames: ['张三', '李四'],
@@ -1498,7 +1498,7 @@ void main() {
     });
 
     test('staffKeyword allows when no staffName matches', () {
-      final candidate = ShieldCandidate(
+      const candidate = ShieldCandidate(
         scope: ShieldScope.recommendation,
         title: '测试',
         staffNames: ['张三', '李四'],

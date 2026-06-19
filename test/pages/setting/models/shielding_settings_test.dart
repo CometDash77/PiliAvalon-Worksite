@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui' show Size;
 
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/pages/setting/models/shielding_settings.dart';
@@ -487,6 +488,8 @@ void main() {
     });
 
     testWidgets('shows same-row shielding category navigation', (tester) async {
+      _setLargeTestSurface(tester);
+
       await tester.pumpWidget(
         GetMaterialApp(
           home: ShieldingSettingsPage(
@@ -513,6 +516,8 @@ void main() {
     testWidgets('general editor shows full rule type set', (
       tester,
     ) async {
+      _setLargeTestSurface(tester);
+
       await tester.pumpWidget(
         GetMaterialApp(
           home: ShieldingSettingsPage(
@@ -582,4 +587,11 @@ class _MemoryBox implements ShieldSettingsBox {
   Future<void> delete(String key) async {
     values.remove(key);
   }
+}
+
+void _setLargeTestSurface(WidgetTester tester) {
+  tester.view.physicalSize = const Size(1600, 1200);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
 }

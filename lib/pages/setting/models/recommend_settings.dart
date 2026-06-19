@@ -257,7 +257,7 @@ SettingsModel _buildRangeShieldingModel({
 }) {
   final store = ShieldSettingsStore();
 
-  ({String? lower, String? upper}) _findRangeThresholds() {
+  ({String? lower, String? upper}) findRangeThresholds() {
     final snapshot = store.snapshot();
     String? lower;
     String? upper;
@@ -283,7 +283,7 @@ SettingsModel _buildRangeShieldingModel({
     return (lower: lower, upper: upper);
   }
 
-  String _formatSubtitle(String? lower, String? upper) {
+  String formatSubtitle(String? lower, String? upper) {
     if ((lower == null || lower.isEmpty) &&
         (upper == null || upper.isEmpty)) {
       return '未设置';
@@ -300,11 +300,11 @@ SettingsModel _buildRangeShieldingModel({
     title: title,
     leading: Icon(icon),
     getSubtitle: () {
-      final t = _findRangeThresholds();
-      return _formatSubtitle(t.lower, t.upper);
+      final t = findRangeThresholds();
+      return formatSubtitle(t.lower, t.upper);
     },
     onTap: (context, setState) async {
-      final t = _findRangeThresholds();
+      final t = findRangeThresholds();
       await _openRangeShieldingDialog(context, type, store,
           lowerInit: t.lower, upperInit: t.upper);
       setState();

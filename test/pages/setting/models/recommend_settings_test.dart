@@ -333,7 +333,7 @@ void main() {
       expect(entry.effectiveSubtitle, '屏蔽 ≤ 30 及 ≥ 200');
     });
 
-    test('empty rules default to 未设置', () async {
+    test('empty rules default to 未设置', () {
       final list = recommendSettings;
       for (final title in ['时长过滤', '播放量过滤', '弹幕量过滤']) {
         final entry = list.firstWhere((e) => e.effectiveTitle == title);
