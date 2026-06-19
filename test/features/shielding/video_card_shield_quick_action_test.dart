@@ -77,6 +77,45 @@ void main() {
       expect(rules.single.pattern, '这是一段视频简介');
     });
 
+    testWidgets('recommendation dialog exposes video detail quick actions', (
+      tester,
+    ) async {
+      final store = ShieldSettingsStore(box: _MemoryBox());
+
+      await _pumpLauncher(
+        tester,
+        onTap: (context) => VideoCardShieldQuickAction.showRecommendationDialog(
+          context: context,
+          title: '相关视频',
+          description: '这是一段搬运视频简介',
+          pubdate: 1600000000,
+          isUpowerExclusive: true,
+          staffNames: const ['张三'],
+          store: store,
+        ),
+      );
+
+      await tester.tap(find.text('打开'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('视频简介'), findsOneWidget);
+      expect(find.text('发布时间'), findsOneWidget);
+      expect(find.text('充电专属'), findsOneWidget);
+      expect(find.text('制作人员'), findsOneWidget);
+      expect(find.text('屏蔽早于此发布时间'), findsOneWidget);
+      expect(find.text('屏蔽充电专属'), findsOneWidget);
+
+      await tester.tap(find.text('屏蔽早于此发布时间'));
+      await tester.pumpAndSettle();
+
+      final rules = (await store.load()).rules;
+      expect(rules, hasLength(1));
+      expect(rules.single.type, ShieldRuleType.publishTime);
+      expect(rules.single.scope, ShieldScope.videoDetail);
+      expect(rules.single.matchMode, ShieldMatchMode.range);
+      expect(rules.single.pattern, '..1600000000');
+    });
+
     testWidgets('recommendation dialog shows editable title and UP inputs', (
       tester,
     ) async {

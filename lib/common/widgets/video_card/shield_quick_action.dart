@@ -63,6 +63,10 @@ abstract final class VideoCardShieldQuickAction {
     required String title,
     String? upName,
     String? reason,
+    String? description,
+    int? pubdate,
+    bool? isUpowerExclusive,
+    List<String> staffNames = const [],
     String? cover,
     String? bvid,
     int? upUid,
@@ -109,6 +113,63 @@ abstract final class VideoCardShieldQuickAction {
                       onRuleAdded: onRuleAdded,
                       store: store,
                     ),
+                  if (description?.trim().isNotEmpty == true)
+                    _TextActionRow(
+                      label: '视频简介',
+                      text: description!.trim(),
+                      type: ShieldRuleType.descriptionKeyword,
+                      scope: ShieldScope.videoDetail,
+                      onRuleAdded: onRuleAdded,
+                      store: store,
+                    ),
+                  if (pubdate != null)
+                    _SingleActionRow(
+                      label: '发布时间',
+                      text: pubdate.toString(),
+                      actionLabel: '屏蔽早于此发布时间',
+                      onAdd: () async {
+                        await addRule(
+                          store: store,
+                          type: ShieldRuleType.publishTime,
+                          pattern: '..$pubdate',
+                          scope: ShieldScope.videoDetail,
+                          successLabel: '屏蔽发布时间 ≤ $pubdate',
+                        );
+                        onRuleAdded?.call();
+                        if (context.mounted) {
+                          Navigator.of(context).pop();
+                        }
+                      },
+                    ),
+                  if (isUpowerExclusive == true)
+                    _SingleActionRow(
+                      label: '充电专属',
+                      text: 'true',
+                      actionLabel: '屏蔽充电专属',
+                      onAdd: () async {
+                        await addRule(
+                          store: store,
+                          type: ShieldRuleType.isUpowerExclusive,
+                          pattern: 'true',
+                          scope: ShieldScope.videoDetail,
+                          successLabel: '屏蔽充电专属视频',
+                        );
+                        onRuleAdded?.call();
+                        if (context.mounted) {
+                          Navigator.of(context).pop();
+                        }
+                      },
+                    ),
+                  for (final staffName in staffNames)
+                    if (staffName.trim().isNotEmpty)
+                      _TextActionRow(
+                        label: '制作人员',
+                        text: staffName.trim(),
+                        type: ShieldRuleType.staffKeyword,
+                        scope: ShieldScope.videoDetail,
+                        onRuleAdded: onRuleAdded,
+                        store: store,
+                      ),
                 ],
               ),
             ),
@@ -518,6 +579,7 @@ class _TextActionRow extends StatefulWidget {
     required this.type,
     this.onRuleAdded,
     this.store,
+    this.scope = ShieldScope.recommendation,
   });
 
   final String label;
@@ -525,6 +587,7 @@ class _TextActionRow extends StatefulWidget {
   final ShieldRuleType type;
   final VoidCallback? onRuleAdded;
   final ShieldSettingsStore? store;
+  final ShieldScope scope;
 
   @override
   State<_TextActionRow> createState() => _TextActionRowState();
@@ -584,6 +647,7 @@ class _TextActionRowState extends State<_TextActionRow> {
                     store: widget.store,
                     type: widget.type,
                     pattern: selectedText,
+                    scope: widget.scope,
                     successLabel:
                         VideoCardShieldQuickAction._contextualRuleLabel(
                           widget.label,
@@ -611,5 +675,55 @@ class _TextActionRowState extends State<_TextActionRow> {
       return selection.textInside(controller.text);
     }
     return controller.text;
+  }
+}
+
+class _SingleActionRow extends StatelessWidget {
+  const _SingleActionRow({
+    required this.label,
+    required this.text,
+    required this.actionLabel,
+    required this.onAdd,
+  });
+
+  final String label;
+  final String text;
+  final String actionLabel;
+  final Future<void> Function() onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+          ),
+          const SizedBox(height: 3),
+          SelectableText(text),
+          const SizedBox(height: 3),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              TextButton(
+                onPressed: () => Utils.copyText(text),
+                child: const Text('复制'),
+              ),
+              TextButton(
+                onPressed: onAdd,
+                child: Text(actionLabel),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -91,6 +91,8 @@ class VideoCardV extends StatelessWidget {
       upName: videoItem.owner.name,
       upUid: videoItem.owner.mid,
       reason: videoItem.rcmdReason,
+      description: videoItem.desc,
+      pubdate: videoItem.pubdate,
       cover: videoItem.cover,
       bvid: videoItem.bvid,
       onRuleAdded: onRemove,
