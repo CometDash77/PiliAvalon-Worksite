@@ -352,18 +352,9 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
     ),
     if (videoDetail.descV2?.isNotEmpty == true) ...[
       const SizedBox(height: 8),
-      GestureDetector(
-        onLongPress: () => VideoCardShieldQuickAction.showTextDialog(
-          context: context,
-          title: '视频简介',
-          text: videoDetail.desc ?? '',
-          type: ShieldRuleType.descriptionKeyword,
-          scope: ShieldScope.videoDetail,
-        ),
-        child: selectableRichText(
-          style: const TextStyle(height: 1.4),
-          buildContent(theme, videoDetail),
-        ),
+      selectableRichText(
+        style: const TextStyle(height: 1.4),
+        buildContent(theme, videoDetail),
       ),
     ],
     Obx(() {
@@ -375,39 +366,31 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
     }),
   ];
 
-  WidgetSpan _labelWidget(
-    String text,
-    Color bgColor,
-    Color textColor, {
-    VoidCallback? onLongPress,
-  }) {
+  WidgetSpan _labelWidget(String text, Color bgColor, Color textColor) {
     return WidgetSpan(
       alignment: PlaceholderAlignment.middle,
-      child: GestureDetector(
-        onLongPress: onLongPress,
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 4,
-            vertical: 3,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 4,
+          vertical: 3,
+        ),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: const BorderRadius.all(Radius.circular(4)),
+        ),
+        child: Text(
+          text,
+          textScaler: TextScaler.noScaling,
+          strutStyle: const StrutStyle(
+            leading: 0,
+            height: 1,
+            fontSize: 12,
           ),
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: const BorderRadius.all(Radius.circular(4)),
-          ),
-          child: Text(
-            text,
-            textScaler: TextScaler.noScaling,
-            strutStyle: const StrutStyle(
-              leading: 0,
-              height: 1,
-              fontSize: 12,
-            ),
-            style: TextStyle(
-              height: 1,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: textColor,
-            ),
+          style: TextStyle(
+            height: 1,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: textColor,
           ),
         ),
       ),
@@ -485,11 +468,6 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                 isDark
                     ? theme.colorScheme.onError
                     : theme.colorScheme.onErrorContainer,
-                onLongPress: () => VideoCardShieldQuickAction.quickRule(
-                  type: ShieldRuleType.isUpowerExclusive,
-                  pattern: 'true',
-                  scope: ShieldScope.videoDetail,
-                ),
               ),
               const TextSpan(text: ' '),
             ] else if (videoDetail.rights?.isSteinGate == 1) ...[
@@ -810,12 +788,10 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
     );
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onLongPress: () => VideoCardShieldQuickAction.showRecommendationDialog(
+      onLongPress: () => VideoCardShieldQuickAction.showUpDialog(
         context: context,
-        title: introController.videoDetail.value.title ?? '',
         upName: item.name ?? '',
         upUid: item.mid,
-        staffNames: [item.name ?? ''],
       ),
       onTap: () {
         if (item.mid == ownerMid &&
@@ -1009,20 +985,11 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
         value: videoDetail.stat?.danmaku,
         color: theme.colorScheme.outline,
       ),
-      GestureDetector(
-        onLongPress: videoDetail.pubdate == null
-            ? null
-            : () => VideoCardShieldQuickAction.quickRule(
-                type: ShieldRuleType.publishTime,
-                pattern: '..${videoDetail.pubdate}',
-                scope: ShieldScope.videoDetail,
-              ),
-        child: Text(
-          DateFormatUtils.format(videoDetail.pubdate),
-          style: TextStyle(
-            fontSize: 12,
-            color: theme.colorScheme.outline,
-          ),
+      Text(
+        DateFormatUtils.format(videoDetail.pubdate),
+        style: TextStyle(
+          fontSize: 12,
+          color: theme.colorScheme.outline,
         ),
       ),
       if (MineController.anonymity.value)

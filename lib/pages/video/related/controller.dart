@@ -1,4 +1,3 @@
-import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/video.dart';
 import 'package:PiliPlus/models/model_hot_video_item.dart';
@@ -20,18 +19,6 @@ class RelatedController
   }
 
   @override
-  Future<LoadingState<List<HotVideoItemModel>?>> customGetData() async {
-    final state = await VideoHttp.relatedVideoList(bvid: bvid);
-    return switch (state) {
-      Success(:final response) => Success(
-        response == null
-            ? null
-            : ShieldingAdapters.filterRelatedVideos(
-                response,
-                ShieldSettingsStore().snapshot(),
-              ),
-      ),
-      _ => state,
-    };
-  }
+  Future<LoadingState<List<HotVideoItemModel>?>> customGetData() =>
+      VideoHttp.relatedVideoList(bvid: bvid);
 }
