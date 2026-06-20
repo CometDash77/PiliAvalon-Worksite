@@ -136,6 +136,24 @@ List<SettingsModel> get recommendSettings => [
     defaultVal: true,
     onChanged: (value) => ShieldSettingsStore().setRelatedVideoEnabled(value),
   ),
+  _buildRangeShieldingModel(
+    title: '相关视频时长过滤',
+    icon: Icons.hourglass_empty_outlined,
+    type: ShieldRuleType.duration,
+    scope: ShieldScope.videoDetail,
+  ),
+  _buildRangeShieldingModel(
+    title: '相关视频播放量过滤',
+    icon: Icons.play_circle_outline,
+    type: ShieldRuleType.playbackCount,
+    scope: ShieldScope.videoDetail,
+  ),
+  _buildRangeShieldingModel(
+    title: '相关视频弹幕量过滤',
+    icon: Icons.chat_bubble_outline,
+    type: ShieldRuleType.danmakuCount,
+    scope: ShieldScope.videoDetail,
+  ),
   _buildNumberInputModel(
     title: '标签获取并发数',
     icon: Icons.memory_outlined,
@@ -364,6 +382,7 @@ SettingsModel _buildRangeShieldingModel({
   required String title,
   required IconData icon,
   required ShieldRuleType type,
+  ShieldScope scope = ShieldScope.recommendation,
 }) {
   final store = ShieldSettingsStore();
 
@@ -373,7 +392,7 @@ SettingsModel _buildRangeShieldingModel({
     String? upper;
     for (final rule in snapshot.rules) {
       if (rule.type == type &&
-          rule.scope == ShieldScope.recommendation &&
+          rule.scope == scope &&
           rule.matchMode == ShieldMatchMode.range) {
         final parsed = _parseRangeFields(rule.pattern);
         if (parsed.min.isEmpty && parsed.max.isNotEmpty) {
@@ -420,6 +439,8 @@ SettingsModel _buildRangeShieldingModel({
         context,
         type,
         store,
+        scope: scope,
+        title: title,
         lowerInit: t.lower,
         upperInit: t.upper,
       );
@@ -433,18 +454,18 @@ Future<void> _openRangeShieldingDialog(
   BuildContext context,
   ShieldRuleType type,
   ShieldSettingsStore store, {
+  required ShieldScope scope,
+  required String title,
   String? lowerInit,
   String? upperInit,
 }) async {
   String minStr = lowerInit ?? '';
   String maxStr = upperInit ?? '';
 
-  final typeLabel = _rangeTypeLabel(type);
-
   await showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: Text('$typeLabel过滤'),
+      title: Text(title),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -535,56 +556,14 @@ Future<void> _openRangeShieldingDialog(
               return;
             }
 
-            final ruleSet = await store.load();
-            // Remove ALL existing range rules for this type+scope.
-            final newRules = ruleSet.rules
-                .where(
-                  (rule) =>
-                      !(rule.type == type &&
-                          rule.scope == ShieldScope.recommendation &&
-                          rule.matchMode == ShieldMatchMode.range),
-                )
-                .toList();
-
-            final now = DateTime.now();
-            final baseId = 'range-${now.microsecondsSinceEpoch}';
-
-            // Persist the lower-side threshold as "..X"; range matching is
-            // inclusive, so this blocks values <= X.
-            if (min.isNotEmpty) {
-              newRules.add(
-                ShieldRule(
-                  id: max.isEmpty ? baseId : '$baseId-lo',
-                  type: type,
-                  matchMode: ShieldMatchMode.range,
-                  scope: ShieldScope.recommendation,
-                  action: ShieldAction.block,
-                  pattern: '..$min',
-                  enabled: true,
-                  updatedAt: now,
-                ),
-              );
-            }
-
-            // Persist the upper-side threshold as "Y.."; range matching is
-            // inclusive, so this blocks values >= Y.
-            if (max.isNotEmpty) {
-              newRules.add(
-                ShieldRule(
-                  id: min.isEmpty ? baseId : '$baseId-hi',
-                  type: type,
-                  matchMode: ShieldMatchMode.range,
-                  scope: ShieldScope.recommendation,
-                  action: ShieldAction.block,
-                  pattern: '$max..',
-                  enabled: true,
-                  updatedAt: now,
-                ),
-              );
-            }
-
             try {
-              await store.save(ruleSet.copyWith(rules: newRules));
+              await _saveRangeShieldingRules(
+                store: store,
+                type: type,
+                scope: scope,
+                lower: min,
+                upper: max,
+              );
               Get.back();
               SmartDialog.showToast('已保存');
             } catch (e) {
@@ -598,12 +577,80 @@ Future<void> _openRangeShieldingDialog(
   );
 }
 
-String _rangeTypeLabel(ShieldRuleType type) => switch (type) {
-  ShieldRuleType.duration => '时长',
-  ShieldRuleType.playbackCount => '播放量',
-  ShieldRuleType.danmakuCount => '弹幕量',
-  _ => '',
-};
+@visibleForTesting
+Future<void> saveRangeShieldingRulesForTesting({
+  required ShieldSettingsStore store,
+  required ShieldRuleType type,
+  required ShieldScope scope,
+  required String lower,
+  required String upper,
+}) => _saveRangeShieldingRules(
+  store: store,
+  type: type,
+  scope: scope,
+  lower: lower,
+  upper: upper,
+);
+
+Future<void> _saveRangeShieldingRules({
+  required ShieldSettingsStore store,
+  required ShieldRuleType type,
+  required ShieldScope scope,
+  required String lower,
+  required String upper,
+}) async {
+  final min = lower.trim();
+  final max = upper.trim();
+  final ruleSet = await store.load();
+  // Remove ALL existing range rules for this type+scope.
+  final newRules = ruleSet.rules
+      .where(
+        (rule) =>
+            !(rule.type == type &&
+                rule.scope == scope &&
+                rule.matchMode == ShieldMatchMode.range),
+      )
+      .toList();
+
+  final now = DateTime.now();
+  final baseId = 'range-${now.microsecondsSinceEpoch}';
+
+  // Persist the lower-side threshold as "..X"; range matching is inclusive,
+  // so this blocks values <= X.
+  if (min.isNotEmpty) {
+    newRules.add(
+      ShieldRule(
+        id: max.isEmpty ? baseId : '$baseId-lo',
+        type: type,
+        matchMode: ShieldMatchMode.range,
+        scope: scope,
+        action: ShieldAction.block,
+        pattern: '..$min',
+        enabled: true,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  // Persist the upper-side threshold as "Y.."; range matching is inclusive,
+  // so this blocks values >= Y.
+  if (max.isNotEmpty) {
+    newRules.add(
+      ShieldRule(
+        id: min.isEmpty ? baseId : '$baseId-hi',
+        type: type,
+        matchMode: ShieldMatchMode.range,
+        scope: scope,
+        action: ShieldAction.block,
+        pattern: '$max..',
+        enabled: true,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  await store.save(ruleSet.copyWith(rules: newRules));
+}
 
 /// Parses a range pattern string into separate min/max field values.
 ///
