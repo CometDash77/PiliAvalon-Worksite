@@ -994,7 +994,7 @@ void main() {
     );
 
     test(
-      'web recommendation durationSeconds, playbackCount, danmakuCount leave fromRelatedVideo unchanged',
+      'fromRelatedVideo populates durationSeconds, playbackCount, danmakuCount',
       () {
         final video = HotVideoItemModel.fromJson({
           'aid': 1,
@@ -1016,10 +1016,9 @@ void main() {
 
         final candidate = ShieldingAdapters.fromRelatedVideo(video);
 
-        // fromRelatedVideo does not populate numeric candidate fields
-        expect(candidate.durationSeconds, isNull);
-        expect(candidate.playbackCount, isNull);
-        expect(candidate.danmakuCount, isNull);
+        expect(candidate.durationSeconds, 300);
+        expect(candidate.playbackCount, 5000);
+        expect(candidate.danmakuCount, 50);
       },
     );
   });
@@ -1381,6 +1380,147 @@ void main() {
         ); // Not filtered — recommendationEnabled is off.
       },
     );
+
+    test(
+      'duration range blocks related video through video detail scope',
+      () {
+        final blocked = _relatedVideo(
+          aid: 1,
+          title: '长视频',
+          duration: 720,
+          view: 5000,
+          danmaku: 50,
+        );
+        final visible = _relatedVideo(
+          aid: 2,
+          title: '短视频',
+          duration: 120,
+          view: 5000,
+          danmaku: 50,
+        );
+
+        final result = ShieldingAdapters.filterRelatedVideos(
+          [blocked, visible],
+          _videoDetailRangeRuleSet(
+            id: 'duration',
+            type: ShieldRuleType.duration,
+            pattern: '600..900',
+          ),
+        );
+
+        expect(result, [visible]);
+      },
+    );
+
+    test(
+      'playbackCount range blocks related video through video detail scope',
+      () {
+        final blocked = _relatedVideo(
+          aid: 1,
+          title: '热视频',
+          duration: 300,
+          view: 80000,
+          danmaku: 50,
+        );
+        final visible = _relatedVideo(
+          aid: 2,
+          title: '普通视频',
+          duration: 300,
+          view: 3000,
+          danmaku: 50,
+        );
+
+        final result = ShieldingAdapters.filterRelatedVideos(
+          [blocked, visible],
+          _videoDetailRangeRuleSet(
+            id: 'playback',
+            type: ShieldRuleType.playbackCount,
+            pattern: '50000..100000',
+          ),
+        );
+
+        expect(result, [visible]);
+      },
+    );
+
+    test(
+      'danmakuCount range blocks related video through video detail scope',
+      () {
+        final blocked = _relatedVideo(
+          aid: 1,
+          title: '弹幕视频',
+          duration: 300,
+          view: 5000,
+          danmaku: 900,
+        );
+        final visible = _relatedVideo(
+          aid: 2,
+          title: '安静视频',
+          duration: 300,
+          view: 5000,
+          danmaku: 20,
+        );
+
+        final result = ShieldingAdapters.filterRelatedVideos(
+          [blocked, visible],
+          _videoDetailRangeRuleSet(
+            id: 'danmaku',
+            type: ShieldRuleType.danmakuCount,
+            pattern: '500..1000',
+          ),
+        );
+
+        expect(result, [visible]);
+      },
+    );
+
+    test(
+      'relatedVideoEnabled false disables video detail range rules',
+      () {
+        final video = _relatedVideo(
+          aid: 1,
+          title: '长视频',
+          duration: 720,
+          view: 80000,
+          danmaku: 900,
+        );
+        final ruleSet = _videoDetailRangeRuleSet(
+          id: 'duration',
+          type: ShieldRuleType.duration,
+          pattern: '600..900',
+          relatedVideoEnabled: false,
+        );
+        final items = [video];
+
+        final result = ShieldingAdapters.filterRelatedVideos(items, ruleSet);
+
+        expect(identical(result, items), isTrue);
+        expect(result, [video]);
+      },
+    );
+
+    test(
+      'recommendationEnabled false does not disable filterRelatedVideos',
+      () {
+        final video = _relatedVideo(
+          aid: 1,
+          title: '长视频',
+          duration: 720,
+          view: 80000,
+          danmaku: 900,
+        );
+        final ruleSet = _videoDetailRangeRuleSet(
+          id: 'duration',
+          type: ShieldRuleType.duration,
+          pattern: '600..900',
+          recommendationEnabled: false,
+        );
+
+        final result = ShieldingAdapters.filterRelatedVideos([video], ruleSet);
+
+        expect(result, isEmpty);
+      },
+    );
   });
 
   group('task-066 new rule type matching', () {
@@ -1588,6 +1728,53 @@ ShieldRuleSet _userRegexRuleSet(String pattern) => ShieldRuleSet(
       type: ShieldRuleType.userKeyword,
       matchMode: ShieldMatchMode.regex,
       scope: ShieldScope.recommendation,
+      action: ShieldAction.block,
+      pattern: pattern,
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+    ),
+  ],
+);
+
+HotVideoItemModel _relatedVideo({
+  required int aid,
+  required String title,
+  required int duration,
+  required int view,
+  required int danmaku,
+}) => HotVideoItemModel.fromJson({
+  'aid': aid,
+  'cid': aid + 100,
+  'bvid': 'BV$aid',
+  'videos': 1,
+  'tid': 17,
+  'tname': '游戏',
+  'copyright': 1,
+  'pic': '',
+  'title': title,
+  'pubdate': 1,
+  'ctime': 1,
+  'desc': '',
+  'duration': duration,
+  'owner': {'mid': 42, 'name': '玩家UP'},
+  'stat': {'view': view, 'like': 10, 'danmaku': danmaku},
+});
+
+ShieldRuleSet _videoDetailRangeRuleSet({
+  required String id,
+  required ShieldRuleType type,
+  required String pattern,
+  bool recommendationEnabled = true,
+  bool relatedVideoEnabled = true,
+}) => ShieldRuleSet(
+  globalEnabled: true,
+  recommendationEnabled: recommendationEnabled,
+  relatedVideoEnabled: relatedVideoEnabled,
+  rules: [
+    ShieldRule(
+      id: id,
+      type: type,
+      matchMode: ShieldMatchMode.range,
+      scope: ShieldScope.videoDetail,
       action: ShieldAction.block,
       pattern: pattern,
       updatedAt: DateTime.fromMillisecondsSinceEpoch(1),

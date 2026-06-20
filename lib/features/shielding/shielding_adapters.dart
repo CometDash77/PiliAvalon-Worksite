@@ -135,6 +135,9 @@ abstract final class ShieldingAdapters {
       item.title,
       item.tname,
     ]),
+    durationSeconds: item.duration > 0 ? item.duration : null,
+    playbackCount: item.stat.view,
+    danmakuCount: item.stat.danmu,
     // task-066: populate detail-introduction fields from related-video model.
     description: item.desc,
     pubdate: item.pubdate,
