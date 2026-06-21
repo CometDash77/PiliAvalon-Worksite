@@ -60,12 +60,14 @@ Only `file_picker` changed; no other package affected.
 
 - Commit message: `Regenerate lockfile for Task-075 upstream merge`
 - Push target: `origin/task-075-upstream-stable-merge`
+- Actual commit SHA:
+  `0f00ff7084bb3eff3f3dcd4dad47b693156447f6`
 - Expected branch update: one commit containing only:
   - `pubspec.lock`
   - `records/reasonix/task-075/lockfile-fix-report.md`
   - `records/reasonix/prompts/2026-06-21-task075-lockfile-fix.prompt.md`
-- Final commit SHA and remote-ref verification are recorded by Codex after the
-  GitHub API update.
+- Remote-ref verification confirmed the branch advanced to that commit before
+  the follow-up live-room compile fix.
 
 ## Explicit non-claims
 
