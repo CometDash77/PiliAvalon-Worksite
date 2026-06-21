@@ -707,7 +707,6 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                         Icon(
                           tempHide ? CustomIcons.dm_off : CustomIcons.dm_on,
                           size: 19,
-                          color: color,
                         ),
                         Text(tempHide ? '显示弹幕' : '隐藏弹幕'),
                       ],
@@ -726,7 +725,6 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                         Icon(
                           tempHide ? Icons.visibility_off : Icons.visibility,
                           size: 19,
-                          color: color,
                         ),
                         Text(tempHide ? '显示 SC' : '隐藏 SC'),
                       ],
