@@ -259,6 +259,27 @@ abstract final class VideoCardShieldQuickAction {
         ShieldRuleType.staffKeyword => '屏蔽制作人员关键词「$pattern」',
       };
 
+  static bool _isRecommendationQuickActionType(ShieldRuleType type) =>
+      switch (type) {
+        ShieldRuleType.keyword ||
+        ShieldRuleType.userKeyword ||
+        ShieldRuleType.reasonKeyword ||
+        ShieldRuleType.uid ||
+        ShieldRuleType.category ||
+        ShieldRuleType.tag ||
+        ShieldRuleType.duration ||
+        ShieldRuleType.playbackCount ||
+        ShieldRuleType.danmakuCount ||
+        ShieldRuleType.descriptionKeyword ||
+        ShieldRuleType.publishTime ||
+        ShieldRuleType.isUpowerExclusive ||
+        ShieldRuleType.staffKeyword => true,
+        ShieldRuleType.commentMemberSex ||
+        ShieldRuleType.commentMemberLevel ||
+        ShieldRuleType.avatarPendant ||
+        ShieldRuleType.garb => false,
+      };
+
   static String _contextualRuleLabel(
     String label,
     ShieldRuleType type,
