@@ -609,7 +609,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap the type dropdown to see options
-      await tester.tap(find.text('标题/正文关键词'));
+      await tester.tap(find.text('标题/正文关键词').last);
       await tester.pumpAndSettle();
 
       expect(find.text('头像挂件'), findsWidgets);
