@@ -15,6 +15,7 @@ blankness_report="runtime-smoke/evidence/screenshot-blankness.txt"
 launcher_component_file="runtime-smoke/evidence/launcher-component.txt"
 launcher_resolution_file="runtime-smoke/evidence/launcher-resolution.txt"
 max_system_dialog_retries=2
+max_scenario_swipes=6
 
 record_status() {
   echo "status=${status}" | tee -a runtime-smoke/evidence/status.txt
@@ -32,6 +33,7 @@ record_status() {
     100) echo "result=fail reason=app_not_foreground" ;;
     110) echo "result=fail reason=uiautomator_xml_missing_app_package" ;;
     120) echo "result=fail reason=launcher_activity_not_found" ;;
+    130) echo "result=fail reason=runtime_scenario_failed" ;;
     *) echo "result=fail reason=unknown_status" ;;
   esac | tee -a runtime-smoke/evidence/status.txt
 }
@@ -180,6 +182,166 @@ retry_after_system_dialog_if_needed() {
       return 0
     fi
   done
+}
+
+# --- scenario UI helpers ---------------------------------------------------
+dump_ui_to() {
+  local dest="$1"
+  local device_path="/sdcard/scenario_dump.xml"
+  if adb shell uiautomator dump "$device_path" > /dev/null 2>&1; then
+    adb pull "$device_path" "$dest" > /dev/null 2>&1 || return 1
+    return 0
+  fi
+  return 1
+}
+
+swipe_vertical() {
+  local direction="${1:-up}"
+  local count="${2:-1}"
+  local i
+  for i in $(seq 1 "$count"); do
+    if [ "$direction" = "up" ]; then
+      adb shell input swipe 540 1600 540 600 300 || true
+    else
+      adb shell input swipe 540 600 540 1600 300 || true
+    fi
+    sleep 2
+  done
+}
+
+find_nodes_by_text() {
+  local dump_file="$1"
+  local out_file="$2"
+  shift 2
+  python3 - "$dump_file" "$out_file" "$@" <<'PY'
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+dump_path, out_path = sys.argv[1], sys.argv[2]
+patterns = sys.argv[3:]
+pattern_priority = {pat: idx for idx, pat in enumerate(patterns)}
+
+try:
+    root = ET.parse(dump_path).getroot()
+except ET.ParseError:
+    with open(out_path, "w") as f:
+        f.write("# parse_error\n")
+    sys.exit(0)
+
+def sanitize(s):
+    """Replace CR/LF so records stay on one line; use pilcrow (U+00B6) as placeholder."""
+    return s.replace("\r", "\u00b6").replace("\n", "\u00b6")
+
+BOUNDS_RE = re.compile(r"^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$")
+
+results = []
+for node in root.iter("node"):
+    text = node.attrib.get("text", "")
+    content_desc = node.attrib.get("content-desc", "")
+    clickable = node.attrib.get("clickable", "false")
+    combined = f"{text} {content_desc}"
+    for pat in patterns:
+        if pat in combined:
+            priority = pattern_priority.get(pat, len(patterns))
+            bounds_str = node.attrib.get("bounds", "")
+            m = BOUNDS_RE.match(bounds_str) if bounds_str else None
+            if m:
+                left, top, right, bottom = map(int, m.groups())
+                cx = (left + right) // 2
+                cy = (top + bottom) // 2
+                w = right - left
+                h = bottom - top
+                area = w * h
+                # sort key: (pattern_priority, clickable_priority, area)
+                click_prio = 0 if clickable == "true" else 1
+                results.append((
+                    priority, click_prio, area,
+                    f"text={sanitize(text)} content_desc={sanitize(content_desc)} "
+                    f"matched={sanitize(pat)} priority={priority} bounds={bounds_str} "
+                    f"w={w} h={h} area={area} clickable={clickable} cx={cx} cy={cy}"
+                ))
+            else:
+                results.append((
+                    priority, 1, sys.maxsize,
+                    f"text={sanitize(text)} content_desc={sanitize(content_desc)} "
+                    f"matched={sanitize(pat)} priority={priority} bounds=none clickable={clickable} cx=0 cy=0"
+                ))
+
+# Sort: higher-priority navigation text first, then clickable nodes, then smallest area.
+results.sort(key=lambda x: (x[0], x[1], x[2]))
+
+with open(out_path, "w") as f:
+    for _, _, _, line in results:
+        f.write(line + "\n")
+    if not results:
+        f.write("# no_match\n")
+PY
+}
+
+tap_first_match() {
+  local matches_file="$1"
+  local nav_log="${2:-}"
+  if [ ! -s "$matches_file" ]; then
+    return 1
+  fi
+  local cx cy
+  while IFS= read -r line; do
+    # skip comment lines
+    [[ "$line" =~ ^# ]] && continue
+    cx="$(echo "$line" | sed -n 's/.*cx=\([0-9]\+\).*/\1/p')"
+    cy="$(echo "$line" | sed -n 's/.*cy=\([0-9]\+\).*/\1/p')"
+    # skip malformed lines: require both cx and cy present, and cx != 0
+    if [ -n "${cx:-}" ] && [ -n "${cy:-}" ] && [ "$cx" != "0" ]; then
+      if [ -n "$nav_log" ]; then
+        echo "tap_match=$line" >> "$nav_log"
+        echo "tap_coords=${cx},${cy}" >> "$nav_log"
+      fi
+      adb shell input tap "$cx" "$cy"
+      return 0
+    fi
+  done < "$matches_file"
+  return 1
+}
+
+check_ui_for_labels() {
+  local dump_file="$1"
+  local out_file="$2"
+  python3 - "$dump_file" "$out_file" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+
+dump_path, out_path = sys.argv[1], sys.argv[2]
+targets = [
+    "标签获取并发数",
+    "标签获取超时",
+    "标签缓存上限",
+    "标签缓存状态",
+]
+
+try:
+    root = ET.parse(dump_path).getroot()
+except ET.ParseError:
+    with open(out_path, "w") as f:
+        f.write("label_check=error\nreason=xml_parse_error\n")
+    sys.exit(1)
+
+found = []
+for node in root.iter("node"):
+    text = node.attrib.get("text", "")
+    content_desc = node.attrib.get("content-desc", "")
+    combined = f"{text} {content_desc}"
+    for t in targets:
+        if t in combined:
+            found.append(t)
+
+with open(out_path, "w") as f:
+    if found:
+        f.write(f"label_check=pass\nfound_labels={','.join(found)}\n")
+    else:
+        f.write("label_check=fail\nreason=no_target_labels_found\n")
+PY
+  grep -q "label_check=pass" "$out_file"
 }
 
 {
@@ -408,6 +570,326 @@ if [ "$status" -eq 0 ]; then
   if ! adb shell pidof "$PACKAGE_NAME" | tee runtime-smoke/evidence/pidof.txt; then
     status=40
   fi
+fi
+
+# --- scenario-specific evidence collection -------------------------------
+scenario="${RUNTIME_SMOKE_SCENARIO:-}"
+scenario_evidence_dir="runtime-smoke/evidence/scenario"
+mkdir -p "$scenario_evidence_dir"
+
+if [ -n "$scenario" ] && [ "$status" -eq 0 ]; then
+  echo "scenario=${scenario}" | tee "$scenario_evidence_dir/scenario-metadata.txt"
+  echo "package_name=${PACKAGE_NAME:-}" | tee -a "$scenario_evidence_dir/scenario-metadata.txt"
+  echo "github_sha=${GITHUB_SHA:-}" | tee -a "$scenario_evidence_dir/scenario-metadata.txt"
+
+  case "$scenario" in
+    recommend-detail-tag-shielding)
+      echo "Running recommend-detail-tag-shielding scenario — attempting in-app navigation..."
+
+      # Save post-launch evidence for inspection
+      cp "$ui_dump" "$scenario_evidence_dir/post-launch-ui.xml" 2>/dev/null || true
+      cp "$screenshot" "$scenario_evidence_dir/post-launch-screenshot.png" 2>/dev/null || true
+
+      scenario_success=0
+      scenario_nav_attempt=0
+
+      # Step 1: Check if debug labels are already visible post-launch
+      if check_ui_for_labels "$ui_dump" "$scenario_evidence_dir/label-check-0.txt"; then
+        scenario_success=1
+        echo "labels_found=on_launch" >> "$scenario_evidence_dir/navigation-log.txt"
+      fi
+
+      # Step 2: If not already visible, attempt navigation via taps and swipes
+      if [ "$scenario_success" -eq 0 ]; then
+        nav_targets="推荐流设置 设置 我的 推荐流"
+
+        while [ "$scenario_nav_attempt" -lt "$max_scenario_swipes" ]; do
+          scenario_nav_attempt=$((scenario_nav_attempt + 1))
+          echo "--- scenario navigation attempt ${scenario_nav_attempt} ---" >> "$scenario_evidence_dir/navigation-log.txt"
+
+          current_ui="$scenario_evidence_dir/ui-attempt-${scenario_nav_attempt}.xml"
+          if ! dump_ui_to "$current_ui"; then
+            echo "ui_dump_failed=true" >> "$scenario_evidence_dir/navigation-log.txt"
+            continue
+          fi
+
+          # Check if this UI dump reveals the debug labels
+          if check_ui_for_labels "$current_ui" "$scenario_evidence_dir/label-check-${scenario_nav_attempt}.txt"; then
+            scenario_success=1
+            echo "labels_found_at_attempt=${scenario_nav_attempt}" >> "$scenario_evidence_dir/navigation-log.txt"
+            break
+          fi
+
+          # Search for clickable navigation targets in current UI
+          find_nodes_by_text "$current_ui" "$scenario_evidence_dir/matches-${scenario_nav_attempt}.txt" $nav_targets
+
+          if grep -qv '^#' "$scenario_evidence_dir/matches-${scenario_nav_attempt}.txt" 2>/dev/null; then
+            if tap_first_match "$scenario_evidence_dir/matches-${scenario_nav_attempt}.txt" "$scenario_evidence_dir/navigation-log.txt"; then
+              echo "tapped_navigation_target=true" >> "$scenario_evidence_dir/navigation-log.txt"
+              sleep 3
+              continue
+            fi
+            echo "tap_failed=true" >> "$scenario_evidence_dir/navigation-log.txt"
+          else
+            echo "no_clickable_target=true" >> "$scenario_evidence_dir/navigation-log.txt"
+          fi
+
+          # No navigable target found or tap failed — swipe to reveal more UI
+          echo "action=swipe_up" >> "$scenario_evidence_dir/navigation-log.txt"
+          swipe_vertical "up" 1
+          sleep 2
+        done
+      fi
+
+      # Write final outcome
+      if [ "$scenario_success" -eq 1 ]; then
+        echo "scenario_outcome=pass" > "$scenario_evidence_dir/scenario-outcome.txt"
+        echo "navigation_attempts=${scenario_nav_attempt}" >> "$scenario_evidence_dir/scenario-outcome.txt"
+      else
+        echo "scenario_outcome=fail" > "$scenario_evidence_dir/scenario-outcome.txt"
+        echo "navigation_attempts=${scenario_nav_attempt}" >> "$scenario_evidence_dir/scenario-outcome.txt"
+        echo "reason=debug_labels_not_reachable_via_ui_navigation" >> "$scenario_evidence_dir/scenario-outcome.txt"
+        status=130
+      fi
+
+      echo "--- recommend-detail-tag-shielding scenario outcome ---"
+      cat "$scenario_evidence_dir/scenario-outcome.txt" 2>/dev/null || true
+      echo "--- scenario navigation log ---"
+      cat "$scenario_evidence_dir/navigation-log.txt" 2>/dev/null || true
+      echo "--- scenario match summary ---"
+      for match_file in "$scenario_evidence_dir"/matches-*.txt; do
+        [ -e "$match_file" ] || continue
+        echo "### $(basename "$match_file")"
+        head -n 5 "$match_file" || true
+      done
+      ;;
+    temp-quiet-rewrite)
+      echo "Running temp-quiet-rewrite scenario — verifying video more menu remains usable after temp quiet toggles..."
+
+      cp "$ui_dump" "$scenario_evidence_dir/post-launch-ui.xml" 2>/dev/null || true
+      cp "$screenshot" "$scenario_evidence_dir/post-launch-screenshot.png" 2>/dev/null || true
+
+      scenario_success=0
+      scenario_nav_attempt=0
+      scenario_menu_ui=""
+      scenario_log="$scenario_evidence_dir/navigation-log.txt"
+      : > "$scenario_log"
+
+      summarize_temp_quiet_menu() {
+        local dump_file="$1"
+        local out_file="$2"
+        python3 - "$dump_file" "$out_file" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+
+dump_path, out_path = sys.argv[1:3]
+
+targets = {
+    "comment_hide": "隐藏评论",
+    "comment_show": "显示评论",
+    "danmaku_hide": "隐藏弹幕",
+    "danmaku_show": "显示弹幕",
+    "persistent_add": "添加频道屏蔽",
+    "persistent_edit": "编辑频道屏蔽",
+    "persistent_dialog_comments": "默认隐藏评论",
+    "persistent_dialog_danmaku": "默认隐藏弹幕",
+    "view_later": "稍后再看",
+    "report": "举报",
+}
+
+try:
+    root = ET.parse(dump_path).getroot()
+except ET.ParseError:
+    with open(out_path, "w", encoding="utf-8") as handle:
+        handle.write("menu_check=error\nreason=xml_parse_error\n")
+    sys.exit(1)
+
+found = {key: False for key in targets}
+for node in root.iter("node"):
+    text = node.attrib.get("text", "")
+    content_desc = node.attrib.get("content-desc", "")
+    combined = f"{text} {content_desc}"
+    for key, target in targets.items():
+        if target in combined:
+            found[key] = True
+
+has_comment_temp = found["comment_hide"] or found["comment_show"]
+has_danmaku_temp = found["danmaku_hide"] or found["danmaku_show"]
+has_persistent_entry = found["persistent_add"] or found["persistent_edit"]
+has_menu = has_comment_temp or has_danmaku_temp or has_persistent_entry or found["view_later"] or found["report"]
+
+with open(out_path, "w", encoding="utf-8") as handle:
+    handle.write(f"menu_detected={int(has_menu)}\n")
+    handle.write(f"has_comment_temp={int(has_comment_temp)}\n")
+    handle.write(f"has_danmaku_temp={int(has_danmaku_temp)}\n")
+    handle.write(f"has_persistent_entry={int(has_persistent_entry)}\n")
+    for key, value in found.items():
+        handle.write(f"{key}={int(value)}\n")
+PY
+      }
+
+      open_more_from_ui() {
+        local source_ui="$1"
+        local attempt="$2"
+        local matches="$scenario_evidence_dir/more-matches-${attempt}.txt"
+        find_nodes_by_text "$source_ui" "$matches" "更多选项" "更多设置" "More options" "Show menu"
+        if grep -qv '^#' "$matches" 2>/dev/null; then
+          if tap_first_match "$matches" "$scenario_log"; then
+            sleep 2
+            scenario_menu_ui="$scenario_evidence_dir/menu-open-${attempt}.xml"
+            dump_ui_to "$scenario_menu_ui" || return 1
+            summarize_temp_quiet_menu "$scenario_menu_ui" "$scenario_evidence_dir/menu-check-${attempt}.txt" || return 1
+            return 0
+          fi
+        fi
+        return 1
+      }
+
+      tap_menu_label() {
+        local source_ui="$1"
+        local attempt="$2"
+        shift 2
+        local matches="$scenario_evidence_dir/menu-label-matches-${attempt}.txt"
+        find_nodes_by_text "$source_ui" "$matches" "$@"
+        if grep -qv '^#' "$matches" 2>/dev/null; then
+          tap_first_match "$matches" "$scenario_log"
+          return $?
+        fi
+        return 1
+      }
+
+      # Try to open a visible video-detail more menu. The normal runtime launch
+      # may already restore the last detail route; otherwise collect diagnostic
+      # UI dumps while swiping through the launch screen.
+      while [ "$scenario_nav_attempt" -lt "$max_scenario_swipes" ]; do
+        scenario_nav_attempt=$((scenario_nav_attempt + 1))
+        echo "--- temp quiet attempt ${scenario_nav_attempt} ---" >> "$scenario_log"
+
+        current_ui="$scenario_evidence_dir/temp-quiet-ui-${scenario_nav_attempt}.xml"
+        if ! dump_ui_to "$current_ui"; then
+          echo "ui_dump_failed=true" >> "$scenario_log"
+          continue
+        fi
+
+        if open_more_from_ui "$current_ui" "$scenario_nav_attempt"; then
+          if grep -q "menu_detected=1" "$scenario_evidence_dir/menu-check-${scenario_nav_attempt}.txt"; then
+            scenario_success=1
+            echo "more_menu_opened_at_attempt=${scenario_nav_attempt}" >> "$scenario_log"
+            break
+          fi
+          echo "more_candidate_opened_without_expected_menu=true" >> "$scenario_log"
+          adb shell input keyevent 4 || true
+          sleep 1
+        else
+          echo "more_candidate_not_found=true" >> "$scenario_log"
+        fi
+
+        echo "action=swipe_up" >> "$scenario_log"
+        swipe_vertical "up" 1
+      done
+
+      if [ "$scenario_success" -eq 1 ]; then
+        if ! grep -q "has_comment_temp=1" "$scenario_evidence_dir/menu-check-${scenario_nav_attempt}.txt"; then
+          echo "scenario_outcome=fail" > "$scenario_evidence_dir/scenario-outcome.txt"
+          echo "reason=temp_comment_entry_missing" >> "$scenario_evidence_dir/scenario-outcome.txt"
+          status=130
+        elif ! grep -q "has_danmaku_temp=1" "$scenario_evidence_dir/menu-check-${scenario_nav_attempt}.txt"; then
+          echo "scenario_outcome=fail" > "$scenario_evidence_dir/scenario-outcome.txt"
+          echo "reason=temp_danmaku_entry_missing" >> "$scenario_evidence_dir/scenario-outcome.txt"
+          status=130
+        else
+          # Toggle temporary comments, then prove the more menu can reopen.
+          if ! tap_menu_label "$scenario_menu_ui" "comment-toggle" "隐藏评论" "显示评论"; then
+            echo "scenario_outcome=fail" > "$scenario_evidence_dir/scenario-outcome.txt"
+            echo "reason=temp_comment_entry_not_tappable" >> "$scenario_evidence_dir/scenario-outcome.txt"
+            status=130
+          else
+            sleep 2
+            after_comment_ui="$scenario_evidence_dir/after-comment-toggle.xml"
+            dump_ui_to "$after_comment_ui" || true
+            if ! open_more_from_ui "$after_comment_ui" "after-comment"; then
+              echo "scenario_outcome=fail" > "$scenario_evidence_dir/scenario-outcome.txt"
+              echo "reason=more_menu_not_reopenable_after_comment_toggle" >> "$scenario_evidence_dir/scenario-outcome.txt"
+              status=130
+            fi
+          fi
+
+          # Toggle temporary danmaku from the reopened menu, then prove the
+          # more menu can reopen again.
+          if [ "$status" -eq 0 ]; then
+            if ! tap_menu_label "$scenario_menu_ui" "danmaku-toggle" "隐藏弹幕" "显示弹幕"; then
+              echo "scenario_outcome=fail" > "$scenario_evidence_dir/scenario-outcome.txt"
+              echo "reason=temp_danmaku_entry_not_tappable" >> "$scenario_evidence_dir/scenario-outcome.txt"
+              status=130
+            else
+              sleep 2
+              after_danmaku_ui="$scenario_evidence_dir/after-danmaku-toggle.xml"
+              dump_ui_to "$after_danmaku_ui" || true
+              if ! open_more_from_ui "$after_danmaku_ui" "after-danmaku"; then
+                echo "scenario_outcome=fail" > "$scenario_evidence_dir/scenario-outcome.txt"
+                echo "reason=more_menu_not_reopenable_after_danmaku_toggle" >> "$scenario_evidence_dir/scenario-outcome.txt"
+                status=130
+              fi
+            fi
+          fi
+
+          # If channel identity is available, the persistent channel quiet
+          # entry should remain visible and open its dialog. Absence is recorded
+          # as channel-identity-unavailable, not a failure.
+          if [ "$status" -eq 0 ]; then
+            final_check="$scenario_evidence_dir/menu-check-after-danmaku.txt"
+            summarize_temp_quiet_menu "$scenario_menu_ui" "$final_check" || true
+            if grep -q "has_persistent_entry=1" "$final_check"; then
+              if tap_menu_label "$scenario_menu_ui" "persistent-entry" "添加频道屏蔽" "编辑频道屏蔽"; then
+                sleep 2
+                persistent_dialog_ui="$scenario_evidence_dir/persistent-dialog.xml"
+                dump_ui_to "$persistent_dialog_ui" || true
+                summarize_temp_quiet_menu "$persistent_dialog_ui" "$scenario_evidence_dir/persistent-dialog-check.txt" || true
+                if ! grep -q "persistent_dialog_comments=1" "$scenario_evidence_dir/persistent-dialog-check.txt" ||
+                   ! grep -q "persistent_dialog_danmaku=1" "$scenario_evidence_dir/persistent-dialog-check.txt"; then
+                  echo "scenario_outcome=fail" > "$scenario_evidence_dir/scenario-outcome.txt"
+                  echo "reason=persistent_channel_entry_dialog_not_opened" >> "$scenario_evidence_dir/scenario-outcome.txt"
+                  status=130
+                fi
+              else
+                echo "scenario_outcome=fail" > "$scenario_evidence_dir/scenario-outcome.txt"
+                echo "reason=persistent_channel_entry_not_tappable" >> "$scenario_evidence_dir/scenario-outcome.txt"
+                status=130
+              fi
+            else
+              echo "persistent_channel_entry=not_visible_channel_identity_unavailable" >> "$scenario_log"
+            fi
+          fi
+
+          if [ "$status" -eq 0 ]; then
+            echo "scenario_outcome=pass" > "$scenario_evidence_dir/scenario-outcome.txt"
+            echo "navigation_attempts=${scenario_nav_attempt}" >> "$scenario_evidence_dir/scenario-outcome.txt"
+            echo "comment_toggle_reopened_more=true" >> "$scenario_evidence_dir/scenario-outcome.txt"
+            echo "danmaku_toggle_reopened_more=true" >> "$scenario_evidence_dir/scenario-outcome.txt"
+          fi
+        fi
+      else
+        echo "scenario_outcome=fail" > "$scenario_evidence_dir/scenario-outcome.txt"
+        echo "navigation_attempts=${scenario_nav_attempt}" >> "$scenario_evidence_dir/scenario-outcome.txt"
+        echo "reason=video_more_menu_not_reachable" >> "$scenario_evidence_dir/scenario-outcome.txt"
+        status=130
+      fi
+
+      echo "--- temp-quiet-rewrite scenario outcome ---"
+      cat "$scenario_evidence_dir/scenario-outcome.txt" 2>/dev/null || true
+      echo "--- temp-quiet-rewrite navigation log ---"
+      cat "$scenario_log" 2>/dev/null || true
+      echo "--- temp-quiet-rewrite menu checks ---"
+      for check_file in "$scenario_evidence_dir"/menu-check*.txt "$scenario_evidence_dir"/persistent-dialog-check.txt; do
+        [ -e "$check_file" ] || continue
+        echo "### $(basename "$check_file")"
+        cat "$check_file" || true
+      done
+      ;;
+    *)
+      echo "Unknown scenario: $scenario" | tee "$scenario_evidence_dir/scenario-error.txt"
+      ;;
+  esac
 fi
 
 record_status

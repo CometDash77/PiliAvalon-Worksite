@@ -6,8 +6,66 @@ String shieldRuleSummary(List<ShieldRule> rules) {
   return '$enabled/${rules.length} 条规则启用';
 }
 
-String shieldRuleTitle(ShieldRule rule) =>
-    '${shieldActionLabel(rule.action)} ${shieldRuleTypeLabel(rule.type)}: ${rule.pattern}';
+String shieldRuleTitle(ShieldRule rule) {
+  final display = _displayPattern(rule);
+  return '${shieldActionLabel(rule.action)} ${shieldRuleTypeLabel(rule.type)}: $display';
+}
+
+/// Returns the user-facing display text for a rule's pattern.
+///
+/// Prefers [ShieldRule.displayPattern] when set.
+/// For old user/UP keyword rules whose pattern is a generated regex
+/// from [shieldTokenPatternRegex], extracts and unescapes the original keyword.
+/// Falls back to the raw [pattern] for manual regex, UID, and other rules.
+String _displayPattern(ShieldRule rule) {
+  // 1. Use explicit displayPattern when available.
+  if (rule.displayPattern != null && rule.displayPattern!.isNotEmpty) {
+    return rule.displayPattern!;
+  }
+
+  // 2. For user/UP keyword regex rules, try to recover keyword from
+  //    the generated token pattern shape.
+  if (rule.type == ShieldRuleType.userKeyword &&
+      rule.matchMode == ShieldMatchMode.regex) {
+    final extracted = _extractKeywordFromTokenPattern(rule.pattern);
+    if (extracted != null) return extracted;
+  }
+
+  // 3. Fallback: show the raw pattern (UID, manual regex, etc.).
+  return rule.pattern;
+}
+
+/// Detects a pattern produced by [shieldTokenPatternRegex] and extracts
+/// the original keyword (with regex escaping reversed).
+String? _extractKeywordFromTokenPattern(String pattern) {
+  const prefix = r'(^|[\s,，。！？!?:：;；_\-])';
+  const suffix = r'($|[\s,，。！？!?:：;；_\-])';
+  if (pattern.startsWith(prefix) && pattern.endsWith(suffix)) {
+    final escaped = pattern.substring(
+      prefix.length,
+      pattern.length - suffix.length,
+    );
+    if (escaped.isNotEmpty) {
+      return _unescapeRegex(escaped);
+    }
+  }
+  return null;
+}
+
+/// Reverses [RegExp.escape] — strips single backslashes before special
+/// regex characters and collapses double backslashes to single ones.
+String _unescapeRegex(String s) {
+  final buffer = StringBuffer();
+  for (int i = 0; i < s.length; i++) {
+    if (s[i] == '\\' && i + 1 < s.length) {
+      buffer.write(s[i + 1]);
+      i++;
+    } else {
+      buffer.write(s[i]);
+    }
+  }
+  return buffer.toString();
+}
 
 String shieldRuleSubtitle(ShieldRule rule) =>
     '${shieldScopeLabel(rule.scope)} / '
@@ -21,6 +79,17 @@ String shieldRuleTypeLabel(ShieldRuleType type) => switch (type) {
   ShieldRuleType.uid => '用户 UID',
   ShieldRuleType.category => '分区',
   ShieldRuleType.tag => '标签',
+  ShieldRuleType.avatarPendant => '头像挂件',
+  ShieldRuleType.garb => '装扮卡片',
+  ShieldRuleType.duration => '时长',
+  ShieldRuleType.playbackCount => '播放数',
+  ShieldRuleType.danmakuCount => '弹幕数',
+  ShieldRuleType.commentMemberSex => '评论用户性别',
+  ShieldRuleType.commentMemberLevel => '评论用户等级',
+  ShieldRuleType.descriptionKeyword => '视频简介',
+  ShieldRuleType.publishTime => '发布时间',
+  ShieldRuleType.isUpowerExclusive => '充电专属',
+  ShieldRuleType.staffKeyword => '制作人员',
 };
 
 const shieldingRuleCategoryLabels = [
@@ -29,6 +98,10 @@ const shieldingRuleCategoryLabels = [
   '推荐理由',
   '标签',
   '分区',
+  '数值元数据',
+  '评论用户信息',
+  '评论装饰',
+  '视频详情信息',
   '评论关键词',
 ];
 
@@ -47,12 +120,41 @@ String shieldingRuleCategoryFor(ShieldRule rule) {
           rule.scope == ShieldScope.both)) {
     return '标题关键词';
   }
+  if (rule.type == ShieldRuleType.duration ||
+      rule.type == ShieldRuleType.playbackCount ||
+      rule.type == ShieldRuleType.danmakuCount) {
+    return '数值元数据';
+  }
+  if (rule.type == ShieldRuleType.commentMemberSex ||
+      rule.type == ShieldRuleType.commentMemberLevel) {
+    return '评论用户信息';
+  }
+  if (rule.type == ShieldRuleType.avatarPendant ||
+      rule.type == ShieldRuleType.garb) {
+    return '评论装饰';
+  }
+  if (rule.type == ShieldRuleType.descriptionKeyword ||
+      rule.type == ShieldRuleType.publishTime ||
+      rule.type == ShieldRuleType.isUpowerExclusive ||
+      rule.type == ShieldRuleType.staffKeyword) {
+    return '视频详情信息';
+  }
   return switch (rule.type) {
     ShieldRuleType.keyword => '标题关键词',
     ShieldRuleType.userKeyword || ShieldRuleType.uid => '用户/UP',
     ShieldRuleType.reasonKeyword => '推荐理由',
     ShieldRuleType.category => '分区',
     ShieldRuleType.tag => '标签',
+    ShieldRuleType.avatarPendant || ShieldRuleType.garb => '评论装饰',
+    ShieldRuleType.duration ||
+    ShieldRuleType.playbackCount ||
+    ShieldRuleType.danmakuCount => '数值元数据',
+    ShieldRuleType.commentMemberSex ||
+    ShieldRuleType.commentMemberLevel => '评论用户信息',
+    ShieldRuleType.descriptionKeyword ||
+    ShieldRuleType.publishTime ||
+    ShieldRuleType.isUpowerExclusive ||
+    ShieldRuleType.staffKeyword => '视频详情信息',
   };
 }
 
@@ -60,8 +162,11 @@ String shieldMatchModeLabel(
   ShieldMatchMode mode, {
   ShieldRuleType? type,
 }) => switch (mode) {
-  ShieldMatchMode.exact => type == ShieldRuleType.keyword ? '包含文字' : '完全相同',
+  ShieldMatchMode.exact => '完全相同',
+  ShieldMatchMode.contains => '包含文字',
   ShieldMatchMode.regex => '正则匹配',
+  ShieldMatchMode.range => '数值范围',
+  ShieldMatchMode.enumValue => '枚举值',
   ShieldMatchMode.token => '词元匹配',
 };
 
@@ -69,6 +174,10 @@ String shieldScopeLabel(ShieldScope scope) => switch (scope) {
   ShieldScope.recommendation => '推荐',
   ShieldScope.comment => '评论',
   ShieldScope.both => '推荐和评论',
+  ShieldScope.search => '搜索',
+  ShieldScope.dynamic => '动态',
+  ShieldScope.live => '直播',
+  ShieldScope.videoDetail => '视频详情',
 };
 
 String shieldActionLabel(ShieldAction action) => switch (action) {

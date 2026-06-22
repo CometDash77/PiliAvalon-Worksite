@@ -3,6 +3,8 @@ import 'package:PiliPlus/common/widgets/view_safe_area.dart';
 import 'package:PiliPlus/http/login.dart';
 import 'package:PiliPlus/models/common/setting_type.dart';
 import 'package:PiliPlus/pages/about/view.dart';
+import 'package:PiliPlus/pages/channel_quiet_settings/view.dart';
+import 'package:PiliPlus/pages/comment_shield_settings/view.dart';
 import 'package:PiliPlus/pages/login/controller.dart';
 import 'package:PiliPlus/pages/setting/extra_setting.dart';
 import 'package:PiliPlus/pages/setting/play_setting.dart';
@@ -48,13 +50,23 @@ class _SettingPageState extends State<SettingPage> {
   static const List<_SettingsModel> _items = [
     _SettingsModel(
       type: SettingType.privacySetting,
-      subtitle: '黑名单、无痕模式',
+      subtitle: '黑名单',
       icon: Icon(Icons.privacy_tip_outlined),
     ),
     _SettingsModel(
       type: SettingType.shieldingSetting,
       subtitle: '全局开关、推荐/评论场景、规则列表',
       icon: Icon(Icons.shield_outlined),
+    ),
+    _SettingsModel(
+      type: SettingType.channelQuietSetting,
+      subtitle: '按频道持久隐藏评论和弹幕',
+      icon: Icon(Icons.visibility_off_outlined),
+    ),
+    _SettingsModel(
+      type: SettingType.commentShieldSetting,
+      subtitle: '评论等级、性别、会员、IP、字数、点赞等过滤',
+      icon: Icon(Icons.comment_bank_outlined),
     ),
     _SettingsModel(
       type: SettingType.recommendSetting,
@@ -122,6 +134,10 @@ class _SettingPageState extends State<SettingPage> {
                       ),
                       SettingType.shieldingSetting =>
                         const ShieldingSettingsPage(showAppBar: false),
+                      SettingType.channelQuietSetting =>
+                        const ChannelQuietSettingsPage(showAppBar: false),
+                      SettingType.commentShieldSetting =>
+                        const CommentShieldSettingsPage(showAppBar: false),
                       SettingType.recommendSetting => const RecommendSetting(
                         showAppBar: false,
                       ),
@@ -198,7 +214,7 @@ class _SettingPageState extends State<SettingPage> {
         ListTile(
           onTap: () => LoginPageController.switchAccountDialog(context),
           leading: const Icon(Icons.switch_account_outlined),
-          title: Text('设置账号模式', style: titleStyle),
+          title: Text('切换账号', style: titleStyle),
         ),
         Obx(
           () => _noAccount.value

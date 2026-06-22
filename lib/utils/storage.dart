@@ -10,6 +10,7 @@ import 'package:PiliPlus/utils/accounts/account_type_adapter.dart';
 import 'package:PiliPlus/utils/accounts/cookie_jar_adapter.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/set_int_adapter.dart';
+import 'package:PiliPlus/features/exposure_tracker/exposure_tracker_models.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:hive_ce/hive.dart';
@@ -23,6 +24,7 @@ abstract final class GStorage {
   static late final Box<dynamic> video;
   static late final Box<int> watchProgress;
   static late final Box<Uint8List>? reply;
+  static late final Box<ExposureRecord> exposureTracker;
 
   static Future<void> init() async {
     Hive.init(path.join(appSupportDirPath, 'hive'));
@@ -62,6 +64,9 @@ abstract final class GStorage {
           return deletedEntries > 4;
         },
       ).then((res) => watchProgress = res),
+      Hive.openBox<ExposureRecord>(
+        'exposure_tracker_v1',
+      ).then((res) => exposureTracker = res),
     ]);
 
     if (Pref.saveReply) {
@@ -105,7 +110,8 @@ abstract final class GStorage {
       ..registerAdapter(LoginAccountAdapter())
       ..registerAdapter(AccountTypeAdapter())
       ..registerAdapter(SetIntAdapter())
-      ..registerAdapter(RuleFilterAdapter());
+      ..registerAdapter(RuleFilterAdapter())
+      ..registerAdapter(ExposureRecordAdapter());
   }
 
   static Future<List<void>> compact() {
@@ -117,6 +123,7 @@ abstract final class GStorage {
       video.compact(),
       Accounts.account.compact(),
       watchProgress.compact(),
+      exposureTracker.compact(),
       ?reply?.compact(),
     ]);
   }
@@ -130,6 +137,7 @@ abstract final class GStorage {
       video.close(),
       Accounts.account.close(),
       watchProgress.close(),
+      exposureTracker.close(),
       ?reply?.close(),
     ]);
   }
@@ -143,6 +151,7 @@ abstract final class GStorage {
       video.clear(),
       Accounts.clear(),
       watchProgress.clear(),
+      exposureTracker.clear(),
       ?reply?.clear(),
     ]);
   }

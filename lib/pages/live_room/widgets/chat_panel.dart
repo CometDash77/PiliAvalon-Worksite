@@ -58,6 +58,9 @@ class LiveRoomChatPanel extends StatelessWidget {
             itemBuilder: (_, index) {
               final item = liveRoomController.messages[index];
               if (item is DanmakuMsg) {
+                if (!liveRoomController.effectiveShowDanmaku) {
+                  return const SizedBox.shrink();
+                }
                 WidgetSpan? medal;
                 if (item.medalInfo case final medalInfo?) {
                   try {
@@ -127,6 +130,9 @@ class LiveRoomChatPanel extends StatelessWidget {
                 );
               }
               if (item is SuperChatItem) {
+                if (!liveRoomController.effectiveShowSC) {
+                  return const SizedBox.shrink();
+                }
                 return SuperChatCard(
                   item: item,
                   persistentSC: true,
@@ -144,9 +150,11 @@ class LiveRoomChatPanel extends StatelessWidget {
             child: TextButton(
               onPressed: () {
                 final item = SuperChatItem.random;
-                liveRoomController
-                  ..superChatMsg.insert(0, item)
-                  ..addDm(item);
+                if (liveRoomController.effectiveShowSC) {
+                  liveRoomController
+                    ..superChatMsg.insert(0, item)
+                    ..addDm(item);
+                }
               },
               child: const Text('add superchat'),
             ),
@@ -169,7 +177,9 @@ class LiveRoomChatPanel extends StatelessWidget {
             top: 12,
             right: 12,
             child: Obx(() {
-              final isEmpty = liveRoomController.superChatMsg.isEmpty;
+              final isEmpty =
+                  !liveRoomController.effectiveShowSC ||
+                  liveRoomController.superChatMsg.isEmpty;
               return AnimatedOpacity(
                 opacity: isEmpty ? 0 : 1,
                 duration: const Duration(milliseconds: 120),

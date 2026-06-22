@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_lambdas
+
 import 'dart:io';
 
 import 'package:PiliPlus/features/shielding/shielding.dart';
@@ -29,7 +31,7 @@ void main() {
           ShieldRule(
             id: 'spoiler',
             type: ShieldRuleType.keyword,
-            matchMode: ShieldMatchMode.exact,
+            matchMode: ShieldMatchMode.contains,
             scope: ShieldScope.comment,
             action: ShieldAction.block,
             pattern: '剧透',
@@ -71,7 +73,7 @@ void main() {
             ShieldRule(
               id: 'root-spoiler',
               type: ShieldRuleType.keyword,
-              matchMode: ShieldMatchMode.exact,
+              matchMode: ShieldMatchMode.contains,
               scope: ShieldScope.comment,
               action: ShieldAction.block,
               pattern: '剧透',
@@ -152,6 +154,136 @@ void main() {
       },
     );
   });
+
+  group('ReplyController config + rule composition', () {
+    test(
+      'config level threshold removes parent reply and children disappear',
+      () {
+        final ruleSet = ShieldRuleSet();
+        const config = CommentShieldingConfig(levelThreshold: 5);
+        final parent = ReplyInfo(
+          id: Int64(1),
+          mid: Int64(1),
+          content: Content(message: '正常主评论'),
+          member: Member(
+            mid: Int64(1),
+            name: '用户A',
+            level: Int64(2),
+          ),
+          replies: [
+            ReplyInfo(
+              id: Int64(2),
+              mid: Int64(2),
+              content: Content(message: '子评论'),
+              member: Member(mid: Int64(2), name: '用户B', level: Int64(6)),
+            ),
+          ],
+        );
+
+        final visible = _ConfigurableReplyController(
+          ruleSet,
+          config,
+        ).applyShielding([parent]);
+
+        expect(visible, isEmpty);
+      },
+    );
+
+    test(
+      'config gender filter removes only matching child reply',
+      () {
+        final ruleSet = ShieldRuleSet();
+        const config = CommentShieldingConfig(genderFilter: ['女']);
+        final parent = ReplyInfo(
+          id: Int64(1),
+          mid: Int64(1),
+          content: Content(message: '正常主评论'),
+          member: Member(mid: Int64(1), name: '用户A', sex: '男'),
+          replies: [
+            ReplyInfo(
+              id: Int64(2),
+              mid: Int64(2),
+              content: Content(message: '正常子评论'),
+              member: Member(mid: Int64(2), name: '用户B', sex: '男'),
+            ),
+            ReplyInfo(
+              id: Int64(3),
+              mid: Int64(3),
+              content: Content(message: '被屏蔽子评论'),
+              member: Member(mid: Int64(3), name: '用户C', sex: '女'),
+            ),
+          ],
+        );
+
+        final visible = _ConfigurableReplyController(
+          ruleSet,
+          config,
+        ).applyShielding([parent]);
+
+        expect(visible, [parent]);
+        expect(parent.replies.map((r) => r.id.toInt()), [2]);
+      },
+    );
+
+    test(
+      'config filtering works when ShieldRuleSet.commentEnabled is false',
+      () {
+        final ruleSet = ShieldRuleSet(commentEnabled: false);
+        const config = CommentShieldingConfig(levelThreshold: 5);
+        final parent = ReplyInfo(
+          id: Int64(1),
+          mid: Int64(1),
+          content: Content(message: '低等级评论'),
+          member: Member(
+            mid: Int64(1),
+            name: '用户A',
+            level: Int64(2),
+          ),
+        );
+
+        final visible = _ConfigurableReplyController(
+          ruleSet,
+          config,
+        ).applyShielding([parent]);
+
+        expect(visible, isEmpty);
+      },
+    );
+
+    test(
+      'existing comment keyword rule obeys ShieldRuleSet.commentEnabled',
+      () {
+        final ruleSet = ShieldRuleSet(
+          commentEnabled: false,
+          rules: [
+            ShieldRule(
+              id: 'spoiler',
+              type: ShieldRuleType.keyword,
+              matchMode: ShieldMatchMode.exact,
+              scope: ShieldScope.comment,
+              action: ShieldAction.block,
+              pattern: '剧透',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            ),
+          ],
+        );
+        const config = CommentShieldingConfig();
+        final parent = ReplyInfo(
+          id: Int64(1),
+          mid: Int64(1),
+          content: Content(message: '剧透评论'),
+          member: Member(mid: Int64(1), name: '用户A'),
+        );
+
+        final visible = _ConfigurableReplyController(
+          ruleSet,
+          config,
+        ).applyShielding([parent]);
+
+        expect(visible, [parent]);
+      },
+    );
+  });
 }
 
 class _ReplyController extends ReplyController<MainListReply> {
@@ -161,6 +293,27 @@ class _ReplyController extends ReplyController<MainListReply> {
 
   @override
   ShieldRuleSet get shieldingRuleSet => ruleSet;
+
+  @override
+  Object get sourceId => 1;
+
+  @override
+  Future<LoadingState<MainListReply>> customGetData() {
+    throw UnimplementedError();
+  }
+}
+
+class _ConfigurableReplyController extends ReplyController<MainListReply> {
+  _ConfigurableReplyController(this._ruleSet, this._config);
+
+  final ShieldRuleSet _ruleSet;
+  final CommentShieldingConfig _config;
+
+  @override
+  ShieldRuleSet get shieldingRuleSet => _ruleSet;
+
+  @override
+  CommentShieldingConfig get commentShieldingConfig => _config;
 
   @override
   Object get sourceId => 1;

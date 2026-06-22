@@ -1,7 +1,9 @@
 import 'dart:convert';
 
 import 'package:PiliPlus/common/constants.dart';
+import 'package:PiliPlus/features/shielding/home_feed_comment_gate.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
+import 'package:PiliPlus/features/shielding/shielding_recommend_tag_enricher.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo;
 import 'package:PiliPlus/http/api.dart';
@@ -29,6 +31,7 @@ import 'package:PiliPlus/models_new/video/video_note_list/data.dart';
 import 'package:PiliPlus/models_new/video/video_play_info/data.dart';
 import 'package:PiliPlus/models_new/video/video_relation/data.dart';
 import 'package:PiliPlus/models_new/video/video_shot/data.dart';
+import 'package:PiliPlus/features/exposure_tracker/exposure_tracker.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/app_sign.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
@@ -68,8 +71,8 @@ abstract final class VideoHttp {
       }),
     );
     if (res.data['code'] == 0) {
-      List<RcmdVideoItemModel> list = <RcmdVideoItemModel>[];
       final shieldRuleSet = ShieldSettingsStore().snapshot();
+      final List<RcmdVideoItemModel> survivors = <RcmdVideoItemModel>[];
       for (final i in res.data['data']['item']) {
         //过滤掉live与ad，以及拉黑用户
         if (i['goto'] == 'av' &&
@@ -84,11 +87,29 @@ abstract final class VideoHttp {
             shieldRuleSet,
           );
           if (!RecommendFilter.filter(videoItem) && visible) {
-            list.add(videoItem);
+            survivors.add(videoItem);
           }
         }
       }
-      return Success(list);
+      final enricher = RecommendationTagEnricher();
+      final list = await enricher.enrichAndFilter(
+        survivors,
+        shieldRuleSet,
+        getBvid: (item) => item.bvid,
+        getCid: (item) => item.cid,
+      );
+      final gatedList = await HomeFeedCommentGate.filter(
+        list,
+        config: CommentShieldingStore().snapshot(),
+        ruleSet: shieldRuleSet,
+        getAid: (item) => item.aid,
+      );
+      return Success(
+        ExposureTracker.instance.filterAndRecord(
+          gatedList,
+          getBvid: (item) => item.bvid,
+        ),
+      );
     } else {
       return Error(res.data['message']);
     }
@@ -149,8 +170,8 @@ abstract final class VideoHttp {
       ),
     );
     if (res.data['code'] == 0) {
-      List<RcmdVideoItemAppModel> list = <RcmdVideoItemAppModel>[];
       final shieldRuleSet = ShieldSettingsStore().snapshot();
+      final List<RcmdVideoItemAppModel> survivors = <RcmdVideoItemAppModel>[];
       for (final i in res.data['data']['items']) {
         // 屏蔽推广和拉黑用户
         if (i['card_goto'] != 'ad_av' &&
@@ -173,11 +194,29 @@ abstract final class VideoHttp {
             shieldRuleSet,
           );
           if (!RecommendFilter.filter(videoItem) && visible) {
-            list.add(videoItem);
+            survivors.add(videoItem);
           }
         }
       }
-      return Success(list);
+      final enricher = RecommendationTagEnricher();
+      final list = await enricher.enrichAndFilter(
+        survivors,
+        shieldRuleSet,
+        getBvid: (item) => item.bvid,
+        getCid: (item) => item.cid,
+      );
+      final gatedList = await HomeFeedCommentGate.filter(
+        list,
+        config: CommentShieldingStore().snapshot(),
+        ruleSet: shieldRuleSet,
+        getAid: (item) => item.aid,
+      );
+      return Success(
+        ExposureTracker.instance.filterAndRecord(
+          gatedList,
+          getBvid: (item) => item.bvid,
+        ),
+      );
     } else {
       return Error(res.data['message']);
     }
@@ -265,25 +304,24 @@ abstract final class VideoHttp {
       if (res.data['code'] == 0) {
         late PlayUrlModel data;
         switch (videoType) {
-          case VideoType.ugc:
+          case .ugc:
             data = PlayUrlModel.fromJson(res.data['data']);
-            break;
-          case VideoType.pugv:
-            final result = res.data['data'];
-            data = PlayUrlModel.fromJson(result)
-              ..lastPlayTime =
-                  result?['play_view_business_info']?['user_status']?['watch_progress']?['current_watch_progress'];
-            break;
-          case VideoType.pgc:
+
+          case .pgc:
             final result = res.data['result'];
             data = PlayUrlModel.fromJson(result['video_info'])
               ..lastPlayTime =
-                  result?['play_view_business_info']?['user_status']?['watch_progress']?['current_watch_progress'];
-            break;
+                  result['play_view_business_info']?['user_status']?['watch_progress']?['current_watch_progress'];
+
+          case .pugv:
+            final result = res.data['data'];
+            data = PlayUrlModel.fromJson(result)
+              ..lastPlayTime =
+                  result['play_view_business_info']?['user_status']?['watch_progress']?['current_watch_progress'];
         }
         return Success(data);
-      } else if (epid != null && videoType == VideoType.ugc) {
-        return videoUrl(
+      } else if (epid != null && videoType == .ugc) {
+        return await videoUrl(
           avid: avid,
           bvid: bvid,
           cid: cid,
@@ -291,7 +329,7 @@ abstract final class VideoHttp {
           epid: epid,
           seasonId: seasonId,
           tryLook: tryLook,
-          videoType: VideoType.pgc,
+          videoType: .pgc,
         );
       }
       return Error(_parseVideoErr(res.data['code'], res.data['message']));
@@ -366,7 +404,7 @@ abstract final class VideoHttp {
       final shieldRuleSet = ShieldSettingsStore().snapshot();
       final visibleList = list == null
           ? null
-          : ShieldingAdapters.filterRecommendationVideos(list, shieldRuleSet);
+          : ShieldingAdapters.filterRelatedVideos(list, shieldRuleSet);
       return Success(visibleList);
     } else {
       return Error(res.data['message']);
@@ -888,7 +926,7 @@ abstract final class VideoHttp {
       ..writeAll(
         list.map(
           (item) =>
-              '${item?['sid'] ?? 0}\n${_subtitleTimecode(item['from'])} --> ${_subtitleTimecode(item['to'])}\n${item['content'].trim()}',
+              '${_subtitleTimecode(item['from'])} --> ${_subtitleTimecode(item['to'])}\n${item['content'].trim()}',
         ),
         '\n\n',
       );

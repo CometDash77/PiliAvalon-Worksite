@@ -23,6 +23,8 @@ import 'package:PiliPlus/models/video/play/url.dart';
 import 'package:PiliPlus/models_new/video/video_play_info/subtitle.dart';
 import 'package:PiliPlus/pages/common/common_intro_controller.dart';
 import 'package:PiliPlus/pages/danmaku/danmaku_model.dart';
+import 'package:PiliPlus/pages/setting/models/play_settings.dart'
+    show showPlayerVolumeDialog;
 import 'package:PiliPlus/pages/setting/widgets/popup_item.dart';
 import 'package:PiliPlus/pages/setting/widgets/select_dialog.dart';
 import 'package:PiliPlus/pages/video/controller.dart';
@@ -66,6 +68,7 @@ import 'package:get/get.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:media_kit/media_kit.dart' show NativePlayer;
 
 mixin TimeBatteryMixin<T extends StatefulWidget> on State<T> {
   PlPlayerController get plPlayerController;
@@ -429,6 +432,46 @@ class HeaderControlState extends State<HeaderControl>
                   leading: const Icon(Icons.hourglass_top_outlined, size: 20),
                   title: const Text('定时关闭', style: titleStyle),
                 ),
+                Obx(() {
+                  if (!videoDetailCtr.showReply) return const SizedBox.shrink();
+                  final tempHide = videoDetailCtr.tempHideReply.value;
+                  return ListTile(
+                    dense: true,
+                    onTap: () {
+                      Get.back();
+                      videoDetailCtr.toggleTempHideReply();
+                    },
+                    leading: Icon(
+                      size: 20,
+                      tempHide ? Icons.comment : Icons.comment_outlined,
+                    ),
+                    title: Text(
+                      tempHide ? '显示评论' : '隐藏评论',
+                      style: titleStyle,
+                    ),
+                  );
+                }),
+                Obx(() {
+                  if (!plPlayerController.enableShowDanmaku.value) {
+                    return const SizedBox.shrink();
+                  }
+                  final tempHide = videoDetailCtr.tempHideDanmaku.value;
+                  return ListTile(
+                    dense: true,
+                    onTap: () {
+                      Get.back();
+                      videoDetailCtr.toggleTempHideDanmaku();
+                    },
+                    leading: Icon(
+                      size: 20,
+                      tempHide ? CustomIcons.dm_on : CustomIcons.dm_off,
+                    ),
+                    title: Text(
+                      tempHide ? '显示弹幕' : '隐藏弹幕',
+                      style: titleStyle,
+                    ),
+                  );
+                }),
                 if (!isFileSource) ...[
                   ListTile(
                     dense: true,
@@ -446,10 +489,7 @@ class HeaderControlState extends State<HeaderControl>
                     dense: true,
                     onTap: () {
                       Get.back();
-                      videoDetailCtr.queryVideoUrl(
-                        defaultST: videoDetailCtr.playedTime,
-                        fromReset: true,
-                      );
+                      videoDetailCtr.queryVideoUrl(fromReset: true);
                     },
                     leading: const Icon(Icons.refresh_outlined, size: 20),
                     title: const Text('重载视频', style: titleStyle),
@@ -476,6 +516,24 @@ class HeaderControlState extends State<HeaderControl>
                   descFontSize: 12,
                   descPosType: .subtitle,
                 ),
+                if (PlatformUtils.isMobile)
+                  if (plPlayerController.videoPlayerController
+                      case final player?)
+                    Builder(
+                      builder: (context) => ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.volume_up, size: 20),
+                        title: const Text('播放器音量'),
+                        subtitle: Text(
+                          '当前: ${Pref.playerVolume.toStringAsFixed(0)}%',
+                        ),
+                        onTap: () => showPlayerVolumeDialog(
+                          context,
+                          () => (context as Element).markNeedsBuild(),
+                          onChanged: player.setVolume,
+                        ),
+                      ),
+                    ),
                 if (!isFileSource)
                   ListTile(
                     dense: true,
@@ -497,10 +555,7 @@ class HeaderControlState extends State<HeaderControl>
                         VideoUtils.cdnService = result;
                         setting.put(SettingBoxKey.CDNService, result.name);
                         SmartDialog.showToast('已设置为 ${result.desc}，正在重载视频');
-                        videoDetailCtr.queryVideoUrl(
-                          defaultST: videoDetailCtr.playedTime,
-                          fromReset: true,
-                        );
+                        videoDetailCtr.queryVideoUrl(fromReset: true);
                       }
                     },
                   ),
@@ -729,15 +784,13 @@ class HeaderControlState extends State<HeaderControl>
                     leading: const Icon(Icons.download_outlined, size: 20),
                     title: const Text('保存字幕', style: titleStyle),
                   ),
-                ListTile(
-                  dense: true,
-                  title: const Text('播放信息', style: titleStyle),
-                  leading: const Icon(Icons.info_outline, size: 20),
-                  onTap: () => showPlayerInfo(
-                    context,
-                    plPlayerController: plPlayerController,
+                if (plPlayerController.videoPlayerController case final player?)
+                  ListTile(
+                    dense: true,
+                    title: const Text('播放信息', style: titleStyle),
+                    leading: const Icon(Icons.info_outline, size: 20),
+                    onTap: () => showPlayerInfo(context, player: player),
                   ),
-                ),
                 ListTile(
                   dense: true,
                   onTap: () {
@@ -761,14 +814,10 @@ class HeaderControlState extends State<HeaderControl>
 
   static void showPlayerInfo(
     BuildContext context, {
-    required PlPlayerController plPlayerController,
+    required NativePlayer player,
   }) {
-    final player = plPlayerController.videoPlayerController;
-    if (player == null) {
-      SmartDialog.showToast('播放器未初始化');
-      return;
-    }
     final hwdec = player.getProperty('hwdec-current');
+    final volume = player.getProperty('volume').subLength(3);
     showDialog(
       context: context,
       builder: (context) {
@@ -789,9 +838,7 @@ class HeaderControlState extends State<HeaderControl>
                     ListTile(
                       dense: true,
                       title: const Text("Resolution"),
-                      subtitle: Text(
-                        '${state.width}x${state.height}',
-                      ),
+                      subtitle: Text('${state.width}x${state.height}'),
                       onTap: () => Utils.copyText(
                         'Resolution\n${state.width}x${state.height}',
                       ),
@@ -799,60 +846,36 @@ class HeaderControlState extends State<HeaderControl>
                     ListTile(
                       dense: true,
                       title: const Text("VideoParams"),
-                      subtitle: Text(
-                        state.videoParams.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'VideoParams\n${state.videoParams}',
-                      ),
+                      subtitle: Text(state.videoParams.toString()),
+                      onTap: () =>
+                          Utils.copyText('VideoParams\n${state.videoParams}'),
                     ),
                     ListTile(
                       dense: true,
                       title: const Text("AudioParams"),
-                      subtitle: Text(
-                        state.audioParams.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'AudioParams\n${state.audioParams}',
-                      ),
+                      subtitle: Text(state.audioParams.toString()),
+                      onTap: () =>
+                          Utils.copyText('AudioParams\n${state.audioParams}'),
                     ),
                     ListTile(
                       dense: true,
                       title: const Text("Media"),
-                      subtitle: Text(
-                        state.playlist.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'Media\n${state.playlist}',
-                      ),
+                      subtitle: Text(state.playlist.toString()),
+                      onTap: () => Utils.copyText('Media\n${state.playlist}'),
                     ),
                     ListTile(
                       dense: true,
                       title: const Text("AudioTrack"),
-                      subtitle: Text(
-                        state.track.audio.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'AudioTrack\n${state.track.audio}',
-                      ),
+                      subtitle: Text(state.track.audio.toString()),
+                      onTap: () =>
+                          Utils.copyText('AudioTrack\n${state.track.audio}'),
                     ),
                     ListTile(
                       dense: true,
                       title: const Text("VideoTrack"),
-                      subtitle: Text(
-                        state.track.video.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'VideoTrack\n${state.track.audio}',
-                      ),
-                    ),
-                    ListTile(
-                      dense: true,
-                      title: const Text("pitch"),
-                      subtitle: Text(state.pitch.toString()),
-                      onTap: () => Utils.copyText(
-                        'pitch\n${state.pitch}',
-                      ),
+                      subtitle: Text(state.track.video.toString()),
+                      onTap: () =>
+                          Utils.copyText('VideoTrack\n${state.track.audio}'),
                     ),
                     ListTile(
                       dense: true,
@@ -863,12 +886,8 @@ class HeaderControlState extends State<HeaderControl>
                     ListTile(
                       dense: true,
                       title: const Text("Volume"),
-                      subtitle: Text(
-                        state.volume.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'Volume\n${state.volume}',
-                      ),
+                      subtitle: Text(volume.toString()),
+                      onTap: () => Utils.copyText('Volume\n$volume'),
                     ),
                     ListTile(
                       dense: true,
@@ -1920,6 +1939,44 @@ class HeaderControlState extends State<HeaderControl>
                   ),
                 ),
               ],
+              Obx(() {
+                if (!videoDetailCtr.showReply) return const SizedBox.shrink();
+                final tempHide = videoDetailCtr.tempHideReply.value;
+                return SizedBox(
+                  width: btnWidth,
+                  height: btnHeight,
+                  child: IconButton(
+                    tooltip: tempHide ? '显示评论' : '隐藏评论',
+                    style: btnStyle,
+                    onPressed: videoDetailCtr.toggleTempHideReply,
+                    icon: Icon(
+                      Icons.comment_outlined,
+                      size: 19,
+                      color: tempHide ? Colors.white54 : Colors.white,
+                    ),
+                  ),
+                );
+              }),
+              Obx(() {
+                if (!plPlayerController.enableShowDanmaku.value) {
+                  return const SizedBox.shrink();
+                }
+                final tempHide = videoDetailCtr.tempHideDanmaku.value;
+                return SizedBox(
+                  width: btnWidth,
+                  height: btnHeight,
+                  child: IconButton(
+                    tooltip: tempHide ? '显示弹幕' : '隐藏弹幕',
+                    style: btnStyle,
+                    onPressed: videoDetailCtr.toggleTempHideDanmaku,
+                    icon: Icon(
+                      size: 20,
+                      tempHide ? CustomIcons.dm_off : CustomIcons.dm_on,
+                      color: tempHide ? Colors.white54 : Colors.white,
+                    ),
+                  ),
+                );
+              }),
               SizedBox(
                 width: btnWidth,
                 height: btnHeight,
@@ -1989,9 +2046,7 @@ class HeaderControlState extends State<HeaderControl>
                         FontAwesomeIcons.thumbsUp,
                         color: Colors.white,
                       ),
-                      selectIcon: const Icon(
-                        FontAwesomeIcons.solidThumbsUp,
-                      ),
+                      selectIcon: const Icon(FontAwesomeIcons.solidThumbsUp),
                       selectStatus: introController.hasLike.value,
                       semanticsLabel: '点赞',
                       animation: introController.tripleAnimation,

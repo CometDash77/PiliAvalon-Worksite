@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_const_declarations
+
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/utils/recommend_filter.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,7 +44,7 @@ void main() {
         expect(candidate.feasibility, MigrationFeasibility.direct);
         expect(candidate.suggestedRule, isNotNull);
         expect(candidate.suggestedRule!.type, ShieldRuleType.keyword);
-        expect(candidate.suggestedRule!.matchMode, ShieldMatchMode.exact);
+        expect(candidate.suggestedRule!.matchMode, ShieldMatchMode.contains);
         expect(candidate.suggestedRule!.action, ShieldAction.block);
         expect(candidate.suggestedRule!.scope, ShieldScope.recommendation);
         expect(candidate.suggestedRule!.source, ShieldRuleSource.imported);
@@ -169,7 +171,7 @@ void main() {
         suggestedRule: ShieldRule(
           id: 'test',
           type: ShieldRuleType.keyword,
-          matchMode: ShieldMatchMode.exact,
+          matchMode: ShieldMatchMode.contains,
           scope: ShieldScope.recommendation,
           action: ShieldAction.block,
           pattern: 'test',

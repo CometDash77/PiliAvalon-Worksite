@@ -24,11 +24,13 @@ import 'package:intl/intl.dart';
 class VideoCardV extends StatelessWidget {
   final BaseRcmdVideoItemModel videoItem;
   final VoidCallback? onRemove;
+  final ValueChanged<String>? onRecommendationTapBvid;
 
   const VideoCardV({
     super.key,
     required this.videoItem,
     this.onRemove,
+    this.onRecommendationTapBvid,
   });
 
   Future<void> onPushDetail() async {
@@ -54,6 +56,7 @@ class VideoCardV extends StatelessWidget {
           }
         }
         if (cid != null) {
+          onRecommendationTapBvid?.call(bvid);
           PageUtils.toVideoPage(
             aid: videoItem.aid,
             bvid: bvid,

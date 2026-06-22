@@ -5,13 +5,27 @@ enum ShieldRuleType {
   uid,
   category,
   tag,
+  avatarPendant,
+  garb,
+  duration,
+  playbackCount,
+  danmakuCount,
+  commentMemberSex,
+  commentMemberLevel,
+  descriptionKeyword,
+  publishTime,
+  isUpowerExclusive,
+  staffKeyword,
 }
 
 enum ShieldMatchMode {
   exact,
+  contains,
   regex,
+  range,
+  enumValue,
   // Deprecated visible mode: kept only for persisted-rule compatibility.
-  // New user-facing rules should use regex or exact matching.
+  // New user-facing rules should use regex or contains matching.
   token,
 }
 
@@ -19,6 +33,10 @@ enum ShieldScope {
   recommendation,
   comment,
   both,
+  search,
+  dynamic,
+  live,
+  videoDetail,
 }
 
 enum ShieldAction {
@@ -28,9 +46,7 @@ enum ShieldAction {
 
 String shieldTokenPatternRegex(String pattern) {
   final escaped = RegExp.escape(pattern.trim());
-  return r'(^|[\s,，。！？!?:：;；_\-])' +
-      escaped +
-      r'($|[\s,，。！？!?:：;；_\-])';
+  return r'(^|[\s,，。！？!?:：;；_\-])' + escaped + r'($|[\s,，。！？!?:：;；_\-])';
 }
 
 enum ShieldRuleSource {
@@ -50,6 +66,7 @@ class ShieldRule {
     required this.updatedAt,
     this.enabled = true,
     this.source = ShieldRuleSource.manual,
+    this.displayPattern,
   });
 
   final String id;
@@ -61,6 +78,7 @@ class ShieldRule {
   final bool enabled;
   final DateTime updatedAt;
   final ShieldRuleSource source;
+  final String? displayPattern;
 
   ShieldRule copyWith({
     String? id,
@@ -72,6 +90,7 @@ class ShieldRule {
     bool? enabled,
     DateTime? updatedAt,
     ShieldRuleSource? source,
+    String? displayPattern,
   }) => ShieldRule(
     id: id ?? this.id,
     type: type ?? this.type,
@@ -82,27 +101,26 @@ class ShieldRule {
     enabled: enabled ?? this.enabled,
     updatedAt: updatedAt ?? this.updatedAt,
     source: source ?? this.source,
+    displayPattern: displayPattern ?? this.displayPattern,
   );
 
   Map<String, Object?> toJson() => {
     'id': id,
     'type': type.name,
-    'match_mode': matchMode.name,
+    'match_mode': matchMode._jsonName,
     'scope': scope.name,
     'action': action.name,
     'pattern': pattern,
     'enabled': enabled,
     'updated_at': updatedAt.millisecondsSinceEpoch,
     'source': source.name,
+    if (displayPattern != null) 'display_pattern': displayPattern,
   };
 
   factory ShieldRule.fromJson(Map<String, Object?> json) => ShieldRule(
     id: json._string('id'),
     type: _enumByName(ShieldRuleType.values, json._string('type')),
-    matchMode: _enumByName(
-      ShieldMatchMode.values,
-      json._string('match_mode'),
-    ),
+    matchMode: _shieldMatchModeFromJson(json._string('match_mode')),
     scope: _enumByName(ShieldScope.values, json._string('scope')),
     action: _enumByName(ShieldAction.values, json._string('action')),
     pattern: json._string('pattern'),
@@ -114,6 +132,7 @@ class ShieldRule {
       ShieldRuleSource.values,
       json['source']?.toString() ?? ShieldRuleSource.manual.name,
     ),
+    displayPattern: json['display_pattern'] as String?,
   );
 }
 
@@ -123,6 +142,7 @@ class ShieldRuleSet {
     this.globalEnabled = true,
     this.recommendationEnabled = true,
     this.commentEnabled = true,
+    this.relatedVideoEnabled = true,
     this.version = 1,
     this.lastLoadedAt,
     this.loadErrors = const [],
@@ -144,6 +164,7 @@ class ShieldRuleSet {
       globalEnabled: json['global_enabled'] as bool? ?? true,
       recommendationEnabled: json['recommendation_enabled'] as bool? ?? true,
       commentEnabled: json['comment_enabled'] as bool? ?? true,
+      relatedVideoEnabled: json['related_video_enabled'] as bool? ?? true,
       version: json['version'] as int? ?? 1,
       lastLoadedAt: json['last_loaded_at'] == null
           ? null
@@ -169,6 +190,7 @@ class ShieldRuleSet {
   final bool globalEnabled;
   final bool recommendationEnabled;
   final bool commentEnabled;
+  final bool relatedVideoEnabled;
   final int version;
   final DateTime? lastLoadedAt;
   final List<String> loadErrors;
@@ -179,6 +201,10 @@ class ShieldRuleSet {
       ShieldScope.recommendation => recommendationEnabled,
       ShieldScope.comment => commentEnabled,
       ShieldScope.both => recommendationEnabled || commentEnabled,
+      ShieldScope.search ||
+      ShieldScope.dynamic ||
+      ShieldScope.live => true,
+      ShieldScope.videoDetail => relatedVideoEnabled,
     };
   }
 
@@ -187,6 +213,7 @@ class ShieldRuleSet {
     bool? globalEnabled,
     bool? recommendationEnabled,
     bool? commentEnabled,
+    bool? relatedVideoEnabled,
     int? version,
     DateTime? lastLoadedAt,
     List<String>? loadErrors,
@@ -195,6 +222,7 @@ class ShieldRuleSet {
     globalEnabled: globalEnabled ?? this.globalEnabled,
     recommendationEnabled: recommendationEnabled ?? this.recommendationEnabled,
     commentEnabled: commentEnabled ?? this.commentEnabled,
+    relatedVideoEnabled: relatedVideoEnabled ?? this.relatedVideoEnabled,
     version: version ?? this.version,
     lastLoadedAt: lastLoadedAt ?? this.lastLoadedAt,
     loadErrors: loadErrors ?? this.loadErrors,
@@ -205,6 +233,7 @@ class ShieldRuleSet {
     'global_enabled': globalEnabled,
     'recommendation_enabled': recommendationEnabled,
     'comment_enabled': commentEnabled,
+    'related_video_enabled': relatedVideoEnabled,
     'last_loaded_at': lastLoadedAt?.millisecondsSinceEpoch,
     'rules': rules.map((rule) => rule.toJson()).toList(),
   };
@@ -222,6 +251,17 @@ class ShieldCandidate {
     this.category,
     this.tags = const [],
     this.tokens = const [],
+    this.avatarPendantValues = const [],
+    this.garbValues = const [],
+    this.durationSeconds,
+    this.playbackCount,
+    this.danmakuCount,
+    this.commentMemberSex,
+    this.commentMemberLevel,
+    this.description,
+    this.pubdate,
+    this.staffNames = const [],
+    this.isUpowerExclusive,
   });
 
   final ShieldScope scope;
@@ -234,6 +274,18 @@ class ShieldCandidate {
   final String? category;
   final List<String> tags;
   final List<String> tokens;
+  final List<String> avatarPendantValues;
+  final List<String> garbValues;
+  final num? durationSeconds;
+  final num? playbackCount;
+  final num? danmakuCount;
+  final String? commentMemberSex;
+  final num? commentMemberLevel;
+  // task-066 detail-introduction candidate metadata
+  final String? description;
+  final int? pubdate;
+  final List<String> staffNames;
+  final bool? isUpowerExclusive;
 }
 
 class ShieldMatchResult {
@@ -264,6 +316,18 @@ class ShieldMatchError {
 
 T _enumByName<T extends Enum>(List<T> values, String name) =>
     values.firstWhere((value) => value.name == name);
+
+ShieldMatchMode _shieldMatchModeFromJson(String name) => switch (name) {
+  'enum' => ShieldMatchMode.enumValue,
+  _ => _enumByName(ShieldMatchMode.values, name),
+};
+
+extension on ShieldMatchMode {
+  String get _jsonName => switch (this) {
+    ShieldMatchMode.enumValue => 'enum',
+    _ => name,
+  };
+}
 
 extension _JsonRead on Map<String, Object?> {
   String _string(String key) {

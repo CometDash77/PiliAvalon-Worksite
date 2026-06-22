@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math' show min;
 import 'dart:ui';
 
@@ -43,6 +42,8 @@ import 'package:PiliPlus/pages/video/introduction/pgc/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/controller.dart';
 import 'package:PiliPlus/pages/video/medialist/view.dart';
 import 'package:PiliPlus/pages/video/note/view.dart';
+import 'package:PiliPlus/pages/video/quiet_state.dart';
+import 'package:PiliPlus/pages/video/channel_quiet/channel_quiet.dart';
 import 'package:PiliPlus/pages/video/post_panel/view.dart';
 import 'package:PiliPlus/pages/video/send_danmaku/view.dart';
 import 'package:PiliPlus/pages/video/widgets/header_control.dart';
@@ -54,12 +55,10 @@ import 'package:PiliPlus/services/download/download_service.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/connectivity_utils.dart';
 import 'package:PiliPlus/utils/extension/context_ext.dart';
-import 'package:PiliPlus/utils/extension/file_ext.dart';
 import 'package:PiliPlus/utils/extension/iterable_ext.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/extension/size_ext.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
-import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
@@ -75,7 +74,6 @@ import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:get/get.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:media_kit/media_kit.dart' hide Subtitle;
-import 'package:path/path.dart' as path;
 
 class VideoDetailController extends GetxController
     with GetTickerProviderStateMixin, BlockMixin {
@@ -155,6 +153,180 @@ class VideoDetailController extends GetxController
       : isUgc
       ? plPlayerController.showVideoReply
       : plPlayerController.showBangumiReply;
+
+  /// The quiet rule currently matched for this video's channel.
+  /// Set by later slices once channel identity is known.
+  /// `null` means no persistent rule is active for the current channel.
+  final Rx<ChannelQuietRule?> currentChannelQuietRule = Rx<ChannelQuietRule?>(
+    null,
+  );
+
+  /// Per-page temporary hide controls.
+  /// These reset on video/page change and are not persisted.
+  final RxBool tempHideReply = false.obs;
+  final RxBool tempHideDanmaku = false.obs;
+
+  bool get persistentRuleHideReply =>
+      currentChannelQuietRule.value?.hideComments ?? false;
+  bool get persistentRuleHideDanmaku =>
+      currentChannelQuietRule.value?.hideDanmaku ?? false;
+
+  bool get effectiveShowReply => effectiveShowContent(
+    globalShow: showReply,
+    persistentRuleHide: persistentRuleHideReply,
+    temporaryHide: tempHideReply.value,
+  );
+
+  bool get effectiveShowDanmaku => effectiveShowContent(
+    globalShow: plPlayerController.enableShowDanmaku.value,
+    persistentRuleHide: persistentRuleHideDanmaku,
+    temporaryHide: tempHideDanmaku.value,
+  );
+
+  /// Toggle per-page temporary hide for comments.
+  ///
+  /// No-op when the global comment gate is off.
+  void toggleTempHideReply() {
+    if (!showReply) return;
+    tempHideReply.toggle();
+  }
+
+  /// Toggle per-page temporary hide for danmaku.
+  ///
+  /// No-op when the global danmaku gate is off. Clears visible danmaku
+  /// immediately when hiding so the screen does not show stale danmaku.
+  void toggleTempHideDanmaku() {
+    if (!plPlayerController.enableShowDanmaku.value) return;
+    tempHideDanmaku.toggle();
+    if (tempHideDanmaku.value) {
+      plPlayerController.danmakuController?.clear();
+    }
+  }
+
+  /// Reset per-page temporary hide controls to their defaults.
+  void resetTempQuietControls() {
+    tempHideReply.value = false;
+    tempHideDanmaku.value = false;
+  }
+
+  /// Set the current channel's persistent quiet rule.
+  ///
+  /// Called by later slices once the channel identity is known and a matching
+  /// rule is found in [ChannelQuietStore].  Pass `null` to clear the active
+  /// match without touching the persisted database.
+  ///
+  /// When a rule with `hideDanmaku == true` takes effect, visible danmaku
+  /// is cleared immediately so the screen does not show stale danmaku.
+  void setChannelQuietRule(ChannelQuietRule? rule) {
+    final previous = currentChannelQuietRule.value;
+    currentChannelQuietRule.value = rule;
+    if (rule?.hideDanmaku == true && (previous?.hideDanmaku != true)) {
+      plPlayerController.danmakuController?.clear();
+    }
+  }
+
+  /// Compute the current channel identity for persistent quiet rules.
+  ///
+  /// Returns null when channel identity is not yet available (e.g. before
+  /// the detail response arrives or for unsupported video types such as
+  /// local files).
+  ChannelQuietTarget? get currentChannelTarget {
+    if (isFileSource) return null;
+    if (isUgc) {
+      try {
+        final ugcCtr = Get.find<UgcIntroController>(tag: heroTag);
+        final detail = ugcCtr.videoDetail.value;
+        final mid = detail.owner?.mid;
+        if (mid == null) return null;
+        return ChannelQuietTarget(
+          key: ChannelQuietRule.ugcKey(mid),
+          channelUid: mid.toString(),
+          channelName: detail.owner?.name ?? '',
+        );
+      } catch (_) {
+        return null;
+      }
+    } else {
+      if (seasonId == null) return null;
+      try {
+        final pgcCtr = Get.find<PgcIntroController>(tag: heroTag);
+        final title = pgcCtr.pgcItem.title;
+        return ChannelQuietTarget(
+          key: ChannelQuietRule.pgcKey(seasonId!),
+          channelUid: seasonId.toString(),
+          channelName: title ?? '',
+        );
+      } catch (_) {
+        return null;
+      }
+    }
+  }
+
+  /// Persist a quiet rule for the given [target].
+  ///
+  /// Uses [ChannelQuietStore.update] when a rule already exists for the
+  /// channel (preserving `createdAt`), and [ChannelQuietStore.add] for new
+  /// channels.  Immediately applies the result via [setChannelQuietRule].
+  Future<void> saveChannelRule(
+    ChannelQuietTarget target, {
+    required bool hideComments,
+    required bool hideDanmaku,
+  }) async {
+    final store = ChannelQuietStore();
+    final existing = store.lookup(target.key);
+    ChannelQuietRule? saved;
+    if (existing != null) {
+      saved = await store.update(
+        key: target.key,
+        channelName: target.channelName,
+        hideComments: hideComments,
+        hideDanmaku: hideDanmaku,
+      );
+    } else {
+      saved = await store.add(
+        key: target.key,
+        channelUid: target.channelUid,
+        channelName: target.channelName,
+        hideComments: hideComments,
+        hideDanmaku: hideDanmaku,
+      );
+    }
+    setChannelQuietRule(saved);
+  }
+
+  /// Remove the persistent quiet rule for the given [target] and clear
+  /// [currentChannelQuietRule].
+  Future<void> removeChannelRule(ChannelQuietTarget target) async {
+    final store = ChannelQuietStore();
+    await store.delete(target.key);
+    setChannelQuietRule(null);
+  }
+
+  /// Persist a quiet rule for the current channel.
+  ///
+  /// Uses [ChannelQuietStore.update] when a rule already exists for the
+  /// channel (preserving `createdAt`), and [ChannelQuietStore.add] for new
+  /// channels.  Immediately applies the result via [setChannelQuietRule].
+  Future<void> saveCurrentChannelRule({
+    required bool hideComments,
+    required bool hideDanmaku,
+  }) async {
+    final target = currentChannelTarget;
+    if (target == null) return;
+    await saveChannelRule(
+      target,
+      hideComments: hideComments,
+      hideDanmaku: hideDanmaku,
+    );
+  }
+
+  /// Remove the persistent quiet rule for the current channel and clear
+  /// [currentChannelQuietRule].
+  Future<void> removeCurrentChannelRule() async {
+    final target = currentChannelTarget;
+    if (target == null) return;
+    await removeChannelRule(target);
+  }
 
   bool get showRelatedVideo =>
       isFileSource ? false : plPlayerController.showRelatedVideo;
@@ -648,7 +820,7 @@ class VideoDetailController extends GetxController
     await Get.key.currentState!.push(
       PublishRoute(
         pageBuilder: (buildContext, animation, secondaryAnimation) {
-          return SendDanmakuPanel(
+          final child = SendDanmakuPanel(
             cid: cid.value,
             bvid: bvid,
             progress: plPlayerController.position.inMilliseconds,
@@ -658,10 +830,13 @@ class VideoDetailController extends GetxController
               savedDanmaku = null;
               plPlayerController.danmakuController?.addDanmaku(danmakuModel);
             },
-            darkVideoPage: plPlayerController.darkVideoPage,
             dmConfig: dmConfig,
             onSaveDmConfig: (dmConfig) => this.dmConfig = dmConfig,
           );
+          if (plPlayerController.darkVideoPage) {
+            return Theme(data: ThemeUtils.darkTheme, child: child);
+          }
+          return child;
         },
       ),
     );
@@ -740,15 +915,10 @@ class VideoDetailController extends GetxController
   }
 
   Future<void> playerInit({
-    String? video,
-    String? audio,
-    Duration? seekToTime,
-    Duration? duration,
     bool? autoplay,
-    Volume? volume,
     bool autoFullScreenFlag = false,
   }) async {
-    Duration? seek = seekToTime ?? defaultST ?? playedTime;
+    Duration? seek = defaultST ?? playedTime;
     if (seek == null || seek == Duration.zero) {
       seek = getFirstSegment();
     }
@@ -761,15 +931,13 @@ class VideoDetailController extends GetxController
               hasDashAudio: entry.hasDashAudio,
             )
           : NetworkSource(
-              videoSource: video ?? videoUrl!,
-              audioSource: audio ?? audioUrl,
+              videoSource: videoUrl!,
+              audioSource: audioUrl,
             ),
       seekTo: seek,
-      duration:
-          duration ??
-          (data.timeLength == null
-              ? null
-              : Duration(milliseconds: data.timeLength!)),
+      duration: data.timeLength == null
+          ? null
+          : Duration(milliseconds: data.timeLength!),
       isVertical: isVertical.value,
       aid: aid,
       bvid: bvid,
@@ -785,7 +953,7 @@ class VideoDetailController extends GetxController
       },
       width: firstVideo.width,
       height: firstVideo.height,
-      volume: volume ?? this.volume,
+      volume: volume,
       autoFullScreenFlag: autoFullScreenFlag,
     );
 
@@ -819,14 +987,13 @@ class VideoDetailController extends GetxController
       return;
     }
     currLang.value = language;
-    queryVideoUrl(defaultST: playedTime);
+    queryVideoUrl(fromReset: true);
   }
 
   Volume? volume;
 
   // 视频链接
   Future<void> queryVideoUrl({
-    Duration? defaultST,
     bool fromReset = false,
     bool autoFullScreenFlag = false,
   }) async {
@@ -870,11 +1037,13 @@ class VideoDetailController extends GetxController
 
       volume = data.volume;
 
-      final progress = args.remove('progress');
-      if (progress != null) {
-        this.defaultST = Duration(milliseconds: progress);
-      } else if (defaultST == null && data.lastPlayTime != null) {
-        this.defaultST = Duration(milliseconds: data.lastPlayTime!);
+      if (!fromReset) {
+        final progress = args.remove('progress');
+        if (progress != null) {
+          defaultST = Duration(milliseconds: progress);
+        } else {
+          defaultST = Duration(milliseconds: data.lastPlayTime);
+        }
       }
 
       if (!isUgc && !fromReset && plPlayerController.enablePgcSkip) {
@@ -1032,22 +1201,16 @@ class VideoDetailController extends GetxController
       );
     }
     if (plPlayerController.isFullScreen.value || showVideoSheet) {
+      final child = PostPanel(
+        enableSlide: false,
+        videoDetailController: this,
+        plPlayerController: plPlayerController,
+      );
       PageUtils.showVideoBottomSheet(
         context,
         child: plPlayerController.darkVideoPage
-            ? Theme(
-                data: ThemeUtils.darkTheme,
-                child: PostPanel(
-                  enableSlide: false,
-                  videoDetailController: this,
-                  plPlayerController: plPlayerController,
-                ),
-              )
-            : PostPanel(
-                enableSlide: false,
-                videoDetailController: this,
-                plPlayerController: plPlayerController,
-              ),
+            ? Theme(data: ThemeUtils.darkTheme, child: child)
+            : child,
       );
     } else {
       childKey.currentState?.showBottomSheet(
@@ -1081,19 +1244,8 @@ class VideoDetailController extends GetxController
       final sub = subtitles[index - 1];
 
       String subUri = subtitle.id;
-      File? file;
       if (subtitle.isData) {
-        subUri = path.join(tmpDirPath, '${cid.value}-${sub.lan}.vtt');
-        file = File(subUri);
-        if (!file.existsSync()) {
-          await file.writeAsString(subtitle.id);
-          if (plPlayerController.videoPlayerController?.disposed == false) {
-            plPlayerController.videoPlayerController!.release.add(file.tryDel);
-          } else {
-            file.tryDel();
-            return;
-          }
-        }
+        subUri = 'memory://$subUri';
       }
       await plPlayerController.videoPlayerController?.setSubtitleTrack(
         SubtitleTrack(subUri, sub.lanDoc, sub.lan, uri: true),
@@ -1300,6 +1452,11 @@ class VideoDetailController extends GetxController
 
     // danmaku
     savedDanmaku = null;
+    // Clear the current persistent-rule match without touching the stored
+    // database -- later slices re-evaluate the match when channel identity
+    // becomes available again.
+    currentChannelQuietRule.value = null;
+    resetTempQuietControls();
 
     // subtitle
     subtitles.clear();
@@ -1370,26 +1527,18 @@ class VideoDetailController extends GetxController
       ).videoDetail.value.title;
     } catch (_) {}
     if (plPlayerController.isFullScreen.value || showVideoSheet) {
+      final child = NoteListPage(
+        oid: aid,
+        enableSlide: false,
+        heroTag: heroTag,
+        isStein: graphVersion != null,
+        title: title,
+      );
       PageUtils.showVideoBottomSheet(
         context,
         child: plPlayerController.darkVideoPage
-            ? Theme(
-                data: ThemeUtils.darkTheme,
-                child: NoteListPage(
-                  oid: aid,
-                  enableSlide: false,
-                  heroTag: heroTag,
-                  isStein: graphVersion != null,
-                  title: title,
-                ),
-              )
-            : NoteListPage(
-                oid: aid,
-                enableSlide: false,
-                heroTag: heroTag,
-                isStein: graphVersion != null,
-                title: title,
-              ),
+            ? Theme(data: ThemeUtils.darkTheme, child: child)
+            : child,
       );
     } else {
       childKey.currentState?.showBottomSheet(

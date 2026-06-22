@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_const_constructors
+
 import 'dart:io';
 
 import 'package:PiliPlus/build_config.dart';
@@ -414,8 +416,11 @@ class MyApp extends StatelessWidget {
       getPages: Routes.getPages,
       defaultTransition: Pref.pageTransition,
       builder: FlutterSmartDialog.init(
-        toastBuilder: (msg) => CustomToast(msg: msg),
-        loadingBuilder: (msg) => LoadingWidget(msg: msg),
+        toastBuilder: CustomToast.new,
+        loadingBuilder: LoadingWidget.new,
+        notifyStyle: const FlutterSmartNotifyStyle(
+          warningBuilder: NotifyWarning.new,
+        ),
         builder: _builder,
       ),
       navigatorObservers: [

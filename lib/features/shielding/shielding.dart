@@ -1,3 +1,4 @@
+export 'comment_shielding_config.dart';
 export 'shielding_adapters.dart';
 export 'shielding_matcher.dart';
 export 'shielding_migration.dart';

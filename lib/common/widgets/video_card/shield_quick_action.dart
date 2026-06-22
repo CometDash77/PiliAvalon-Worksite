@@ -10,10 +10,15 @@ abstract final class VideoCardShieldQuickAction {
     ShieldSettingsStore? store,
     required ShieldRuleType type,
     required String pattern,
-    ShieldMatchMode matchMode = ShieldMatchMode.exact,
+    ShieldMatchMode? matchMode,
     bool showToast = true,
     String? successLabel,
+    String? displayPattern,
+    ShieldScope scope = ShieldScope.recommendation,
   }) async {
+    if (!_isRecommendationQuickActionType(type)) {
+      return;
+    }
     final trimmed = pattern.trim();
     if (trimmed.isEmpty) {
       return;
@@ -21,9 +26,10 @@ abstract final class VideoCardShieldQuickAction {
     final resolvedStore = store ?? ShieldSettingsStore();
     final rule = await resolvedStore.addQuickActionRule(
       type: type,
-      scope: ShieldScope.recommendation,
+      scope: scope,
       pattern: trimmed,
       matchMode: matchMode,
+      displayPattern: displayPattern,
     );
     if (rule == null) {
       if (showToast) {
@@ -163,6 +169,7 @@ abstract final class VideoCardShieldQuickAction {
     VoidCallback? onRuleAdded,
     String? note,
     ShieldSettingsStore? store,
+    ShieldScope scope = ShieldScope.recommendation,
   }) async {
     final resolvedPattern = pattern ?? text;
     await showDialog<void>(
@@ -201,6 +208,7 @@ abstract final class VideoCardShieldQuickAction {
                 store: store,
                 type: type,
                 pattern: resolvedPattern,
+                scope: scope,
                 successLabel: _contextualRuleLabel(
                   title,
                   type,
@@ -224,8 +232,9 @@ abstract final class VideoCardShieldQuickAction {
     required String pattern,
     VoidCallback? onRuleAdded,
     ShieldSettingsStore? store,
+    ShieldScope scope = ShieldScope.recommendation,
   }) async {
-    await addRule(store: store, type: type, pattern: pattern);
+    await addRule(store: store, type: type, pattern: pattern, scope: scope);
     onRuleAdded?.call();
   }
 
@@ -237,6 +246,17 @@ abstract final class VideoCardShieldQuickAction {
         ShieldRuleType.reasonKeyword => '屏蔽推荐理由「$pattern」',
         ShieldRuleType.category => '屏蔽推荐分区「$pattern」',
         ShieldRuleType.tag => '屏蔽推荐标签「$pattern」',
+        ShieldRuleType.duration => '屏蔽推荐时长 $pattern',
+        ShieldRuleType.playbackCount => '屏蔽推荐播放数 $pattern',
+        ShieldRuleType.danmakuCount => '屏蔽推荐弹幕数 $pattern',
+        ShieldRuleType.commentMemberSex => '屏蔽评论用户性别 $pattern',
+        ShieldRuleType.commentMemberLevel => '屏蔽评论用户等级 $pattern',
+        ShieldRuleType.avatarPendant => '屏蔽评论头像挂件 $pattern',
+        ShieldRuleType.garb => '屏蔽评论装扮卡片 $pattern',
+        ShieldRuleType.descriptionKeyword => '屏蔽视频简介关键词「$pattern」',
+        ShieldRuleType.publishTime => '屏蔽视频发布时间 $pattern',
+        ShieldRuleType.isUpowerExclusive => '屏蔽充电专属状态 $pattern',
+        ShieldRuleType.staffKeyword => '屏蔽制作人员关键词「$pattern」',
       };
 
   static String _contextualRuleLabel(
@@ -467,6 +487,7 @@ class _UpActionRowState extends State<_UpActionRow> {
       type: ShieldRuleType.userKeyword,
       pattern: shieldTokenPatternRegex(trimmed),
       matchMode: ShieldMatchMode.regex,
+      displayPattern: trimmed,
       successLabel: '屏蔽推荐用户/UP关键词「$trimmed」',
     );
     widget.onRuleAdded?.call();

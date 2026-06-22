@@ -643,6 +643,36 @@ abstract final class Pref {
   static int get minLikeRatioForRecommend =>
       _setting.get(SettingBoxKey.minLikeRatioForRecommend, defaultValue: 0);
 
+  static bool get filterInteractionRateForRecommend => _setting.get(
+    SettingBoxKey.filterInteractionRateForRecommend,
+    defaultValue: false,
+  );
+
+  static double get minInteractionRateForRecommend => _setting.get(
+    SettingBoxKey.minInteractionRateForRecommend,
+    defaultValue: 1.0,
+  );
+
+  static bool get filterTripleRateForRecommend => _setting.get(
+    SettingBoxKey.filterTripleRateForRecommend,
+    defaultValue: false,
+  );
+
+  static double get minTripleRateForRecommend => _setting.get(
+    SettingBoxKey.minTripleRateForRecommend,
+    defaultValue: 3.0,
+  );
+
+  static bool get filterContentValueForRecommend => _setting.get(
+    SettingBoxKey.filterContentValueForRecommend,
+    defaultValue: false,
+  );
+
+  static double get minContentValueForRecommend => _setting.get(
+    SettingBoxKey.minContentValueForRecommend,
+    defaultValue: 10.0,
+  );
+
   static bool get exemptFilterForFollowed =>
       _setting.get(SettingBoxKey.exemptFilterForFollowed, defaultValue: true);
 
@@ -811,8 +841,31 @@ abstract final class Pref {
   static bool get enableLongShowControl =>
       _setting.get(SettingBoxKey.enableLongShowControl, defaultValue: false);
 
-  static bool get expandBuffer =>
-      _setting.get(SettingBoxKey.expandBuffer, defaultValue: false);
+  static double get bufferSize =>
+      _setting.get(SettingBoxKey.bufferSize, defaultValue: 4.0);
+
+  static double get bufferSec =>
+      _setting.get(SettingBoxKey.bufferSec, defaultValue: 16.0);
+
+  static Map<String, String> initBuffer([double playbackSpeed = 1.0]) {
+    final bufSec = Pref.bufferSec * playbackSpeed;
+    final bufSiz = (Pref.bufferSize * 0x100000).toStringAsFixed(0);
+    return {
+      'cache': 'yes',
+      'cache-secs': bufSec.toStringAsFixed(3),
+      'demuxer-hysteresis-secs': (bufSec / 1.5).toStringAsFixed(3),
+      'demuxer-max-bytes': bufSiz,
+      'demuxer-max-back-bytes': bufSiz,
+    };
+  }
+
+  static Map<String, String> initLiveBuffer() {
+    return {
+      'cache': 'yes',
+      'demuxer-max-bytes': (Pref.bufferSize * 0x200000).toStringAsFixed(0),
+      'demuxer-max-back-bytes': '0',
+    };
+  }
 
   static String get audioOutput => _setting.get(
     SettingBoxKey.audioOutput,
@@ -999,4 +1052,10 @@ abstract final class Pref {
 
   static int get angleDegrees =>
       _setting.get(SettingBoxKey.angleDegrees, defaultValue: 30);
+
+  static double get playerVolume => // mobile
+      _setting.get(SettingBoxKey.playerVolume, defaultValue: 100.0);
+
+  static double get maxVolume => // desktop
+      _setting.get(SettingBoxKey.maxVolume, defaultValue: 2.0);
 }

@@ -105,11 +105,6 @@ class SearchVideoItemModel extends HorizontalVideoModel {
 }
 
 class SearchStat extends BaseStat {
-  // 收藏数
-  int? favorite;
-  // 评论数
-  int? reply;
-
   SearchStat.fromJson(Map<String, dynamic> json) {
     view = json['play'];
     danmu = json['danmaku'];

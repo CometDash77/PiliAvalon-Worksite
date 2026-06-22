@@ -34,6 +34,8 @@ import 'package:PiliPlus/pages/video/introduction/ugc/widgets/page.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/widgets/season.dart';
 import 'package:PiliPlus/pages/video/member/controller.dart';
 import 'package:PiliPlus/pages/video/member/view.dart';
+import 'package:PiliPlus/pages/video/channel_quiet/channel_quiet.dart';
+import 'package:PiliPlus/pages/video/quiet_state.dart';
 import 'package:PiliPlus/pages/video/related/view.dart';
 import 'package:PiliPlus/pages/video/reply/controller.dart';
 import 'package:PiliPlus/pages/video/reply/view.dart';
@@ -79,11 +81,7 @@ class VideoDetailPageV extends StatefulWidget {
 }
 
 class _VideoDetailPageVState extends State<VideoDetailPageV>
-    with
-        TickerProviderStateMixin,
-        RouteAware,
-        RouteAwareMixin,
-        WidgetsBindingObserver {
+    with RouteAware, RouteAwareMixin, WidgetsBindingObserver {
   final heroTag = Get.arguments['heroTag'];
 
   late final VideoDetailController videoDetailController;
@@ -133,6 +131,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   final videoReplyPanelKey = GlobalKey();
   final videoRelatedKey = GlobalKey();
   final videoIntroKey = GlobalKey();
+  bool _lastTabBarHadReply = false;
 
   @override
   void initState() {
@@ -771,7 +770,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                           needCtr: false,
                           isNested: true,
                         ),
-                        if (videoDetailController.showReply)
+                        if (videoDetailController.effectiveShowReply)
                           videoReplyPanel(isNested: true),
                         if (_shouldShowSeasonPanel) seasonPanel,
                       ],
@@ -841,7 +840,8 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                           width: introWidth,
                           height: maxHeight,
                         ),
-                        if (videoDetailController.showReply) videoReplyPanel(),
+                        if (videoDetailController.effectiveShowReply)
+                          videoReplyPanel(),
                         if (_shouldShowSeasonPanel) seasonPanel,
                       ],
                     ),
@@ -902,7 +902,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                           child: tabBarView(
                             controller: videoDetailController.tabCtr,
                             children: [
-                              if (videoDetailController.showReply)
+                              if (videoDetailController.effectiveShowReply)
                                 videoReplyPanel(),
                               if (_shouldShowSeasonPanel) seasonPanel,
                             ],
@@ -1008,7 +1008,8 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                               ],
                             ),
                           ),
-                        if (videoDetailController.showReply) videoReplyPanel(),
+                        if (videoDetailController.effectiveShowReply)
+                          videoReplyPanel(),
                         if (_shouldShowSeasonPanel) seasonPanel,
                       ],
                     ),
@@ -1093,14 +1094,16 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                           child: videoIntro(
                             width: () {
                               double flex = 1;
-                              if (videoDetailController.showReply) flex++;
+                              if (videoDetailController.effectiveShowReply) {
+                                flex++;
+                              }
                               if (shouldShowSeasonPanel) flex++;
                               return maxWidth / flex;
                             }(),
                             height: bottomHeight,
                           ),
                         ),
-                        if (videoDetailController.showReply)
+                        if (videoDetailController.effectiveShowReply)
                           Expanded(child: videoReplyPanel()),
                         if (shouldShowSeasonPanel) Expanded(child: seasonPanel),
                       ],
@@ -1207,6 +1210,113 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     return const SizedBox.shrink();
   });
 
+  List<PopupMenuItem<void>> quietControlPopupItems(BuildContext context) {
+    final items = <PopupMenuItem<void>>[
+      if (videoDetailController.showReply)
+        PopupMenuItem(
+          onTap: videoDetailController.toggleTempHideReply,
+          child: Obx(
+            () => Text(
+              videoDetailController.tempHideReply.value ? '显示评论' : '隐藏评论',
+            ),
+          ),
+        ),
+      if (videoDetailController.plPlayerController.enableShowDanmaku.value)
+        PopupMenuItem(
+          onTap: videoDetailController.toggleTempHideDanmaku,
+          child: Obx(
+            () => Text(
+              videoDetailController.tempHideDanmaku.value ? '显示弹幕' : '隐藏弹幕',
+            ),
+          ),
+        ),
+    ];
+
+    // Persistent channel quiet rule entry -- only when identity is known
+    final target = videoDetailController.currentChannelTarget;
+    if (target != null) {
+      final existing = ChannelQuietStore().lookup(target.key);
+      items.add(
+        PopupMenuItem(
+          onTap: () => WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _showChannelQuietEditor(this.context, target, existing);
+          }),
+          child: Text(channelQuietActionLabel(existing)),
+        ),
+      );
+    }
+
+    return items;
+  }
+
+  Future<void> _showChannelQuietEditor(
+    BuildContext context,
+    ChannelQuietTarget target,
+    ChannelQuietRule? existing,
+  ) async {
+    final isAdd = existing == null;
+    bool hideComments = existing?.hideComments ?? false;
+    bool hideDanmaku = existing?.hideDanmaku ?? false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (builderContext, setDialogState) => AlertDialog(
+          title: Text(channelQuietEditorTitle(existing)),
+          content: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                target.channelName,
+                style: Theme.of(builderContext).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 12),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('默认隐藏评论'),
+                value: hideComments,
+                onChanged: (v) => setDialogState(() => hideComments = v),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('默认隐藏弹幕'),
+                value: hideDanmaku,
+                onChanged: (v) => setDialogState(() => hideDanmaku = v),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(builderContext).pop(),
+              child: const Text('取消'),
+            ),
+            if (!isAdd)
+              TextButton(
+                onPressed: () async {
+                  Navigator.of(builderContext).pop();
+                  await videoDetailController.removeChannelRule(target);
+                },
+                child: const Text('移除'),
+              ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(builderContext).pop();
+                await videoDetailController.saveChannelRule(
+                  target,
+                  hideComments: hideComments,
+                  hideDanmaku: hideDanmaku,
+                );
+              },
+              child: const Text('保存'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _moreBtn(Color color, {List<Shadow>? shadows}) => PopupMenuButton(
     icon: Icon(
       size: 22,
@@ -1215,6 +1325,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       shadows: shadows,
     ),
     itemBuilder: (BuildContext context) => <PopupMenuEntry>[
+      ...quietControlPopupItems(context),
       PopupMenuItem(
         onTap: introController.viewLater,
         child: const Text('稍后再看'),
@@ -1291,6 +1402,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                         key: ValueKey(videoDetailController.cid.value),
                         isPipMode: isPipMode,
                         cid: videoDetailController.cid.value,
+                        videoDetailController: videoDetailController,
                         playerController: plPlayerController!,
                         isFullScreen: plPlayerController!.isFullScreen.value,
                         isFileSource: videoDetailController.isFileSource,
@@ -1354,19 +1466,29 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     List<String> tabs = [
       if (showIntro)
         videoDetailController.isFileSource ? '离线视频' : introText ?? '简介',
-      if (videoDetailController.showReply) '评论',
+      if (videoDetailController.effectiveShowReply) '评论',
       if (_shouldShowSeasonPanel) '播放列表',
     ];
     if (videoDetailController.tabCtr.length != tabs.length) {
+      final previousLength = videoDetailController.tabCtr.length;
+      final previousIndex = videoDetailController.tabCtr.index;
+      final previousHadReply = _lastTabBarHadReply;
+      final nextHasReply = videoDetailController.effectiveShowReply;
       videoDetailController.tabCtr.dispose();
       videoDetailController.tabCtr = TabController(
-        vsync: this,
+        vsync: videoDetailController,
         length: tabs.length,
-        initialIndex: tabs.isEmpty
-            ? 0
-            : videoDetailController.tabCtr.index.clamp(0, tabs.length - 1),
+        initialIndex: quietControlsEffectiveTabIndex(
+          currentIndex: previousIndex,
+          previousLength: previousLength,
+          nextLength: tabs.length,
+          previousHadReply: previousHadReply,
+          nextHasReply: nextHasReply,
+          showIntro: showIntro,
+        ),
       );
     }
+    _lastTabBarHadReply = videoDetailController.effectiveShowReply;
 
     final flag = !needIndicator || tabs.length == 1;
     Widget tabBar() => TabBar(
@@ -1614,9 +1736,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                             return FilledButton.tonal(
                               style: FilledButton.styleFrom(
                                 shape: const RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.all(
-                                    Radius.circular(6),
-                                  ),
+                                  borderRadius: .all(.circular(6)),
                                 ),
                                 backgroundColor: themeData
                                     .colorScheme
@@ -1634,9 +1754,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                                   item,
                                   isStein: true,
                                 );
-                                videoDetailController.getSteinEdgeInfo(
-                                  item.id,
-                                );
+                                videoDetailController.getSteinEdgeInfo(item.id);
                               },
                               child: Text(item.option!),
                             );
@@ -1991,14 +2109,12 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       },
     );
     if (isFullScreen || videoDetailController.showVideoSheet) {
+      final child = listSheetContent(enableSlide: false);
       PageUtils.showVideoBottomSheet(
         context,
         child: videoDetailController.plPlayerController.darkVideoPage
-            ? Theme(
-                data: themeData,
-                child: listSheetContent(enableSlide: false),
-              )
-            : listSheetContent(enableSlide: false),
+            ? Theme(data: themeData, child: child)
+            : child,
       );
     } else {
       videoDetailController.childKey.currentState?.showBottomSheet(
@@ -2070,22 +2186,16 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
 
   void showViewPoints() {
     if (isFullScreen || videoDetailController.showVideoSheet) {
+      final child = ViewPointsPage(
+        enableSlide: false,
+        videoDetailController: videoDetailController,
+        plPlayerController: plPlayerController,
+      );
       PageUtils.showVideoBottomSheet(
         context,
         child: videoDetailController.plPlayerController.darkVideoPage
-            ? Theme(
-                data: themeData,
-                child: ViewPointsPage(
-                  enableSlide: false,
-                  videoDetailController: videoDetailController,
-                  plPlayerController: plPlayerController,
-                ),
-              )
-            : ViewPointsPage(
-                enableSlide: false,
-                videoDetailController: videoDetailController,
-                plPlayerController: plPlayerController,
-              ),
+            ? Theme(data: themeData, child: child)
+            : child,
       );
     } else {
       videoDetailController.childKey.currentState?.showBottomSheet(

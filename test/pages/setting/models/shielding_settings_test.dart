@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui' show Size;
 
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/pages/setting/models/shielding_settings.dart';
@@ -35,19 +36,123 @@ void main() {
       expect(shieldRuleSubtitle(rule), '评论 / 完全相同 / 已启用');
     });
 
+    test('uses displayPattern when present for user keyword rules', () {
+      final rule = ShieldRule(
+        id: 'user-keyword-display',
+        type: ShieldRuleType.userKeyword,
+        matchMode: ShieldMatchMode.regex,
+        scope: ShieldScope.recommendation,
+        action: ShieldAction.block,
+        pattern: r'(^|[\s,，。！？!?:：;；_\-])编辑后UP($|[\s,，。！？!?:：;；_\-])',
+        displayPattern: '编辑后UP',
+        enabled: true,
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+        source: ShieldRuleSource.quickAction,
+      );
+
+      expect(shieldRuleTitle(rule), '屏蔽 用户/UP关键词: 编辑后UP');
+    });
+
     test(
-      'labels keyword exact semantics as contains instead of exact equality',
+      'recovers keyword from old generated regex without displayPattern',
       () {
-        final rule = _rule(
-          id: 'keyword',
+        final rule = ShieldRule(
+          id: 'old-user-keyword',
+          type: ShieldRuleType.userKeyword,
+          matchMode: ShieldMatchMode.regex,
+          scope: ShieldScope.recommendation,
+          action: ShieldAction.block,
+          pattern: r'(^|[\s,，。！？!?:：;；_\-])测试UP($|[\s,，。！？!?:：;；_\-])',
+          enabled: true,
+          updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+          source: ShieldRuleSource.quickAction,
+        );
+
+        expect(shieldRuleTitle(rule), '屏蔽 用户/UP关键词: 测试UP');
+      },
+    );
+
+    test(
+      'recovers keyword with escaped special chars from old generated regex',
+      () {
+        final rule = ShieldRule(
+          id: 'old-user-keyword-special',
+          type: ShieldRuleType.userKeyword,
+          matchMode: ShieldMatchMode.regex,
+          scope: ShieldScope.recommendation,
+          action: ShieldAction.block,
+          pattern: r'(^|[\s,，。！？!?:：;；_\-])UP\(\.\*\)($|[\s,，。！？!?:：;；_\-])',
+          enabled: true,
+          updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+          source: ShieldRuleSource.quickAction,
+        );
+
+        expect(shieldRuleTitle(rule), '屏蔽 用户/UP关键词: UP(.*)');
+      },
+    );
+
+    test('shows raw regex for non-user-keyword regex rules', () {
+      final rule = ShieldRule(
+        id: 'manual-regex',
+        type: ShieldRuleType.keyword,
+        matchMode: ShieldMatchMode.regex,
+        scope: ShieldScope.both,
+        action: ShieldAction.block,
+        pattern: r'cat.*dog',
+        enabled: true,
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+        source: ShieldRuleSource.manual,
+      );
+
+      expect(shieldRuleTitle(rule), '屏蔽 标题/正文关键词: cat.*dog');
+    });
+
+    test('shows UID for UID rules', () {
+      final rule = ShieldRule(
+        id: 'uid-rule',
+        type: ShieldRuleType.uid,
+        matchMode: ShieldMatchMode.exact,
+        scope: ShieldScope.recommendation,
+        action: ShieldAction.block,
+        pattern: '12345',
+        enabled: true,
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+        source: ShieldRuleSource.quickAction,
+      );
+
+      expect(shieldRuleTitle(rule), '屏蔽 用户 UID: 12345');
+    });
+
+    test(
+      'labels keyword contains semantics correctly',
+      () {
+        final containsRule = _rule(
+          id: 'keyword-contains',
+          type: ShieldRuleType.keyword,
+          matchMode: ShieldMatchMode.contains,
+          pattern: '猫',
+        );
+
+        expect(
+          shieldMatchModeLabel(containsRule.matchMode, type: containsRule.type),
+          '包含文字',
+        );
+        expect(shieldRuleSubtitle(containsRule), '推荐和评论 / 包含文字 / 已启用');
+
+        final exactRule = _rule(
+          id: 'keyword-exact',
           type: ShieldRuleType.keyword,
           matchMode: ShieldMatchMode.exact,
           pattern: '猫',
         );
 
-        expect(shieldMatchModeLabel(rule.matchMode, type: rule.type), '包含文字');
-        expect(shieldRuleSubtitle(rule), '推荐和评论 / 包含文字 / 已启用');
+        expect(
+          shieldMatchModeLabel(exactRule.matchMode, type: exactRule.type),
+          '完全相同',
+        );
+        expect(shieldRuleSubtitle(exactRule), '推荐和评论 / 完全相同 / 已启用');
         expect(shieldMatchModeLabel(ShieldMatchMode.exact), '完全相同');
+        expect(shieldMatchModeLabel(ShieldMatchMode.contains), '包含文字');
       },
     );
 
@@ -55,6 +160,33 @@ void main() {
       expect(shieldRuleTypeLabel(ShieldRuleType.keyword), '标题/正文关键词');
       expect(shieldRuleTypeLabel(ShieldRuleType.userKeyword), '用户/UP关键词');
       expect(shieldRuleTypeLabel(ShieldRuleType.reasonKeyword), '推荐理由');
+    });
+
+    test('preserves manual recommendation UP regex rule round trip', () {
+      final seed = ShieldRuleSet(
+        rules: [
+          ShieldRule(
+            id: 'manual-up-regex',
+            type: ShieldRuleType.userKeyword,
+            matchMode: ShieldMatchMode.regex,
+            scope: ShieldScope.recommendation,
+            action: ShieldAction.block,
+            pattern: '电影',
+            enabled: true,
+            updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+          ),
+        ],
+      );
+
+      final decoded = ShieldRuleSet.fromJson(seed.toJson());
+      final rule = decoded.rules.single;
+
+      expect(rule.type, ShieldRuleType.userKeyword);
+      expect(rule.matchMode, ShieldMatchMode.regex);
+      expect(rule.scope, ShieldScope.recommendation);
+      expect(rule.action, ShieldAction.block);
+      expect(rule.pattern, '电影');
+      expect(rule.enabled, isTrue);
     });
 
     test('provides horizontal category navigation labels', () {
@@ -66,6 +198,10 @@ void main() {
           '推荐理由',
           '标签',
           '分区',
+          '数值元数据',
+          '评论用户信息',
+          '评论装饰',
+          '视频详情信息',
           '评论关键词',
         ]),
       );
@@ -158,6 +294,155 @@ void main() {
       expect(shieldingRuleCategoryFor(importedTitle), '标题关键词');
       expect(shieldingRuleCategoryFor(importedCategory), '分区');
     });
+
+    test('labels avatar pendant and garb rule types', () {
+      expect(shieldRuleTypeLabel(ShieldRuleType.avatarPendant), '头像挂件');
+      expect(shieldRuleTypeLabel(ShieldRuleType.garb), '装扮卡片');
+    });
+
+    test('categorizes avatar pendant and garb as decoration', () {
+      final pendantRule = _rule(
+        id: 'pendant-1',
+        type: ShieldRuleType.avatarPendant,
+        scope: ShieldScope.comment,
+        pattern: 'https://example.com/pendant.png',
+      );
+      final garbRule = _rule(
+        id: 'garb-1',
+        type: ShieldRuleType.garb,
+        scope: ShieldScope.comment,
+        pattern: r'NO\.\d+',
+      );
+
+      expect(shieldingRuleCategoryFor(pendantRule), '评论装饰');
+      expect(shieldingRuleCategoryFor(garbRule), '评论装饰');
+    });
+
+    test('category labels group decoration types', () {
+      expect(
+        shieldingRuleCategoryLabels,
+        contains('评论装饰'),
+      );
+      expect(shieldingRuleCategoryLabels, isNot(contains('头像挂件')));
+      expect(shieldingRuleCategoryLabels, isNot(contains('装扮卡片')));
+    });
+
+    test('categorizes duration as numeric metadata', () {
+      final rule = _rule(
+        id: 'duration-rule',
+        type: ShieldRuleType.duration,
+        matchMode: ShieldMatchMode.range,
+        scope: ShieldScope.recommendation,
+        pattern: '60..300',
+      );
+
+      expect(shieldingRuleCategoryFor(rule), '数值元数据');
+    });
+
+    test('categorizes comment member fields as comment user info', () {
+      final sexRule = _rule(
+        id: 'sex-rule',
+        type: ShieldRuleType.commentMemberSex,
+        matchMode: ShieldMatchMode.enumValue,
+        scope: ShieldScope.comment,
+        pattern: '女',
+      );
+      final levelRule = _rule(
+        id: 'level-rule',
+        type: ShieldRuleType.commentMemberLevel,
+        matchMode: ShieldMatchMode.range,
+        scope: ShieldScope.comment,
+        pattern: '5..',
+      );
+
+      expect(shieldingRuleCategoryFor(sexRule), '评论用户信息');
+      expect(shieldingRuleCategoryFor(levelRule), '评论用户信息');
+    });
+
+    test('task-024 scope mode and type labels are visible', () {
+      expect(shieldScopeLabel(ShieldScope.search), '搜索');
+      expect(shieldScopeLabel(ShieldScope.dynamic), '动态');
+      expect(shieldScopeLabel(ShieldScope.live), '直播');
+      expect(shieldScopeLabel(ShieldScope.videoDetail), '视频详情');
+
+      expect(shieldMatchModeLabel(ShieldMatchMode.range), '数值范围');
+      expect(shieldMatchModeLabel(ShieldMatchMode.enumValue), '枚举值');
+
+      expect(shieldRuleTypeLabel(ShieldRuleType.duration), '时长');
+      expect(shieldRuleTypeLabel(ShieldRuleType.playbackCount), '播放数');
+      expect(shieldRuleTypeLabel(ShieldRuleType.danmakuCount), '弹幕数');
+      expect(
+        shieldRuleTypeLabel(ShieldRuleType.commentMemberSex),
+        '评论用户性别',
+      );
+      expect(
+        shieldRuleTypeLabel(ShieldRuleType.commentMemberLevel),
+        '评论用户等级',
+      );
+    });
+
+    test('task-066 detail-introduction rule type labels are visible', () {
+      expect(
+        shieldRuleTypeLabel(ShieldRuleType.descriptionKeyword),
+        '视频简介',
+      );
+      expect(
+        shieldRuleTypeLabel(ShieldRuleType.publishTime),
+        '发布时间',
+      );
+      expect(
+        shieldRuleTypeLabel(ShieldRuleType.isUpowerExclusive),
+        '充电专属',
+      );
+      expect(
+        shieldRuleTypeLabel(ShieldRuleType.staffKeyword),
+        '制作人员',
+      );
+    });
+
+    test('task-066 rule types categorize under 视频详情信息', () {
+      final descRule = ShieldRule(
+        id: 'desc-1',
+        type: ShieldRuleType.descriptionKeyword,
+        matchMode: ShieldMatchMode.contains,
+        scope: ShieldScope.recommendation,
+        action: ShieldAction.block,
+        pattern: '测试',
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+      );
+      final pubtimeRule = ShieldRule(
+        id: 'pubtime-1',
+        type: ShieldRuleType.publishTime,
+        matchMode: ShieldMatchMode.range,
+        scope: ShieldScope.recommendation,
+        action: ShieldAction.block,
+        pattern: '..1000',
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+      );
+      final upowerRule = ShieldRule(
+        id: 'upower-1',
+        type: ShieldRuleType.isUpowerExclusive,
+        matchMode: ShieldMatchMode.enumValue,
+        scope: ShieldScope.recommendation,
+        action: ShieldAction.block,
+        pattern: 'true',
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+      );
+      final staffRule = ShieldRule(
+        id: 'staff-1',
+        type: ShieldRuleType.staffKeyword,
+        matchMode: ShieldMatchMode.contains,
+        scope: ShieldScope.recommendation,
+        action: ShieldAction.block,
+        pattern: '张三',
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+      );
+
+      expect(shieldingRuleCategoryFor(descRule), '视频详情信息');
+      expect(shieldingRuleCategoryFor(pubtimeRule), '视频详情信息');
+      expect(shieldingRuleCategoryFor(upowerRule), '视频详情信息');
+      expect(shieldingRuleCategoryFor(staffRule), '视频详情信息');
+    });
   });
 
   group('ShieldingSettingsPage', () {
@@ -201,10 +486,12 @@ void main() {
 
       expect(find.text('包含文字'), findsWidgets);
       expect(find.text('正则匹配'), findsOneWidget);
+      expect(find.text('数值范围'), findsOneWidget);
+      expect(find.text('枚举值'), findsOneWidget);
       expect(find.text('词元匹配'), findsNothing);
     });
 
-    testWidgets('loaded legacy token rule is shown as regex in UI', (
+    testWidgets('loaded legacy token rule is shown as compatibility token', (
       tester,
     ) async {
       final seed = ShieldRuleSet(
@@ -229,11 +516,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('正则匹配'), findsOneWidget);
-      expect(find.textContaining('词元匹配'), findsNothing);
+      expect(find.textContaining('词元匹配'), findsOneWidget);
     });
 
     testWidgets('shows same-row shielding category navigation', (tester) async {
+      _setLargeTestSurface(tester);
+
       await tester.pumpWidget(
         GetMaterialApp(
           home: ShieldingSettingsPage(
@@ -246,8 +534,86 @@ void main() {
       expect(find.text('用户/UP'), findsOneWidget);
       expect(find.text('标题关键词'), findsOneWidget);
       expect(find.text('推荐理由'), findsOneWidget);
+      expect(find.text('标签'), findsOneWidget);
+      expect(find.text('分区'), findsOneWidget);
+      expect(find.text('数值元数据'), findsOneWidget);
+      expect(find.text('评论用户信息'), findsOneWidget);
+      expect(find.text('评论装饰'), findsOneWidget);
+      expect(find.text('视频详情信息'), findsOneWidget);
+      expect(find.text('评论关键词'), findsOneWidget);
       expect(find.text('精确文本'), findsNothing);
       expect(find.text('旧规则兼容'), findsNothing);
+    });
+
+    testWidgets('general editor shows full rule type set', (
+      tester,
+    ) async {
+      _setLargeTestSurface(tester);
+
+      await tester.pumpWidget(
+        GetMaterialApp(
+          home: ShieldingSettingsPage(
+            store: ShieldSettingsStore(box: _MemoryBox()),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('新增').first);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('标题/正文关键词').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('时长'), findsOneWidget);
+      expect(find.text('播放数'), findsOneWidget);
+      expect(find.text('弹幕数'), findsOneWidget);
+      expect(find.text('评论用户性别'), findsOneWidget);
+      expect(find.text('评论用户等级'), findsOneWidget);
+      expect(find.text('头像挂件'), findsOneWidget);
+      expect(find.text('装扮卡片'), findsOneWidget);
+      expect(find.text('视频简介'), findsOneWidget);
+      expect(find.text('发布时间'), findsOneWidget);
+      expect(find.text('充电专属'), findsOneWidget);
+      expect(find.text('制作人员'), findsOneWidget);
+    });
+
+    testWidgets('category chips group decoration types', (tester) async {
+      await tester.pumpWidget(
+        GetMaterialApp(
+          home: ShieldingSettingsPage(
+            store: ShieldSettingsStore(box: _MemoryBox()),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('评论装饰'), findsOneWidget);
+      expect(find.text('头像挂件'), findsNothing);
+      expect(find.text('装扮卡片'), findsNothing);
+    });
+
+    testWidgets('new-rule dialog type dropdown includes decoration types', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        GetMaterialApp(
+          home: ShieldingSettingsPage(
+            store: ShieldSettingsStore(box: _MemoryBox()),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('新增').first);
+      await tester.pumpAndSettle();
+
+      // Tap the type dropdown to see options
+      await tester.tap(find.text('标题/正文关键词'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('头像挂件'), findsWidgets);
+      expect(find.text('装扮卡片'), findsWidgets);
     });
   });
 }
@@ -291,4 +657,11 @@ class _MemoryBox implements ShieldSettingsBox {
   Future<void> delete(String key) async {
     values.remove(key);
   }
+}
+
+void _setLargeTestSurface(WidgetTester tester) {
+  tester.view.physicalSize = const Size(1600, 1200);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
 }

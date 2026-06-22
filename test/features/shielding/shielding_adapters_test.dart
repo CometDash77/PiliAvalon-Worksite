@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_lambdas
+
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart';
 import 'package:PiliPlus/models/home/rcmd/result.dart';
@@ -10,41 +12,44 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('ShieldingAdapters', () {
-    test('maps web recommendation title, owner, category, tags, and reason', () {
-      final item = RcmdVideoItemModel.fromJson({
-        'id': 1,
-        'bvid': 'BV1',
-        'cid': 2,
-        'goto': 'av',
-        'uri': '',
-        'pic': '',
-        'title': '猫咪睡觉合集',
-        'duration': 60,
-        'pubdate': 1,
-        'owner': {'mid': 42, 'name': 'UP主'},
-        'stat': {'view': 1, 'like': 1, 'danmaku': 1},
-        'tname': '动物',
-        'tag': ['萌宠'],
-        'rcmd_reason': {'content': '因为你看过萌宠'},
-      });
-
-      final candidate = ShieldingAdapters.fromRecommendationJson(
-        item,
-        {
+    test(
+      'maps web recommendation title, owner, category, tags, and reason',
+      () {
+        final item = RcmdVideoItemModel.fromJson({
+          'id': 1,
+          'bvid': 'BV1',
+          'cid': 2,
+          'goto': 'av',
+          'uri': '',
+          'pic': '',
+          'title': '猫咪睡觉合集',
+          'duration': 60,
+          'pubdate': 1,
           'owner': {'mid': 42, 'name': 'UP主'},
+          'stat': {'view': 1, 'like': 1, 'danmaku': 1},
           'tname': '动物',
           'tag': ['萌宠'],
           'rcmd_reason': {'content': '因为你看过萌宠'},
-        },
-      );
+        });
 
-      expect(candidate.title, '猫咪睡觉合集');
-      expect(candidate.uid, '42');
-      expect(candidate.authorName, 'UP主');
-      expect(candidate.reason, '因为你看过萌宠');
-      expect(candidate.category, '动物');
-      expect(candidate.tags, contains('萌宠'));
-    });
+        final candidate = ShieldingAdapters.fromRecommendationJson(
+          item,
+          {
+            'owner': {'mid': 42, 'name': 'UP主'},
+            'tname': '动物',
+            'tag': ['萌宠'],
+            'rcmd_reason': {'content': '因为你看过萌宠'},
+          },
+        );
+
+        expect(candidate.title, '猫咪睡觉合集');
+        expect(candidate.uid, '42');
+        expect(candidate.authorName, 'UP主');
+        expect(candidate.reason, '因为你看过萌宠');
+        expect(candidate.category, '动物');
+        expect(candidate.tags, contains('萌宠'));
+      },
+    );
 
     test('maps app recommendation args fields', () {
       final item = RcmdVideoItemAppModel.fromJson({
@@ -75,6 +80,111 @@ void main() {
       expect(candidate.reason, isNull);
     });
 
+    test('web recommendation UP regex blocks owner name substring', () {
+      final item = RcmdVideoItemModel.fromJson({
+        'id': 1,
+        'bvid': 'BV1',
+        'cid': 2,
+        'goto': 'av',
+        'uri': '',
+        'pic': '',
+        'title': '影视推荐',
+        'duration': 60,
+        'pubdate': 1,
+        'owner': {'mid': 1, 'name': 'xx说电影'},
+        'stat': {'view': 1, 'like': 1, 'danmaku': 1},
+        'tname': '影视',
+      });
+      final ruleSet = _userRegexRuleSet('电影');
+
+      final candidate = ShieldingAdapters.fromRecommendationJson(
+        item,
+        {
+          'owner': {'mid': 1, 'name': 'xx说电影'},
+          'tname': '影视',
+        },
+      );
+
+      expect(candidate.authorName, 'xx说电影');
+      expect(ShieldMatcher.match(candidate, ruleSet).visible, isFalse);
+    });
+
+    test('app recommendation UP regex blocks args up_name substring', () {
+      final item = RcmdVideoItemAppModel.fromJson({
+        'player_args': {'aid': 1, 'cid': 2, 'duration': 60},
+        'bvid': 'BV1',
+        'cover': '',
+        'cover_left_text_1': '1',
+        'cover_left_text_2': '1',
+        'title': '影视推荐',
+        'args': {'up_id': 1, 'up_name': 'xx说电影', 'tname': '影视'},
+        'rcmd_reason': '',
+        'goto': 'av',
+        'param': '1',
+        'uri': '',
+      });
+      final ruleSet = _userRegexRuleSet('电影');
+
+      final candidate = ShieldingAdapters.fromRecommendationJson(
+        item,
+        {
+          'args': {'up_id': 1, 'up_name': 'xx说电影', 'tname': '影视'},
+        },
+      );
+
+      expect(candidate.authorName, 'xx说电影');
+      expect(ShieldMatcher.match(candidate, ruleSet).visible, isFalse);
+    });
+
+    test('app recommendation UP name falls back to args uname', () {
+      final item = RcmdVideoItemAppModel.fromJson({
+        'player_args': {'aid': 1, 'cid': 2, 'duration': 60},
+        'bvid': 'BV1',
+        'cover': '',
+        'cover_left_text_1': '1',
+        'cover_left_text_2': '1',
+        'title': '影视推荐',
+        'args': {'up_id': 1, 'tname': '影视'},
+        'rcmd_reason': '',
+        'goto': 'av',
+        'param': '1',
+        'uri': '',
+      });
+
+      final candidate = ShieldingAdapters.fromRecommendationJson(
+        item,
+        {
+          'args': {'up_id': 1, 'uname': 'xx说电影', 'tname': '影视'},
+        },
+      );
+
+      expect(candidate.authorName, 'xx说电影');
+    });
+
+    test('web recommendation UP name falls back to owner_name', () {
+      final item = RcmdVideoItemModel.fromJson({
+        'id': 1,
+        'bvid': 'BV1',
+        'cid': 2,
+        'goto': 'av',
+        'uri': '',
+        'pic': '',
+        'title': '影视推荐',
+        'duration': 60,
+        'pubdate': 1,
+        'owner': {'mid': 1, 'name': ''},
+        'stat': {'view': 1, 'like': 1, 'danmaku': 1},
+        'tname': '影视',
+      });
+
+      final candidate = ShieldingAdapters.fromRecommendationJson(
+        item,
+        {'owner_name': 'xx说电影', 'tname': '影视'},
+      );
+
+      expect(candidate.authorName, 'xx说电影');
+    });
+
     test('reason keyword filters recommendation json reason only', () {
       final item = RcmdVideoItemAppModel.fromJson({
         'player_args': {'aid': 1, 'cid': 2, 'duration': 60},
@@ -102,7 +212,7 @@ void main() {
           ShieldRule(
             id: 'reason',
             type: ShieldRuleType.reasonKeyword,
-            matchMode: ShieldMatchMode.exact,
+            matchMode: ShieldMatchMode.contains,
             scope: ShieldScope.recommendation,
             action: ShieldAction.block,
             pattern: '相似内容',
@@ -128,6 +238,63 @@ void main() {
       expect(candidate.body, '这是一条评论');
       expect(candidate.uid, '42');
       expect(candidate.authorName, '评论者');
+    });
+
+    test('maps decoration values from ReplyInfo pendant and garb fields', () {
+      final reply = ReplyInfo(
+        mid: Int64(42),
+        content: Content(message: '装扮评论'),
+        member: Member(
+          mid: Int64(42),
+          name: '评论者',
+          garbPendantImage: 'https://i0.hdslb.com/pendant.png',
+          garbCardNumber: 'NO.0001',
+          garbCardImage: 'https://i0.hdslb.com/card.png',
+          garbCardJumpUrl: 'https://i0.hdslb.com/jump',
+        ),
+        memberV2: MemberV2(
+          garb: MemberV2_Garb(
+            pendantImage: 'https://i0.hdslb.com/v2-pendant.png',
+            cardImage: 'https://i0.hdslb.com/v2-card.png',
+            cardNumber: 'NO.0002',
+            cardJumpUrl: 'https://i0.hdslb.com/v2-jump',
+          ),
+        ),
+      );
+
+      final candidate = ShieldingAdapters.fromReplyInfo(reply);
+
+      expect(
+        candidate.avatarPendantValues,
+        containsAll([
+          'https://i0.hdslb.com/pendant.png',
+          'https://i0.hdslb.com/v2-pendant.png',
+        ]),
+      );
+      expect(
+        candidate.garbValues,
+        containsAll([
+          'NO.0001',
+          'https://i0.hdslb.com/card.png',
+          'https://i0.hdslb.com/jump',
+          'https://i0.hdslb.com/v2-card.png',
+          'NO.0002',
+          'https://i0.hdslb.com/v2-jump',
+        ]),
+      );
+    });
+
+    test('maps decoration values as empty when pendant and garb are missing', () {
+      final reply = ReplyInfo(
+        mid: Int64(42),
+        content: Content(message: '普通评论'),
+        member: Member(mid: Int64(42), name: '用户'),
+      );
+
+      final candidate = ShieldingAdapters.fromReplyInfo(reply);
+
+      expect(candidate.avatarPendantValues, isEmpty);
+      expect(candidate.garbValues, isEmpty);
     });
 
     test('maps related video title owner and category fields', () {
@@ -157,6 +324,34 @@ void main() {
       expect(candidate.authorName, '玩家UP');
       expect(candidate.category, '单机游戏');
       expect(candidate.tags, isEmpty);
+    });
+
+    test('fromRelatedVideo accepts explicit video detail scope', () {
+      final video = HotVideoItemModel.fromJson({
+        'aid': 1,
+        'cid': 2,
+        'bvid': 'BV1',
+        'videos': 1,
+        'tid': 17,
+        'tname': '单机游戏',
+        'copyright': 1,
+        'pic': '',
+        'title': '硬核攻略',
+        'pubdate': 1,
+        'ctime': 1,
+        'desc': '',
+        'duration': 60,
+        'owner': {'mid': 42, 'name': '玩家UP'},
+        'stat': {'view': 1, 'like': 1, 'danmaku': 1},
+      });
+
+      final candidate = ShieldingAdapters.fromRelatedVideo(
+        video,
+        scope: ShieldScope.videoDetail,
+      );
+
+      expect(candidate.scope, ShieldScope.videoDetail);
+      expect(candidate.title, '硬核攻略');
     });
 
     test(
@@ -427,7 +622,7 @@ void main() {
           ShieldRule(
             id: 'legacy-title',
             type: ShieldRuleType.keyword,
-            matchMode: ShieldMatchMode.exact,
+            matchMode: ShieldMatchMode.contains,
             scope: ShieldScope.recommendation,
             action: ShieldAction.block,
             pattern: '剧透',
@@ -535,8 +730,1114 @@ void main() {
       expect(controller.index.value, 1);
       expect(replies.map((reply) => reply.id.toInt()), [1]);
     });
+
+    // task-065: Direct structured fields on homepage recommendation.
+
+    test(
+      'web recommendation populates durationSeconds, playbackCount, danmakuCount from direct stat fields',
+      () {
+        final item = RcmdVideoItemModel.fromJson({
+          'id': 1,
+          'bvid': 'BV1',
+          'cid': 2,
+          'goto': 'av',
+          'uri': '',
+          'pic': '',
+          'title': '游戏攻略',
+          'duration': 600,
+          'pubdate': 1,
+          'owner': {'mid': 42, 'name': 'UP主'},
+          'stat': {'view': 50000, 'like': 1200, 'danmaku': 300},
+          'tname': '游戏',
+          'rcmd_reason': {'content': '推荐'},
+        });
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(
+          item,
+          {
+            'owner': {'mid': 42, 'name': 'UP主'},
+            'tname': '游戏',
+            'rcmd_reason': {'content': '推荐'},
+          },
+        );
+
+        expect(candidate.durationSeconds, 600);
+        expect(candidate.playbackCount, 50000);
+        expect(candidate.danmakuCount, 300);
+      },
+    );
+
+    test(
+      'web recommendation leaves durationSeconds null when duration is default -1',
+      () {
+        final item = RcmdVideoItemModel.fromJson({
+          'id': 1,
+          'bvid': 'BV1',
+          'cid': 2,
+          'goto': 'av',
+          'uri': '',
+          'pic': '',
+          'title': '无时长',
+          'duration': -1,
+          'pubdate': 1,
+          'owner': {'mid': 42, 'name': 'UP主'},
+          'stat': {'view': 100, 'like': 10, 'danmaku': 5},
+          'tname': '其他',
+        });
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(
+          item,
+          {
+            'owner': {'mid': 42, 'name': 'UP主'},
+            'tname': '其他',
+          },
+        );
+
+        expect(candidate.durationSeconds, isNull);
+      },
+    );
+
+    test(
+      'app recommendation populates durationSeconds, playbackCount, danmakuCount',
+      () {
+        final item = RcmdVideoItemAppModel.fromJson({
+          'player_args': {'aid': 1, 'cid': 2, 'duration': 840},
+          'bvid': 'BV1',
+          'cover': '',
+          'cover_left_text_1': '1.2万',
+          'cover_left_text_2': '450',
+          'title': 'App视频',
+          'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
+          'rcmd_reason': '',
+          'goto': 'av',
+          'param': '1',
+          'uri': '',
+        });
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(
+          item,
+          {
+            'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
+          },
+        );
+
+        // duration is a direct integer from player_args
+        expect(candidate.durationSeconds, 840);
+        // App stat: RcmdStat parses cover_left_text_1/2 into view/danmu.
+        // '1.2万' → 12000, '450' → 450
+        expect(candidate.playbackCount, 12000);
+        expect(candidate.danmakuCount, 450);
+      },
+    );
+
+    test(
+      'web recommendation direct fields survive existing string-field mapping',
+      () {
+        final item = RcmdVideoItemModel.fromJson({
+          'id': 1,
+          'bvid': 'BV1',
+          'cid': 2,
+          'goto': 'av',
+          'uri': '',
+          'pic': '',
+          'title': '综合测试',
+          'duration': 300,
+          'pubdate': 1,
+          'owner': {'mid': 99, 'name': '测试君'},
+          'stat': {'view': 9999, 'like': 500, 'danmaku': 200},
+          'tname': '综合',
+          'tag': ['标签1', '标签2'],
+        });
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(
+          item,
+          {
+            'owner': {'mid': 99, 'name': '测试君'},
+            'tname': '综合',
+            'tag': ['标签1', '标签2'],
+          },
+        );
+
+        // Existing string fields still present
+        expect(candidate.title, '综合测试');
+        expect(candidate.uid, '99');
+        expect(candidate.authorName, '测试君');
+        expect(candidate.category, '综合');
+        expect(candidate.tags, ['标签1', '标签2']);
+
+        // New direct numeric fields populated
+        expect(candidate.durationSeconds, 300);
+        expect(candidate.playbackCount, 9999);
+        expect(candidate.danmakuCount, 200);
+      },
+    );
+
+    test(
+      'duration range rule blocks web recommendation by durationSeconds',
+      () {
+        final item = RcmdVideoItemModel.fromJson({
+          'id': 1,
+          'bvid': 'BV1',
+          'cid': 2,
+          'goto': 'av',
+          'uri': '',
+          'pic': '',
+          'title': '长视频',
+          'duration': 6000,
+          'pubdate': 1,
+          'owner': {'mid': 42, 'name': 'UP主'},
+          'stat': {'view': 100, 'like': 10, 'danmaku': 5},
+          'tname': '其他',
+        });
+
+        final ruleSet = ShieldRuleSet(
+          rules: [
+            ShieldRule(
+              id: 'dur',
+              type: ShieldRuleType.duration,
+              matchMode: ShieldMatchMode.range,
+              scope: ShieldScope.recommendation,
+              action: ShieldAction.block,
+              pattern: '3000..99999',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            ),
+          ],
+        );
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(
+          item,
+          {
+            'owner': {'mid': 42, 'name': 'UP主'},
+            'tname': '其他',
+          },
+        );
+
+        expect(ShieldingAdapters.isVisible(candidate, ruleSet), isFalse);
+      },
+    );
+
+    test(
+      'playbackCount range rule blocks web recommendation by stat view',
+      () {
+        final item = RcmdVideoItemModel.fromJson({
+          'id': 1,
+          'bvid': 'BV1',
+          'cid': 2,
+          'goto': 'av',
+          'uri': '',
+          'pic': '',
+          'title': '高播放',
+          'duration': 300,
+          'pubdate': 1,
+          'owner': {'mid': 42, 'name': 'UP主'},
+          'stat': {'view': 999999, 'like': 10, 'danmaku': 5},
+          'tname': '其他',
+        });
+
+        final ruleSet = ShieldRuleSet(
+          rules: [
+            ShieldRule(
+              id: 'play',
+              type: ShieldRuleType.playbackCount,
+              matchMode: ShieldMatchMode.range,
+              scope: ShieldScope.recommendation,
+              action: ShieldAction.block,
+              pattern: '100000..999999999',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            ),
+          ],
+        );
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(
+          item,
+          {
+            'owner': {'mid': 42, 'name': 'UP主'},
+            'tname': '其他',
+          },
+        );
+
+        expect(ShieldingAdapters.isVisible(candidate, ruleSet), isFalse);
+      },
+    );
+
+    test(
+      'playbackCount range rule blocks app recommendation by stat view from cover_left_text_1',
+      () {
+        final item = RcmdVideoItemAppModel.fromJson({
+          'player_args': {'aid': 1, 'cid': 2, 'duration': 120},
+          'bvid': 'BV1',
+          'cover': '',
+          'cover_left_text_1': '999999',
+          'cover_left_text_2': '50',
+          'title': '高播放APP',
+          'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
+          'rcmd_reason': '',
+          'goto': 'av',
+          'param': '1',
+          'uri': '',
+        });
+
+        final ruleSet = ShieldRuleSet(
+          rules: [
+            ShieldRule(
+              id: 'play-app',
+              type: ShieldRuleType.playbackCount,
+              matchMode: ShieldMatchMode.range,
+              scope: ShieldScope.recommendation,
+              action: ShieldAction.block,
+              pattern: '100000..999999999',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            ),
+          ],
+        );
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(
+          item,
+          {
+            'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
+          },
+        );
+
+        // playbackCount is populated from RcmdStat parsing of cover_left_text_1.
+        expect(candidate.playbackCount, 999999);
+        // 999999 falls within range 100000..999999999, so candidate is blocked.
+        expect(ShieldingAdapters.isVisible(candidate, ruleSet), isFalse);
+      },
+    );
+
+    test(
+      'danmakuCount range rule blocks app recommendation when danmakuCount is populated from cover_left_text_2',
+      () {
+        final item = RcmdVideoItemAppModel.fromJson({
+          'player_args': {'aid': 1, 'cid': 2, 'duration': 120},
+          'bvid': 'BV1',
+          'cover': '',
+          'cover_left_text_1': '100',
+          'cover_left_text_2': '50',
+          'title': '弹幕测试',
+          'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
+          'rcmd_reason': '',
+          'goto': 'av',
+          'param': '1',
+          'uri': '',
+        });
+
+        final ruleSet = ShieldRuleSet(
+          rules: [
+            ShieldRule(
+              id: 'dan',
+              type: ShieldRuleType.danmakuCount,
+              matchMode: ShieldMatchMode.range,
+              scope: ShieldScope.recommendation,
+              action: ShieldAction.block,
+              pattern: '0..100',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            ),
+          ],
+        );
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(
+          item,
+          {
+            'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
+          },
+        );
+
+        // danmakuCount is now populated from RcmdStat's parsing of cover_left_text_2.
+        expect(candidate.danmakuCount, 50);
+        // 50 falls within range 0..100, so the candidate is blocked.
+        expect(ShieldingAdapters.isVisible(candidate, ruleSet), isFalse);
+      },
+    );
+
+    test(
+      'fromRelatedVideo populates durationSeconds, playbackCount, danmakuCount',
+      () {
+        final video = HotVideoItemModel.fromJson({
+          'aid': 1,
+          'cid': 2,
+          'bvid': 'BV1',
+          'videos': 1,
+          'tid': 17,
+          'tname': '游戏',
+          'copyright': 1,
+          'pic': '',
+          'title': '相关视频',
+          'pubdate': 1,
+          'ctime': 1,
+          'desc': '',
+          'duration': 300,
+          'owner': {'mid': 42, 'name': '玩家UP'},
+          'stat': {'view': 5000, 'like': 100, 'danmaku': 50},
+        });
+
+        final candidate = ShieldingAdapters.fromRelatedVideo(video);
+
+        expect(candidate.durationSeconds, 300);
+        expect(candidate.playbackCount, 5000);
+        expect(candidate.danmakuCount, 50);
+      },
+    );
+  });
+
+  group('task-066 detail-introduction candidate fields', () {
+    test(
+      'fromRelatedVideo populates description, pubdate, isUpowerExclusive',
+      () {
+        final video = HotVideoItemModel.fromJson({
+          'aid': 1,
+          'cid': 2,
+          'bvid': 'BV1',
+          'videos': 1,
+          'tid': 17,
+          'tname': '游戏',
+          'copyright': 1,
+          'pic': '',
+          'title': '简介测试视频',
+          'pubdate': 1718000000,
+          'ctime': 1718000000,
+          'desc': '这是一段视频简介文字',
+          'duration': 300,
+          'owner': {'mid': 42, 'name': '玩家UP'},
+          'stat': {'view': 5000, 'like': 100, 'danmaku': 50},
+          'charging_pay': {'level': 1},
+        });
+
+        final candidate = ShieldingAdapters.fromRelatedVideo(video);
+
+        expect(candidate.description, '这是一段视频简介文字');
+        expect(candidate.pubdate, 1718000000);
+        expect(candidate.isUpowerExclusive, isTrue);
+      },
+    );
+
+    test(
+      'fromRelatedVideo isUpowerExclusive is false for non-charging badge',
+      () {
+        final video = HotVideoItemModel.fromJson({
+          'aid': 2,
+          'cid': 3,
+          'bvid': 'BV2',
+          'videos': 1,
+          'tid': 17,
+          'tname': '合作视频',
+          'copyright': 1,
+          'pic': '',
+          'title': '合作视频',
+          'pubdate': 1,
+          'ctime': 1,
+          'desc': '',
+          'duration': 300,
+          'owner': {'mid': 42, 'name': 'UP'},
+          'stat': {'view': 5000, 'like': 100, 'danmaku': 50},
+          'rights': {'is_cooperation': 1},
+        });
+
+        final candidate = ShieldingAdapters.fromRelatedVideo(video);
+
+        expect(candidate.isUpowerExclusive, isFalse);
+      },
+    );
+
+    test('fromRelatedVideo isUpowerExclusive is null when badge is null', () {
+      final video = HotVideoItemModel.fromJson({
+        'aid': 3,
+        'cid': 4,
+        'bvid': 'BV3',
+        'videos': 1,
+        'tid': 17,
+        'tname': '普通视频',
+        'copyright': 1,
+        'pic': '',
+        'title': '普通视频',
+        'pubdate': 1,
+        'ctime': 1,
+        'desc': '',
+        'duration': 300,
+        'owner': {'mid': 42, 'name': 'UP'},
+        'stat': {'view': 5000, 'like': 100, 'danmaku': 50},
+      });
+
+      final candidate = ShieldingAdapters.fromRelatedVideo(video);
+
+      expect(candidate.isUpowerExclusive, isNull);
+    });
+
+    test('fromRelatedVideo staffNames is empty when source has no staff', () {
+      final video = HotVideoItemModel.fromJson({
+        'aid': 4,
+        'cid': 5,
+        'bvid': 'BV4',
+        'videos': 1,
+        'tid': 17,
+        'tname': '测试',
+        'copyright': 1,
+        'pic': '',
+        'title': '测试',
+        'pubdate': 1,
+        'ctime': 1,
+        'desc': '',
+        'duration': 300,
+        'owner': {'mid': 42, 'name': 'UP'},
+        'stat': {'view': 5000, 'like': 100, 'danmaku': 50},
+      });
+
+      final candidate = ShieldingAdapters.fromRelatedVideo(video);
+
+      expect(candidate.staffNames, isEmpty);
+    });
+
+    test('fromRelatedVideo populates staffNames from source staff', () {
+      final video = HotVideoItemModel.fromJson({
+        'aid': 4,
+        'cid': 5,
+        'bvid': 'BV4',
+        'videos': 1,
+        'tid': 17,
+        'tname': '测试',
+        'copyright': 1,
+        'pic': '',
+        'title': '测试',
+        'pubdate': 1,
+        'ctime': 1,
+        'desc': '',
+        'duration': 300,
+        'owner': {'mid': 42, 'name': 'UP'},
+        'stat': {'view': 5000, 'like': 100, 'danmaku': 50},
+        'staff': [
+          {'name': '张三', 'title': '导演'},
+          {'name': '李四'},
+        ],
+      });
+
+      final candidate = ShieldingAdapters.fromRelatedVideo(video);
+
+      expect(candidate.staffNames, ['张三', '导演', '李四']);
+    });
+
+    test(
+      'fromRecommendationJson populates description and pubdate from web model',
+      () {
+        final item = RcmdVideoItemModel.fromJson({
+          'id': 1,
+          'bvid': 'BV1',
+          'cid': 2,
+          'pic': '',
+          'title': '测试标题',
+          'duration': 120,
+          'pubdate': 1718000000,
+          'owner': {'mid': 42, 'name': 'UP主'},
+          'stat': {'view': 5000, 'like': 100, 'danmaku': 50},
+          'is_followed': 0,
+          'rcmd_reason': {'content': '热门推荐'},
+        });
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(item, {
+          'owner': {'mid': 42, 'name': 'UP主'},
+          'desc': '测试视频简介',
+          'staff': [
+            {'name': '张三', 'title': '导演'},
+            {'name': '李四'},
+          ],
+        });
+
+        // Web model: pubdate comes from item.pubdate.
+        expect(candidate.pubdate, 1718000000);
+        // desc comes from JSON since web RcmdVideoItemModel doesn't set desc.
+        expect(candidate.description, '测试视频简介');
+        expect(candidate.staffNames, ['张三', '导演', '李四']);
+        expect(candidate.isUpowerExclusive, isNull);
+      },
+    );
+
+    test(
+      'fromRecommendationJson populates description from app model item.desc',
+      () {
+        final item = RcmdVideoItemAppModel.fromJson({
+          'player_args': {'aid': 1, 'cid': 2, 'duration': 120},
+          'bvid': 'BV1',
+          'cover': '',
+          'cover_left_text_1': '100',
+          'cover_left_text_2': '50',
+          'title': 'app测试',
+          'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
+          'rcmd_reason': '',
+          'goto': 'av',
+          'param': '1',
+          'uri': '',
+          'desc': 'app端简介',
+        });
+
+        final candidate = ShieldingAdapters.fromRecommendationJson(item, {
+          'args': {'up_id': 88, 'up_name': '玩家', 'tname': '游戏'},
+        });
+
+        // App model sets desc from json['desc'] in its constructor.
+        expect(candidate.description, 'app端简介');
+        expect(candidate.pubdate, isNull);
+      },
+    );
+
+    test('fromRecommendationJson isUpowerExclusive from charging_pay', () {
+      final item = RcmdVideoItemModel.fromJson({
+        'id': 1,
+        'bvid': 'BV1',
+        'cid': 2,
+        'pic': '',
+        'title': '充电视频',
+        'duration': 120,
+        'pubdate': 1,
+        'owner': {'mid': 42, 'name': 'UP主'},
+        'stat': {'view': 100, 'like': 10, 'danmaku': 5},
+        'is_followed': 0,
+      });
+
+      final candidate = ShieldingAdapters.fromRecommendationJson(item, {
+        'owner': {'mid': 42, 'name': 'UP主'},
+        'charging_pay': {'level': 1},
+      });
+
+      expect(candidate.isUpowerExclusive, isTrue);
+    });
+  });
+
+  group('task-066 filterRelatedVideos independent switch', () {
+    test(
+      'filterRelatedVideos uses relatedVideoEnabled, not recommendationEnabled',
+      () {
+        final video = HotVideoItemModel.fromJson({
+          'aid': 1,
+          'cid': 2,
+          'bvid': 'BV1',
+          'videos': 1,
+          'tid': 17,
+          'tname': '游戏',
+          'copyright': 1,
+          'pic': '',
+          'title': '被屏蔽视频',
+          'pubdate': 1,
+          'ctime': 1,
+          'desc': '',
+          'duration': 300,
+          'owner': {'mid': 42, 'name': '玩家UP'},
+          'stat': {'view': 100, 'like': 10, 'danmaku': 5},
+        });
+
+        final blockRule = ShieldRuleSet(
+          globalEnabled: true,
+          recommendationEnabled: true,
+          relatedVideoEnabled: false,
+          rules: [
+            ShieldRule(
+              id: 'block-all',
+              type: ShieldRuleType.userKeyword,
+              matchMode: ShieldMatchMode.contains,
+              scope: ShieldScope.videoDetail,
+              action: ShieldAction.block,
+              pattern: '玩家',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            ),
+          ],
+        );
+
+        // relatedVideoEnabled = false → filterRelatedVideos should be no-op.
+        final result = ShieldingAdapters.filterRelatedVideos([
+          video,
+        ], blockRule);
+        expect(result.length, 1); // Not filtered — switch is off.
+      },
+    );
+
+    test('filterRelatedVideos blocks when relatedVideoEnabled is true', () {
+      final video = HotVideoItemModel.fromJson({
+        'aid': 1,
+        'cid': 2,
+        'bvid': 'BV1',
+        'videos': 1,
+        'tid': 17,
+        'tname': '游戏',
+        'copyright': 1,
+        'pic': '',
+        'title': '被屏蔽视频',
+        'pubdate': 1,
+        'ctime': 1,
+        'desc': '',
+        'duration': 300,
+        'owner': {'mid': 42, 'name': '玩家UP'},
+        'stat': {'view': 100, 'like': 10, 'danmaku': 5},
+      });
+
+      final blockRule = ShieldRuleSet(
+        globalEnabled: true,
+        recommendationEnabled: false,
+        relatedVideoEnabled: true,
+        rules: [
+          ShieldRule(
+            id: 'block-all',
+            type: ShieldRuleType.userKeyword,
+            matchMode: ShieldMatchMode.contains,
+            scope: ShieldScope.videoDetail,
+            action: ShieldAction.block,
+            pattern: '玩家',
+            updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+          ),
+        ],
+      );
+
+      // relatedVideoEnabled = true → filterRelatedVideos should block.
+      final result = ShieldingAdapters.filterRelatedVideos([video], blockRule);
+      expect(result, isEmpty);
+    });
+
+    test(
+      'filterRecommendationVideos still uses recommendationEnabled (unchanged)',
+      () {
+        final video = HotVideoItemModel.fromJson({
+          'aid': 1,
+          'cid': 2,
+          'bvid': 'BV1',
+          'videos': 1,
+          'tid': 17,
+          'tname': '游戏',
+          'copyright': 1,
+          'pic': '',
+          'title': '测试视频',
+          'pubdate': 1,
+          'ctime': 1,
+          'desc': '',
+          'duration': 300,
+          'owner': {'mid': 42, 'name': '玩家UP'},
+          'stat': {'view': 100, 'like': 10, 'danmaku': 5},
+        });
+
+        // recommendationEnabled = false → filterRecommendationVideos no-op.
+        final offRuleSet = ShieldRuleSet(
+          globalEnabled: true,
+          recommendationEnabled: false,
+          relatedVideoEnabled: true,
+          rules: [
+            ShieldRule(
+              id: 'block-all',
+              type: ShieldRuleType.userKeyword,
+              matchMode: ShieldMatchMode.contains,
+              scope: ShieldScope.recommendation,
+              action: ShieldAction.block,
+              pattern: '玩家',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            ),
+          ],
+        );
+
+        final result = ShieldingAdapters.filterRecommendationVideos([
+          video,
+        ], offRuleSet);
+        expect(
+          result.length,
+          1,
+        ); // Not filtered — recommendationEnabled is off.
+      },
+    );
+
+    test(
+      'duration range blocks related video through video detail scope',
+      () {
+        final blocked = _relatedVideo(
+          aid: 1,
+          title: '长视频',
+          duration: 720,
+          view: 5000,
+          danmaku: 50,
+        );
+        final visible = _relatedVideo(
+          aid: 2,
+          title: '短视频',
+          duration: 120,
+          view: 5000,
+          danmaku: 50,
+        );
+
+        final result = ShieldingAdapters.filterRelatedVideos(
+          [blocked, visible],
+          _videoDetailRangeRuleSet(
+            id: 'duration',
+            type: ShieldRuleType.duration,
+            pattern: '600..900',
+          ),
+        );
+
+        expect(result, [visible]);
+      },
+    );
+
+    test(
+      'playbackCount range blocks related video through video detail scope',
+      () {
+        final blocked = _relatedVideo(
+          aid: 1,
+          title: '热视频',
+          duration: 300,
+          view: 80000,
+          danmaku: 50,
+        );
+        final visible = _relatedVideo(
+          aid: 2,
+          title: '普通视频',
+          duration: 300,
+          view: 3000,
+          danmaku: 50,
+        );
+
+        final result = ShieldingAdapters.filterRelatedVideos(
+          [blocked, visible],
+          _videoDetailRangeRuleSet(
+            id: 'playback',
+            type: ShieldRuleType.playbackCount,
+            pattern: '50000..100000',
+          ),
+        );
+
+        expect(result, [visible]);
+      },
+    );
+
+    test(
+      'danmakuCount range blocks related video through video detail scope',
+      () {
+        final blocked = _relatedVideo(
+          aid: 1,
+          title: '弹幕视频',
+          duration: 300,
+          view: 5000,
+          danmaku: 900,
+        );
+        final visible = _relatedVideo(
+          aid: 2,
+          title: '安静视频',
+          duration: 300,
+          view: 5000,
+          danmaku: 20,
+        );
+
+        final result = ShieldingAdapters.filterRelatedVideos(
+          [blocked, visible],
+          _videoDetailRangeRuleSet(
+            id: 'danmaku',
+            type: ShieldRuleType.danmakuCount,
+            pattern: '500..1000',
+          ),
+        );
+
+        expect(result, [visible]);
+      },
+    );
+
+    test(
+      'relatedVideoEnabled false disables video detail range rules',
+      () {
+        final video = _relatedVideo(
+          aid: 1,
+          title: '长视频',
+          duration: 720,
+          view: 80000,
+          danmaku: 900,
+        );
+        final ruleSet = _videoDetailRangeRuleSet(
+          id: 'duration',
+          type: ShieldRuleType.duration,
+          pattern: '600..900',
+          relatedVideoEnabled: false,
+        );
+        final items = [video];
+
+        final result = ShieldingAdapters.filterRelatedVideos(items, ruleSet);
+
+        expect(identical(result, items), isTrue);
+        expect(result, [video]);
+      },
+    );
+
+    test(
+      'recommendationEnabled false does not disable filterRelatedVideos',
+      () {
+        final video = _relatedVideo(
+          aid: 1,
+          title: '长视频',
+          duration: 720,
+          view: 80000,
+          danmaku: 900,
+        );
+        final ruleSet = _videoDetailRangeRuleSet(
+          id: 'duration',
+          type: ShieldRuleType.duration,
+          pattern: '600..900',
+          recommendationEnabled: false,
+        );
+
+        final result = ShieldingAdapters.filterRelatedVideos([video], ruleSet);
+
+        expect(result, isEmpty);
+      },
+    );
+  });
+
+  group('task-066 new rule type matching', () {
+    test('descriptionKeyword blocks when description contains keyword', () {
+      const candidate = ShieldCandidate(
+        scope: ShieldScope.recommendation,
+        title: '测试',
+        description: '这是一个搬运视频，原视频来自YouTube',
+      );
+
+      final ruleSet = ShieldRuleSet(
+        rules: [
+          ShieldRule(
+            id: 'desc-kw',
+            type: ShieldRuleType.descriptionKeyword,
+            matchMode: ShieldMatchMode.contains,
+            scope: ShieldScope.recommendation,
+            action: ShieldAction.block,
+            pattern: '搬运',
+            updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+          ),
+        ],
+      );
+
+      expect(ShieldingAdapters.isVisible(candidate, ruleSet), isFalse);
+    });
+
+    test(
+      'descriptionKeyword allows when description does not contain keyword',
+      () {
+        const candidate = ShieldCandidate(
+          scope: ShieldScope.recommendation,
+          title: '测试',
+          description: '这是一个原创视频',
+        );
+
+        final ruleSet = ShieldRuleSet(
+          rules: [
+            ShieldRule(
+              id: 'desc-kw',
+              type: ShieldRuleType.descriptionKeyword,
+              matchMode: ShieldMatchMode.contains,
+              scope: ShieldScope.recommendation,
+              action: ShieldAction.block,
+              pattern: '搬运',
+              updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+            ),
+          ],
+        );
+
+        expect(ShieldingAdapters.isVisible(candidate, ruleSet), isTrue);
+      },
+    );
+
+    test('publishTime range blocks candidate within range', () {
+      const candidate = ShieldCandidate(
+        scope: ShieldScope.recommendation,
+        title: '旧视频',
+        pubdate: 1600000000, // Before 2021
+      );
+
+      final ruleSet = ShieldRuleSet(
+        rules: [
+          ShieldRule(
+            id: 'old-video',
+            type: ShieldRuleType.publishTime,
+            matchMode: ShieldMatchMode.range,
+            scope: ShieldScope.recommendation,
+            action: ShieldAction.block,
+            pattern: '..1640995200', // Before 2022-01-01
+            updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+          ),
+        ],
+      );
+
+      expect(ShieldingAdapters.isVisible(candidate, ruleSet), isFalse);
+    });
+
+    test('publishTime allows candidate outside range', () {
+      const candidate = ShieldCandidate(
+        scope: ShieldScope.recommendation,
+        title: '新视频',
+        pubdate: 1700000000, // After 2023
+      );
+
+      final ruleSet = ShieldRuleSet(
+        rules: [
+          ShieldRule(
+            id: 'old-video',
+            type: ShieldRuleType.publishTime,
+            matchMode: ShieldMatchMode.range,
+            scope: ShieldScope.recommendation,
+            action: ShieldAction.block,
+            pattern: '..1640995200',
+            updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+          ),
+        ],
+      );
+
+      expect(ShieldingAdapters.isVisible(candidate, ruleSet), isTrue);
+    });
+
+    test('isUpowerExclusive enum blocks charged videos', () {
+      const candidate = ShieldCandidate(
+        scope: ShieldScope.recommendation,
+        title: '充电视频',
+        isUpowerExclusive: true,
+      );
+
+      final ruleSet = ShieldRuleSet(
+        rules: [
+          ShieldRule(
+            id: 'no-charge',
+            type: ShieldRuleType.isUpowerExclusive,
+            matchMode: ShieldMatchMode.enumValue,
+            scope: ShieldScope.recommendation,
+            action: ShieldAction.block,
+            pattern: 'true',
+            updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+          ),
+        ],
+      );
+
+      expect(ShieldingAdapters.isVisible(candidate, ruleSet), isFalse);
+    });
+
+    test('isUpowerExclusive enum allows non-charged videos', () {
+      const candidate = ShieldCandidate(
+        scope: ShieldScope.recommendation,
+        title: '免费视频',
+        isUpowerExclusive: false,
+      );
+
+      final ruleSet = ShieldRuleSet(
+        rules: [
+          ShieldRule(
+            id: 'no-charge',
+            type: ShieldRuleType.isUpowerExclusive,
+            matchMode: ShieldMatchMode.enumValue,
+            scope: ShieldScope.recommendation,
+            action: ShieldAction.block,
+            pattern: 'true',
+            updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+          ),
+        ],
+      );
+
+      expect(ShieldingAdapters.isVisible(candidate, ruleSet), isTrue);
+    });
+
+    test('staffKeyword blocks when staffName matches', () {
+      const candidate = ShieldCandidate(
+        scope: ShieldScope.recommendation,
+        title: '测试',
+        staffNames: ['张三', '李四'],
+      );
+
+      final ruleSet = ShieldRuleSet(
+        rules: [
+          ShieldRule(
+            id: 'staff-zs',
+            type: ShieldRuleType.staffKeyword,
+            matchMode: ShieldMatchMode.contains,
+            scope: ShieldScope.recommendation,
+            action: ShieldAction.block,
+            pattern: '张三',
+            updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+          ),
+        ],
+      );
+
+      expect(ShieldingAdapters.isVisible(candidate, ruleSet), isFalse);
+    });
+
+    test('staffKeyword allows when no staffName matches', () {
+      const candidate = ShieldCandidate(
+        scope: ShieldScope.recommendation,
+        title: '测试',
+        staffNames: ['张三', '李四'],
+      );
+
+      final ruleSet = ShieldRuleSet(
+        rules: [
+          ShieldRule(
+            id: 'staff-wang',
+            type: ShieldRuleType.staffKeyword,
+            matchMode: ShieldMatchMode.contains,
+            scope: ShieldScope.recommendation,
+            action: ShieldAction.block,
+            pattern: '王五',
+            updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+          ),
+        ],
+      );
+
+      expect(ShieldingAdapters.isVisible(candidate, ruleSet), isTrue);
+    });
   });
 }
+
+ShieldRuleSet _userRegexRuleSet(String pattern) => ShieldRuleSet(
+  rules: [
+    ShieldRule(
+      id: 'up-regex-$pattern',
+      type: ShieldRuleType.userKeyword,
+      matchMode: ShieldMatchMode.regex,
+      scope: ShieldScope.recommendation,
+      action: ShieldAction.block,
+      pattern: pattern,
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+    ),
+  ],
+);
+
+HotVideoItemModel _relatedVideo({
+  required int aid,
+  required String title,
+  required int duration,
+  required int view,
+  required int danmaku,
+}) => HotVideoItemModel.fromJson({
+  'aid': aid,
+  'cid': aid + 100,
+  'bvid': 'BV$aid',
+  'videos': 1,
+  'tid': 17,
+  'tname': '游戏',
+  'copyright': 1,
+  'pic': '',
+  'title': title,
+  'pubdate': 1,
+  'ctime': 1,
+  'desc': '',
+  'duration': duration,
+  'owner': {'mid': 42, 'name': '玩家UP'},
+  'stat': {'view': view, 'like': 10, 'danmaku': danmaku},
+});
+
+ShieldRuleSet _videoDetailRangeRuleSet({
+  required String id,
+  required ShieldRuleType type,
+  required String pattern,
+  bool recommendationEnabled = true,
+  bool relatedVideoEnabled = true,
+}) => ShieldRuleSet(
+  globalEnabled: true,
+  recommendationEnabled: recommendationEnabled,
+  relatedVideoEnabled: relatedVideoEnabled,
+  rules: [
+    ShieldRule(
+      id: id,
+      type: type,
+      matchMode: ShieldMatchMode.range,
+      scope: ShieldScope.videoDetail,
+      action: ShieldAction.block,
+      pattern: pattern,
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+    ),
+  ],
+);
 
 class _TargetLookupController extends VideoReplyReplyController {
   _TargetLookupController({required int targetId})

@@ -1,9 +1,16 @@
+import 'package:PiliPlus/features/exposure_tracker/exposure_tracker_settings.dart';
+import 'package:PiliPlus/features/shielding/shielding_models.dart';
+import 'package:PiliPlus/features/shielding/shielding_recommend_tag_enricher.dart';
+import 'package:PiliPlus/features/shielding/shielding_store.dart';
 import 'package:PiliPlus/pages/rcmd/controller.dart';
 import 'package:PiliPlus/pages/setting/models/model.dart';
 import 'package:PiliPlus/utils/recommend_filter.dart';
+import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 
 List<SettingsModel> get recommendSettings => [
@@ -47,25 +54,63 @@ List<SettingsModel> get recommendSettings => [
       }
     },
   ),
-  getVideoFilterSelectModel(
-    title: '点赞率',
-    suffix: '%',
-    key: SettingBoxKey.minLikeRatioForRecommend,
-    values: [0, 1, 2, 3, 4],
-    onChanged: (value) => RecommendFilter.minLikeRatioForRecommend = value,
+  // Upstream recommend-filter entries hidden from UI (storage and business
+  // logic preserved). See Task-065.
+  // getVideoFilterSelectModel(
+  //   title: '点赞率',
+  //   suffix: '%',
+  //   key: SettingBoxKey.minLikeRatioForRecommend,
+  //   values: [0, 1, 2, 3, 4],
+  //   onChanged: (value) => RecommendFilter.minLikeRatioForRecommend = value,
+  // ),
+  // getVideoFilterSelectModel(
+  //   title: '视频时长',
+  //   suffix: 's',
+  //   key: SettingBoxKey.minDurationForRcmd,
+  //   values: [0, 30, 60, 90, 120],
+  //   onChanged: (value) => RecommendFilter.minDurationForRcmd = value,
+  // ),
+  // getVideoFilterSelectModel(
+  //   title: '播放量',
+  //   key: SettingBoxKey.minPlayForRcmd,
+  //   values: [0, 50, 100, 500, 1000],
+  //   onChanged: (value) => RecommendFilter.minPlayForRcmd = value,
+  // ),
+  _buildDerivedMetricModel(
+    title: '互动率过滤',
+    icon: Icons.forum_outlined,
+    switchKey: SettingBoxKey.filterInteractionRateForRecommend,
+    thresholdKey: SettingBoxKey.minInteractionRateForRecommend,
+    defaultThreshold: 1.0,
+    getThreshold: () => RecommendFilter.minInteractionRateForRecommend,
+    onSwitchChanged: (value) =>
+        RecommendFilter.filterInteractionRateForRecommend = value,
+    onThresholdChanged: (value) =>
+        RecommendFilter.minInteractionRateForRecommend = value,
   ),
-  getVideoFilterSelectModel(
-    title: '视频时长',
-    suffix: 's',
-    key: SettingBoxKey.minDurationForRcmd,
-    values: [0, 30, 60, 90, 120],
-    onChanged: (value) => RecommendFilter.minDurationForRcmd = value,
+  _buildDerivedMetricModel(
+    title: '三连率过滤',
+    icon: Icons.recommend_outlined,
+    switchKey: SettingBoxKey.filterTripleRateForRecommend,
+    thresholdKey: SettingBoxKey.minTripleRateForRecommend,
+    defaultThreshold: 3.0,
+    getThreshold: () => RecommendFilter.minTripleRateForRecommend,
+    onSwitchChanged: (value) =>
+        RecommendFilter.filterTripleRateForRecommend = value,
+    onThresholdChanged: (value) =>
+        RecommendFilter.minTripleRateForRecommend = value,
   ),
-  getVideoFilterSelectModel(
-    title: '播放量',
-    key: SettingBoxKey.minPlayForRcmd,
-    values: [0, 50, 100, 500, 1000],
-    onChanged: (value) => RecommendFilter.minPlayForRcmd = value,
+  _buildDerivedMetricModel(
+    title: '内容价值过滤',
+    icon: Icons.workspace_premium_outlined,
+    switchKey: SettingBoxKey.filterContentValueForRecommend,
+    thresholdKey: SettingBoxKey.minContentValueForRecommend,
+    defaultThreshold: 10.0,
+    getThreshold: () => RecommendFilter.minContentValueForRecommend,
+    onSwitchChanged: (value) =>
+        RecommendFilter.filterContentValueForRecommend = value,
+    onThresholdChanged: (value) =>
+        RecommendFilter.minContentValueForRecommend = value,
   ),
   SwitchModel(
     title: '已关注UP豁免推荐过滤',
@@ -83,4 +128,582 @@ List<SettingsModel> get recommendSettings => [
     defaultVal: true,
     onChanged: (value) => RecommendFilter.applyFilterToRelatedVideos = value,
   ),
+  SwitchModel(
+    title: '相关视频屏蔽',
+    subtitle: '独立控制视频详情页相关视频的屏蔽规则是否生效',
+    leading: const Icon(Icons.shield_outlined),
+    setKey: ShieldBoxKey.relatedVideoEnabled,
+    defaultVal: true,
+    onChanged: (value) => ShieldSettingsStore().setRelatedVideoEnabled(value),
+  ),
+  _buildRangeShieldingModel(
+    title: '相关视频时长过滤',
+    icon: Icons.hourglass_empty_outlined,
+    type: ShieldRuleType.duration,
+    scope: ShieldScope.videoDetail,
+  ),
+  _buildRangeShieldingModel(
+    title: '相关视频播放量过滤',
+    icon: Icons.play_circle_outline,
+    type: ShieldRuleType.playbackCount,
+    scope: ShieldScope.videoDetail,
+  ),
+  _buildRangeShieldingModel(
+    title: '相关视频弹幕量过滤',
+    icon: Icons.chat_bubble_outline,
+    type: ShieldRuleType.danmakuCount,
+    scope: ShieldScope.videoDetail,
+  ),
+  _buildNumberInputModel(
+    title: '标签获取并发数',
+    icon: Icons.memory_outlined,
+    key: SettingBoxKey.tagEnrichConcurrency,
+    defaultVal: 5,
+    min: 1,
+    max: 10,
+  ),
+  _buildNumberInputModel(
+    title: '标签获取超时',
+    icon: Icons.timer_outlined,
+    key: SettingBoxKey.tagEnrichTimeout,
+    defaultVal: 3,
+    min: 1,
+    max: 10,
+    suffix: 's',
+  ),
+  _buildNumberInputModel(
+    title: '标签缓存上限',
+    icon: Icons.storage_outlined,
+    key: SettingBoxKey.tagEnrichCacheMaxMb,
+    defaultVal: 10,
+    min: 1,
+    max: 50,
+    suffix: 'MB',
+  ),
+  NormalModel(
+    title: '标签缓存状态',
+    leading: const Icon(Icons.cached_outlined),
+    getSubtitle: () {
+      final count = RecommendationTagEnricher.cacheEntryCount;
+      final bytes = RecommendationTagEnricher.cacheEstimatedBytes;
+      final usedMb = bytes / (1024 * 1024);
+      final maxMb = tagEnrichCacheMaxMb;
+      return '${usedMb.toStringAsFixed(2)} / $maxMb MB，$count 条（点击可清空缓存）';
+    },
+    onTap: (context, setState) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('清空标签缓存'),
+          content: const Text('缓存清空后，下一轮推荐会重新获取视频标签。'),
+          actions: [
+            TextButton(
+              onPressed: Get.back,
+              child: Text(
+                '取消',
+                style: TextStyle(color: ColorScheme.of(ctx).outline),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                RecommendationTagEnricher.resetCache();
+                Get.back();
+                setState();
+                SmartDialog.showToast('标签缓存已清空');
+              },
+              child: const Text('清空'),
+            ),
+          ],
+        ),
+      );
+    },
+  ),
+  _buildRangeShieldingModel(
+    title: '时长过滤',
+    icon: Icons.hourglass_empty_outlined,
+    type: ShieldRuleType.duration,
+  ),
+  _buildRangeShieldingModel(
+    title: '播放量过滤',
+    icon: Icons.play_circle_outline,
+    type: ShieldRuleType.playbackCount,
+  ),
+  _buildRangeShieldingModel(
+    title: '弹幕量过滤',
+    icon: Icons.chat_bubble_outline,
+    type: ShieldRuleType.danmakuCount,
+  ),
+  ...exposureTrackerSettings(buildNumberInputModel: _buildNumberInputModel),
 ];
+
+SettingsModel _buildDerivedMetricModel({
+  required String title,
+  required IconData icon,
+  required String switchKey,
+  required String thresholdKey,
+  required double defaultThreshold,
+  required ValueGetter<double> getThreshold,
+  required ValueChanged<bool> onSwitchChanged,
+  required ValueChanged<double> onThresholdChanged,
+}) {
+  double value = GStorage.setting.get(
+    thresholdKey,
+    defaultValue: defaultThreshold,
+  );
+  return SplitModel(
+    normalModel: NormalModel.split(
+      title: title,
+      leading: Icon(icon),
+      getSubtitle: () =>
+          '当前: ${value.toStringAsFixed(1)}%（默认${defaultThreshold.toStringAsFixed(1)}%）',
+    ),
+    switchModel: SwitchModel.split(
+      setKey: switchKey,
+      defaultVal: false,
+      onChanged: onSwitchChanged,
+      onTap: (context) async {
+        String valueStr = getThreshold().toStringAsFixed(1);
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(title),
+            content: TextField(
+              autofocus: true,
+              controller: TextEditingController(text: valueStr),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
+              decoration: const InputDecoration(suffixText: '%'),
+              onChanged: (v) => valueStr = v,
+            ),
+            actions: [
+              TextButton(
+                onPressed: Get.back,
+                child: Text(
+                  '取消',
+                  style: TextStyle(color: ColorScheme.of(ctx).outline),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  final parsed = double.tryParse(valueStr);
+                  if (parsed == null || parsed < 0) {
+                    SmartDialog.showToast('请输入有效百分比');
+                    return;
+                  }
+                  value = parsed;
+                  onThresholdChanged(value);
+                  GStorage.setting.put(thresholdKey, value);
+                  Get.back();
+                  SmartDialog.showToast('已保存: ${value.toStringAsFixed(1)}%');
+                },
+                child: const Text('确定'),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
+SettingsModel _buildNumberInputModel({
+  required String title,
+  required IconData icon,
+  required String key,
+  required int defaultVal,
+  required int min,
+  required int max,
+  String? suffix,
+}) {
+  int value = GStorage.setting.get(key, defaultValue: defaultVal);
+  return NormalModel(
+    title: title,
+    leading: Icon(icon),
+    getSubtitle: () {
+      final suffixStr = suffix ?? '';
+      return '当前: $value$suffixStr（默认$defaultVal$suffixStr，范围$min–$max）';
+    },
+    onTap: (context, setState) async {
+      String valueStr = '';
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(title),
+          content: TextField(
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: InputDecoration(
+              hintText: '$defaultVal',
+              suffixText: suffix,
+            ),
+            onChanged: (v) => valueStr = v,
+          ),
+          actions: [
+            TextButton(
+              onPressed: Get.back,
+              child: Text(
+                '取消',
+                style: TextStyle(color: ColorScheme.of(ctx).outline),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                final parsed = int.tryParse(
+                  valueStr.isEmpty ? '$defaultVal' : valueStr,
+                );
+                if (parsed == null) {
+                  SmartDialog.showToast('请输入有效数字');
+                  return;
+                }
+                value = parsed.clamp(min, max).toInt();
+                GStorage.setting.put(key, value);
+                Get.back();
+                setState();
+                SmartDialog.showToast('已保存: $value');
+              },
+              child: const Text('确定'),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+/// Builds a singleton range-shielding settings model for a numeric dimension
+/// (duration, playbackCount, danmakuCount). Each dimension has exactly one
+/// rule: the user sets min/max bounds via an inline dialog.
+SettingsModel _buildRangeShieldingModel({
+  required String title,
+  required IconData icon,
+  required ShieldRuleType type,
+  ShieldScope scope = ShieldScope.recommendation,
+}) {
+  final store = ShieldSettingsStore();
+
+  ({String? lower, String? upper}) findRangeThresholds() {
+    final snapshot = store.snapshot();
+    String? lower;
+    String? upper;
+    for (final rule in snapshot.rules) {
+      if (rule.type == type &&
+          rule.scope == scope &&
+          rule.matchMode == ShieldMatchMode.range) {
+        final parsed = _parseRangeFields(rule.pattern);
+        if (parsed.min.isEmpty && parsed.max.isNotEmpty) {
+          // "..X" pattern -> lower-side threshold (block values <= X).
+          lower = parsed.max;
+        } else if (parsed.min.isNotEmpty && parsed.max.isEmpty) {
+          // "Y.." pattern -> upper-side threshold (block values >= Y).
+          upper = parsed.min;
+        } else if (parsed.min.isNotEmpty && parsed.max.isNotEmpty) {
+          // Legacy bounded "A..B" — derive defensively:
+          // treat A as lower threshold, B as upper threshold.
+          lower ??= parsed.min;
+          upper ??= parsed.max;
+        }
+      }
+    }
+    return (lower: lower, upper: upper);
+  }
+
+  String formatSubtitle(String? lower, String? upper) {
+    if ((lower == null || lower.isEmpty) && (upper == null || upper.isEmpty)) {
+      return '未设置';
+    }
+    if (lower != null &&
+        lower.isNotEmpty &&
+        upper != null &&
+        upper.isNotEmpty) {
+      return '屏蔽 ≤ $lower 及 ≥ $upper';
+    }
+    if (lower != null && lower.isNotEmpty) return '屏蔽 ≤ $lower';
+    return '屏蔽 ≥ ${upper ?? ''}';
+  }
+
+  return NormalModel(
+    title: title,
+    leading: Icon(icon),
+    getSubtitle: () {
+      final t = findRangeThresholds();
+      return formatSubtitle(t.lower, t.upper);
+    },
+    onTap: (context, setState) async {
+      final t = findRangeThresholds();
+      await _openRangeShieldingDialog(
+        context,
+        type,
+        store,
+        scope: scope,
+        title: title,
+        lowerInit: t.lower,
+        upperInit: t.upper,
+      );
+      setState();
+    },
+  );
+}
+
+/// Opens a dialog to edit the singleton range-shielding rule for [type].
+Future<void> _openRangeShieldingDialog(
+  BuildContext context,
+  ShieldRuleType type,
+  ShieldSettingsStore store, {
+  required ShieldScope scope,
+  required String title,
+  String? lowerInit,
+  String? upperInit,
+}) async {
+  String minStr = lowerInit ?? '';
+  String maxStr = upperInit ?? '';
+
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextFormField(
+                  key: ValueKey('range-min-$minStr'),
+                  autofocus: true,
+                  initialValue: minStr,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: const InputDecoration(
+                    labelText: '屏蔽 ≤',
+                    hintText: '留空不限',
+                  ),
+                  onChanged: (v) => minStr = v,
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(top: 16, left: 8, right: 8),
+                child: Text('—', style: TextStyle(fontSize: 20)),
+              ),
+              Expanded(
+                child: TextFormField(
+                  key: ValueKey('range-max-$maxStr'),
+                  initialValue: maxStr,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: const InputDecoration(
+                    labelText: '屏蔽 ≥',
+                    hintText: '留空不限',
+                  ),
+                  onChanged: (v) => maxStr = v,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Builder(
+            builder: (context) {
+              final hint = _rangeHint(minStr, maxStr);
+              return SizedBox(
+                width: double.infinity,
+                child: Text(
+                  hint.text,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: hint.isError
+                        ? ColorScheme.of(context).error
+                        : ColorScheme.of(context).outline,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: Get.back,
+          child: Text(
+            '取消',
+            style: TextStyle(color: ColorScheme.of(ctx).outline),
+          ),
+        ),
+        TextButton(
+          onPressed: () async {
+            final min = minStr.trim();
+            final max = maxStr.trim();
+            if (min.isEmpty && max.isEmpty) {
+              SmartDialog.showToast('至少填写一个阈值');
+              return;
+            }
+            final minNum = min.isNotEmpty ? int.tryParse(min) : null;
+            final maxNum = max.isNotEmpty ? int.tryParse(max) : null;
+            if (min.isNotEmpty && minNum == null) {
+              SmartDialog.showToast('下限格式无效');
+              return;
+            }
+            if (max.isNotEmpty && maxNum == null) {
+              SmartDialog.showToast('上限格式无效');
+              return;
+            }
+            if (minNum != null && maxNum != null && minNum > maxNum) {
+              SmartDialog.showToast('下限不能大于上限');
+              return;
+            }
+
+            try {
+              await _saveRangeShieldingRules(
+                store: store,
+                type: type,
+                scope: scope,
+                lower: min,
+                upper: max,
+              );
+              Get.back();
+              SmartDialog.showToast('已保存');
+            } catch (e) {
+              SmartDialog.showToast(e.toString());
+            }
+          },
+          child: const Text('确定'),
+        ),
+      ],
+    ),
+  );
+}
+
+@visibleForTesting
+Future<void> saveRangeShieldingRulesForTesting({
+  required ShieldSettingsStore store,
+  required ShieldRuleType type,
+  required ShieldScope scope,
+  required String lower,
+  required String upper,
+}) => _saveRangeShieldingRules(
+  store: store,
+  type: type,
+  scope: scope,
+  lower: lower,
+  upper: upper,
+);
+
+Future<void> _saveRangeShieldingRules({
+  required ShieldSettingsStore store,
+  required ShieldRuleType type,
+  required ShieldScope scope,
+  required String lower,
+  required String upper,
+}) async {
+  final min = lower.trim();
+  final max = upper.trim();
+  final ruleSet = await store.load();
+  // Remove ALL existing range rules for this type+scope.
+  final newRules = ruleSet.rules
+      .where(
+        (rule) =>
+            !(rule.type == type &&
+                rule.scope == scope &&
+                rule.matchMode == ShieldMatchMode.range),
+      )
+      .toList();
+
+  final now = DateTime.now();
+  final baseId = 'range-${now.microsecondsSinceEpoch}';
+
+  // Persist the lower-side threshold as "..X"; range matching is inclusive,
+  // so this blocks values <= X.
+  if (min.isNotEmpty) {
+    newRules.add(
+      ShieldRule(
+        id: max.isEmpty ? baseId : '$baseId-lo',
+        type: type,
+        matchMode: ShieldMatchMode.range,
+        scope: scope,
+        action: ShieldAction.block,
+        pattern: '..$min',
+        enabled: true,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  // Persist the upper-side threshold as "Y.."; range matching is inclusive,
+  // so this blocks values >= Y.
+  if (max.isNotEmpty) {
+    newRules.add(
+      ShieldRule(
+        id: min.isEmpty ? baseId : '$baseId-hi',
+        type: type,
+        matchMode: ShieldMatchMode.range,
+        scope: scope,
+        action: ShieldAction.block,
+        pattern: '$max..',
+        enabled: true,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  await store.save(ruleSet.copyWith(rules: newRules));
+}
+
+/// Parses a range pattern string into separate min/max field values.
+///
+/// Handles "min..max", "min..", "..max", and exact "N" patterns.
+({String min, String max}) _parseRangeFields(String? pattern) {
+  if (pattern == null || pattern.trim().isEmpty) {
+    return (min: '', max: '');
+  }
+  final trimmed = pattern.trim();
+  final match = RegExp(
+    r'^\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+)?)\s*\.\.\s*'
+    r'([+-]?(?:\d+(?:\.\d+)?|\.\d+)?)\s*$',
+  ).firstMatch(trimmed);
+  if (match != null) {
+    final m = match.group(1)?.trim();
+    final x = match.group(2)?.trim();
+    return (
+      min: (m != null && m.isNotEmpty) ? m : '',
+      max: (x != null && x.isNotEmpty) ? x : '',
+    );
+  }
+  // Treat bare number as exact match (min == max).
+  final exact = num.tryParse(trimmed);
+  if (exact != null) {
+    return (min: trimmed, max: trimmed);
+  }
+  return (min: '', max: '');
+}
+
+/// Returns a hint about the current range values, or an error if invalid.
+({String text, bool isError}) _rangeHint(String minStr, String maxStr) {
+  final min = minStr.trim();
+  final max = maxStr.trim();
+  if (min.isEmpty && max.isEmpty) {
+    return (text: '至少填写一个值', isError: true);
+  }
+  final minNum = min.isNotEmpty ? int.tryParse(min) : null;
+  final maxNum = max.isNotEmpty ? int.tryParse(max) : null;
+  if (min.isNotEmpty && minNum == null) {
+    return (text: '下限格式无效', isError: true);
+  }
+  if (max.isNotEmpty && maxNum == null) {
+    return (text: '上限格式无效', isError: true);
+  }
+  if (minNum != null && maxNum != null && minNum > maxNum) {
+    return (text: '下限不能大于上限', isError: true);
+  }
+  // Boundary-shield hint: range matching is inclusive.
+  if (minNum != null && maxNum != null) {
+    return (text: '屏蔽 ≤ $minNum 及 ≥ $maxNum', isError: false);
+  }
+  if (minNum != null) {
+    return (text: '屏蔽 ≤ $minNum', isError: false);
+  }
+  return (text: '屏蔽 ≥ $maxNum', isError: false);
+}

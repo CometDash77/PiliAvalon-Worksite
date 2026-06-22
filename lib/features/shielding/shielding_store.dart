@@ -45,6 +45,7 @@ class ShieldSettingsStore {
   static const commentEnabledKey = '$namespace.comment_enabled';
   static const versionKey = '$namespace.version';
   static const lastLoadedAtKey = '$namespace.last_loaded_at';
+  static const relatedVideoEnabledKey = '$namespace.related_video_enabled';
   static const legacyTextImportedKey = '$namespace.legacy_text_imported';
 
   final ShieldSettingsBox _box;
@@ -74,6 +75,9 @@ class ShieldSettingsStore {
             ruleSet.recommendationEnabled,
         commentEnabled:
             _box.get(commentEnabledKey) as bool? ?? ruleSet.commentEnabled,
+        relatedVideoEnabled:
+            _box.get(relatedVideoEnabledKey) as bool? ??
+            ruleSet.relatedVideoEnabled,
         version: _box.get(versionKey) as int? ?? ruleSet.version,
         lastLoadedAt: loadedEpoch == null
             ? loadedAt
@@ -99,6 +103,8 @@ class ShieldSettingsStore {
             recommendationEnabled:
                 _box.get(recommendationEnabledKey) as bool? ?? true,
             commentEnabled: _box.get(commentEnabledKey) as bool? ?? true,
+            relatedVideoEnabled:
+                _box.get(relatedVideoEnabledKey) as bool? ?? true,
             version: _box.get(versionKey) as int? ?? 1,
           ),
         ),
@@ -119,6 +125,9 @@ class ShieldSettingsStore {
             ruleSet.recommendationEnabled,
         commentEnabled:
             _box.get(commentEnabledKey) as bool? ?? ruleSet.commentEnabled,
+        relatedVideoEnabled:
+            _box.get(relatedVideoEnabledKey) as bool? ??
+            ruleSet.relatedVideoEnabled,
         version: _box.get(versionKey) as int? ?? ruleSet.version,
         lastLoadedAt: loadedEpoch == null
             ? ruleSet.lastLoadedAt
@@ -147,6 +156,7 @@ class ShieldSettingsStore {
         resolved.recommendationEnabled,
       );
       await _box.put(commentEnabledKey, resolved.commentEnabled);
+      await _box.put(relatedVideoEnabledKey, resolved.relatedVideoEnabled);
       await _box.put(versionKey, resolved.version);
       await _box.put(legacyTextImportedKey, true);
       _cachedSnapshot = resolved;
@@ -159,8 +169,10 @@ class ShieldSettingsStore {
     required ShieldRuleType type,
     required ShieldScope scope,
     required String pattern,
-    ShieldMatchMode matchMode = ShieldMatchMode.exact,
+    ShieldMatchMode? matchMode,
+    String? displayPattern,
   }) async {
+    final effectiveMode = matchMode ?? _defaultMatchMode(type);
     final trimmed = pattern.trim();
     if (trimmed.isEmpty) {
       throw const ShieldStoreException('Rule pattern is empty');
@@ -172,7 +184,7 @@ class ShieldSettingsStore {
       (rule) =>
           rule.type == type &&
           rule.scope == scope &&
-          rule.matchMode == matchMode &&
+          rule.matchMode == effectiveMode &&
           rule.pattern.trim().toLowerCase() == normalized,
     );
     if (exists) return null;
@@ -180,10 +192,11 @@ class ShieldSettingsStore {
     final rule = ShieldRule(
       id: 'quickAction-${DateTime.now().microsecondsSinceEpoch}',
       type: type,
-      matchMode: matchMode,
+      matchMode: effectiveMode,
       scope: scope,
       action: ShieldAction.block,
       pattern: trimmed,
+      displayPattern: displayPattern,
       enabled: true,
       updatedAt: DateTime.now(),
       source: ShieldRuleSource.quickAction,
@@ -207,11 +220,17 @@ class ShieldSettingsStore {
     _cachedSnapshot = snapshot().copyWith(commentEnabled: enabled);
   }
 
+  Future<void> setRelatedVideoEnabled(bool enabled) async {
+    await _box.put(relatedVideoEnabledKey, enabled);
+    _cachedSnapshot = snapshot().copyWith(relatedVideoEnabled: enabled);
+  }
+
   Future<void> clear() async {
     await _box.delete(rulesKey);
     await _box.delete(globalEnabledKey);
     await _box.delete(recommendationEnabledKey);
     await _box.delete(commentEnabledKey);
+    await _box.delete(relatedVideoEnabledKey);
     await _box.delete(versionKey);
     await _box.delete(lastLoadedAtKey);
     await _box.delete(legacyTextImportedKey);
@@ -231,13 +250,19 @@ class ShieldSettingsStore {
           errors.add('Rule ${rule.id} has invalid regex');
         }
       }
+      if (rule.matchMode == ShieldMatchMode.range) {
+        final rangeError = _rangeValidationError(rule.pattern);
+        if (rangeError != null) {
+          errors.add('Rule ${rule.id} has invalid range: $rangeError');
+        }
+      }
     }
     return errors;
   }
 
   ShieldRuleSet _normalizeRuleSet(ShieldRuleSet ruleSet) {
     final normalized = <ShieldRule>[];
-    for (final rule in ruleSet.rules.map(_deprecateTokenRule)) {
+    for (final rule in ruleSet.rules.map(_upgradeExactKeywordToContains)) {
       final exists = normalized.any(
         (item) =>
             item.type == rule.type &&
@@ -254,12 +279,54 @@ class ShieldSettingsStore {
     return ruleSet.copyWith(rules: normalized);
   }
 
-  ShieldRule _deprecateTokenRule(ShieldRule rule) {
-    if (rule.matchMode != ShieldMatchMode.token) return rule;
-    return rule.copyWith(
-      matchMode: ShieldMatchMode.regex,
-      pattern: shieldTokenPatternRegex(rule.pattern),
-    );
+  ShieldRule _upgradeExactKeywordToContains(ShieldRule rule) {
+    if (rule.matchMode != ShieldMatchMode.exact) return rule;
+    if (rule.type != ShieldRuleType.keyword &&
+        rule.type != ShieldRuleType.reasonKeyword) {
+      return rule;
+    }
+    return rule.copyWith(matchMode: ShieldMatchMode.contains);
+  }
+
+  ShieldMatchMode _defaultMatchMode(ShieldRuleType type) {
+    return switch (type) {
+      ShieldRuleType.keyword || ShieldRuleType.reasonKeyword =>
+        ShieldMatchMode.contains,
+      ShieldRuleType.duration ||
+      ShieldRuleType.playbackCount ||
+      ShieldRuleType.danmakuCount ||
+      ShieldRuleType.commentMemberLevel ||
+      ShieldRuleType.publishTime => ShieldMatchMode.range,
+      ShieldRuleType.commentMemberSex ||
+      ShieldRuleType.isUpowerExclusive => ShieldMatchMode.enumValue,
+      ShieldRuleType.descriptionKeyword ||
+      ShieldRuleType.staffKeyword => ShieldMatchMode.contains,
+      _ => ShieldMatchMode.exact,
+    };
+  }
+
+  String? _rangeValidationError(String pattern) {
+    final trimmed = pattern.trim();
+    if (trimmed.isEmpty) return 'empty range';
+    final match = RegExp(
+      r'^\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+)?)\s*\.\.\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+)?)\s*$',
+    ).firstMatch(trimmed);
+    if (match != null) {
+      final min = _parseBound(match.group(1));
+      final max = _parseBound(match.group(2));
+      if (min == null && max == null) return 'missing bounds';
+      if (min != null && max != null && min > max) {
+        return 'min greater than max';
+      }
+      return null;
+    }
+    return num.tryParse(trimmed) == null ? 'expected min..max' : null;
+  }
+
+  num? _parseBound(String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+    return num.tryParse(trimmed);
   }
 
   ShieldRuleSet _withLegacyRules(ShieldRuleSet ruleSet) {

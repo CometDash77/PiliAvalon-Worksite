@@ -26,6 +26,74 @@ void main() {
       expect(options, isEmpty);
     });
 
+    test('rejects comment decoration rule types', () async {
+      final store = ShieldSettingsStore(box: _MemoryBox());
+
+      await VideoCardShieldQuickAction.quickRule(
+        type: ShieldRuleType.avatarPendant,
+        pattern: 'https://i0.hdslb.com/pendant.png',
+        store: store,
+      );
+      await VideoCardShieldQuickAction.quickRule(
+        type: ShieldRuleType.garb,
+        pattern: 'NO.0001',
+        store: store,
+      );
+
+      expect((await store.load()).rules, isEmpty);
+    });
+
+    test('quickRule accepts explicit approved scope', () async {
+      final store = ShieldSettingsStore(box: _MemoryBox());
+
+      await VideoCardShieldQuickAction.quickRule(
+        type: ShieldRuleType.keyword,
+        pattern: '动态关键词',
+        scope: ShieldScope.dynamic,
+        store: store,
+      );
+
+      final rules = (await store.load()).rules;
+      expect(rules, hasLength(1));
+      expect(rules.single.scope, ShieldScope.dynamic);
+      expect(rules.single.matchMode, ShieldMatchMode.contains);
+      expect(rules.single.pattern, '动态关键词');
+    });
+
+    testWidgets('text dialog creates video detail description rule', (
+      tester,
+    ) async {
+      final store = ShieldSettingsStore(box: _MemoryBox());
+
+      await _pumpLauncher(
+        tester,
+        onTap: (context) => VideoCardShieldQuickAction.showTextDialog(
+          context: context,
+          title: '视频简介',
+          text: '这是一段视频简介',
+          type: ShieldRuleType.descriptionKeyword,
+          scope: ShieldScope.videoDetail,
+          store: store,
+        ),
+      );
+
+      await tester.tap(find.text('打开'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('视频简介'), findsOneWidget);
+      expect(find.text('这是一段视频简介'), findsOneWidget);
+
+      await tester.tap(find.text('屏蔽'));
+      await tester.pumpAndSettle();
+
+      final rules = (await store.load()).rules;
+      expect(rules, hasLength(1));
+      expect(rules.single.type, ShieldRuleType.descriptionKeyword);
+      expect(rules.single.scope, ShieldScope.videoDetail);
+      expect(rules.single.matchMode, ShieldMatchMode.contains);
+      expect(rules.single.pattern, '这是一段视频简介');
+    });
+
     testWidgets('recommendation dialog shows editable title and UP inputs', (
       tester,
     ) async {
@@ -120,6 +188,7 @@ void main() {
       expect(rules.single.scope, ShieldScope.recommendation);
       expect(rules.single.matchMode, ShieldMatchMode.regex);
       expect(rules.single.pattern, shieldTokenPatternRegex('编辑后UP'));
+      expect(rules.single.displayPattern, '编辑后UP');
     });
 
     testWidgets('UP keyword regex escapes edited metacharacters', (
@@ -152,6 +221,7 @@ void main() {
         rules.single.pattern,
         shieldTokenPatternRegex(r'UP(.*)'),
       );
+      expect(rules.single.displayPattern, r'UP(.*)');
     });
 
     testWidgets('recommendation reason action creates reason keyword rule', (
@@ -179,7 +249,7 @@ void main() {
       expect(rules, hasLength(1));
       expect(rules.single.type, ShieldRuleType.reasonKeyword);
       expect(rules.single.scope, ShieldScope.recommendation);
-      expect(rules.single.matchMode, ShieldMatchMode.exact);
+      expect(rules.single.matchMode, ShieldMatchMode.contains);
       expect(rules.single.pattern, '因为你看过游戏攻略');
     });
 

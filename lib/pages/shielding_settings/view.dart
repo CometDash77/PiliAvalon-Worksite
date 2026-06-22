@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use, prefer_initializing_formals, unnecessary_lambdas
+
 import 'package:PiliPlus/common/widgets/flutter/list_tile.dart' as custom;
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/pages/setting/models/shielding_settings.dart';
@@ -21,8 +23,31 @@ class ShieldingSettingsPage extends StatefulWidget {
 
 class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
   static const _visibleMatchModes = [
+    ShieldMatchMode.contains,
     ShieldMatchMode.exact,
     ShieldMatchMode.regex,
+    ShieldMatchMode.range,
+    ShieldMatchMode.enumValue,
+  ];
+
+  static const _visibleRuleTypes = [
+    ShieldRuleType.keyword,
+    ShieldRuleType.userKeyword,
+    ShieldRuleType.reasonKeyword,
+    ShieldRuleType.uid,
+    ShieldRuleType.category,
+    ShieldRuleType.tag,
+    ShieldRuleType.duration,
+    ShieldRuleType.playbackCount,
+    ShieldRuleType.danmakuCount,
+    ShieldRuleType.commentMemberSex,
+    ShieldRuleType.commentMemberLevel,
+    ShieldRuleType.avatarPendant,
+    ShieldRuleType.garb,
+    ShieldRuleType.descriptionKeyword,
+    ShieldRuleType.publishTime,
+    ShieldRuleType.isUpowerExclusive,
+    ShieldRuleType.staffKeyword,
   ];
 
   late final _store = widget.store ?? ShieldSettingsStore();
@@ -240,7 +265,8 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
     final rawMode = rule?.matchMode;
     ShieldMatchMode mode = rawMode == ShieldMatchMode.token
         ? ShieldMatchMode.regex
-        : rawMode ?? ShieldMatchMode.exact;
+        : rawMode ??
+            _defaultEditorMode(type);
     ShieldScope scope = rule?.scope ?? ShieldScope.both;
     ShieldAction action = rule?.action ?? ShieldAction.block;
     bool enabled = rule?.enabled ?? true;
@@ -265,9 +291,14 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
                 _dropdown(
                   label: '类型',
                   value: type,
-                  values: ShieldRuleType.values,
+                  values: _visibleRuleTypes,
                   text: shieldRuleTypeLabel,
-                  onChanged: (value) => setDialogState(() => type = value),
+                  onChanged: (value) => setDialogState(() {
+                    type = value;
+                    if (!_modeFitsType(mode, type)) {
+                      mode = _defaultEditorMode(type);
+                    }
+                  }),
                 ),
                 _dropdown(
                   label: '匹配方式',
@@ -315,6 +346,11 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
                     SmartDialog.showToast('正则表达式无效');
                     return;
                   }
+                }
+                if (mode == ShieldMatchMode.range &&
+                    !_isValidRangePattern(trimmed)) {
+                  SmartDialog.showToast('数值范围无效');
+                  return;
                 }
                 Get.back(
                   result: ShieldRule(
@@ -369,5 +405,56 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
         if (value != null) onChanged(value);
       },
     );
+  }
+
+  ShieldMatchMode _defaultEditorMode(ShieldRuleType type) {
+    return switch (type) {
+      ShieldRuleType.keyword || ShieldRuleType.reasonKeyword =>
+        ShieldMatchMode.contains,
+      ShieldRuleType.duration ||
+      ShieldRuleType.playbackCount ||
+      ShieldRuleType.danmakuCount ||
+      ShieldRuleType.commentMemberLevel ||
+      ShieldRuleType.publishTime => ShieldMatchMode.range,
+      ShieldRuleType.commentMemberSex ||
+      ShieldRuleType.isUpowerExclusive => ShieldMatchMode.enumValue,
+      ShieldRuleType.descriptionKeyword ||
+      ShieldRuleType.staffKeyword => ShieldMatchMode.contains,
+      _ => ShieldMatchMode.exact,
+    };
+  }
+
+  bool _modeFitsType(ShieldMatchMode mode, ShieldRuleType type) {
+    return switch (mode) {
+      ShieldMatchMode.range =>
+        type == ShieldRuleType.duration ||
+            type == ShieldRuleType.playbackCount ||
+            type == ShieldRuleType.danmakuCount ||
+            type == ShieldRuleType.commentMemberLevel ||
+            type == ShieldRuleType.publishTime,
+      ShieldMatchMode.enumValue =>
+        type == ShieldRuleType.commentMemberSex ||
+            type == ShieldRuleType.isUpowerExclusive,
+      _ => true,
+    };
+  }
+
+  bool _isValidRangePattern(String pattern) {
+    final match = RegExp(
+      r'^\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+)?)\s*\.\.\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+)?)\s*$',
+    ).firstMatch(pattern);
+    if (match != null) {
+      final min = _parseRangeBound(match.group(1));
+      final max = _parseRangeBound(match.group(2));
+      if (min == null && max == null) return false;
+      return min == null || max == null || min <= max;
+    }
+    return num.tryParse(pattern) != null;
+  }
+
+  num? _parseRangeBound(String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+    return num.tryParse(trimmed);
   }
 }
