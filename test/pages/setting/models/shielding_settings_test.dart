@@ -596,6 +596,8 @@ void main() {
     testWidgets('new-rule dialog type dropdown includes decoration types', (
       tester,
     ) async {
+      _setLargeTestSurface(tester);
+
       await tester.pumpWidget(
         GetMaterialApp(
           home: ShieldingSettingsPage(
