@@ -10,40 +10,40 @@
   ![GitHub Repo stars](https://img.shields.io/github/stars/CometDash77/PiliAvalon-Worksite)
   ![GitHub all releases](https://img.shields.io/github/downloads/CometDash77/PiliAvalon-Worksite/total)
 
-  [Download stable release](https://github.com/CometDash77/PiliAvalon-Worksite/releases/tag/v1.0.0) · [中文](README.md) · [Source](https://github.com/CometDash77/PiliAvalon-Worksite)
+  [Download stable release](https://github.com/CometDash77/PiliAvalon-Worksite/releases/tag/v2.0.9%2B5218) · [中文](README.md) · [Source](https://github.com/CometDash77/PiliAvalon-Worksite)
 </div>
 
 ## Download
 
-Current stable release: **PiliAvalon v1.0.0**
+Current stable release: **PiliAvalon v2.0.9+5218**
 
-- Release: https://github.com/CometDash77/PiliAvalon-Worksite/releases/tag/v1.0.0
+- Release: https://github.com/CometDash77/PiliAvalon-Worksite/releases/tag/v2.0.9%2B5218
 - Status: stable / latest
-- Source commit: `5ccc9bf243bab2c5f143032bd2549016a5b857da`
-- APK version string: `2.0.8-5ccc9bf24+5099`
+- Source commit: `ee2241f18fbb3560cc3017a06c3e7dd90b01b4e8`
+- APK version string: `2.0.9-ee2241f18+5218`
 - Signing certificate SHA-256 fingerprint: `0DB8F8B964EC8778AA69CA12BC017276826062193F66A8DF9F0A14C64AF47051`
 
 Choose the APK that matches your device:
 
 | Device type | Release asset |
 | --- | --- |
-| Most modern Android phones | `PiliAvalon_android_2.0.8-5ccc9bf24+5099_arm64-v8a.apk` |
-| Older 32-bit Android devices | `PiliAvalon_android_2.0.8-5ccc9bf24+5099_armeabi-v7a.apk` |
-| Android emulators or x86_64 environments | `PiliAvalon_android_2.0.8-5ccc9bf24+5099_x86_64.apk` |
+| Most modern Android phones | `PiliAvalon_android_2.0.9-ee2241f18+5218_arm64-v8a.apk` |
+| Older 32-bit Android devices | `PiliAvalon_android_2.0.9-ee2241f18+5218_armeabi-v7a.apk` |
+| Android emulators or x86_64 environments | `PiliAvalon_android_2.0.9-ee2241f18+5218_x86_64.apk` |
 
-The `v1.0.0` stable release provides exactly these three ABI APKs. There is no universal APK for this release.
+The `v2.0.9+5218` stable release provides exactly these three ABI APKs. There is no universal APK for this release.
 
 ## Current Features
 
-PiliAvalon v1.0.0 focuses on the released Phase 1 personal shielding capability:
+The PiliAvalon 2.0 stable line focuses on more complete personal shielding while staying aligned with the PiliPlus 2.0.9 upstream baseline:
 
 - **Structured shielding rules**: title/body keywords, user/UP keywords, recommendation reasons, user UID, category, and tag rules.
 - **Recommendation-feed shielding**: rules can apply to recommendation lists and related-video surfaces.
-- **Comment-area shielding**: rules can apply to comment text and user-related comment information.
+- **Numeric and related-video shielding**: duration, playback-count, and danmaku-count rules, with independent related-video shielding for video detail pages.
+- **Comment-area shielding**: rules can apply to comment text, comment user information, avatar pendants, and garb cards.
 - **Settings and rule management**: a shielding settings page for viewing, adding, editing, enabling, and disabling rules.
 - **Global and scoped switches**: a global switch plus separate recommendation and comment shielding controls.
-- **Reversible compatibility path**: legacy persisted rules remain compatible while token matching is removed from normal new-rule creation.
-- **Upstream-aligned adaptation**: shielding is maintained on top of PiliPlus while keeping the integration surface reviewable for future upstream syncs.
+- **Upstream-aligned adaptation**: PiliPlus 2.0.9 upstream changes are merged while preserving verified shielding behavior and compatibility migrations.
 
 PiliAvalon also inherits PiliPlus client capabilities such as playback, search, dynamics, comments, favorites, watch later, multiple accounts, cache, and WebDAV settings backup. Actual behavior follows the current APK.
 

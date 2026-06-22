@@ -10,40 +10,40 @@
   ![GitHub Repo stars](https://img.shields.io/github/stars/CometDash77/PiliAvalon-Worksite)
   ![GitHub all releases](https://img.shields.io/github/downloads/CometDash77/PiliAvalon-Worksite/total)
 
-  [下载正式版](https://github.com/CometDash77/PiliAvalon-Worksite/releases/tag/v1.0.0) · [English](README.en.md) · [源代码](https://github.com/CometDash77/PiliAvalon-Worksite)
+  [下载正式版](https://github.com/CometDash77/PiliAvalon-Worksite/releases/tag/v2.0.9%2B5218) · [English](README.en.md) · [源代码](https://github.com/CometDash77/PiliAvalon-Worksite)
 </div>
 
 ## 下载
 
-当前正式版：**PiliAvalon v1.0.0**
+当前正式版：**PiliAvalon v2.0.9+5218**
 
-- Release: https://github.com/CometDash77/PiliAvalon-Worksite/releases/tag/v1.0.0
+- Release: https://github.com/CometDash77/PiliAvalon-Worksite/releases/tag/v2.0.9%2B5218
 - 状态：stable / latest
-- 来源提交：`5ccc9bf243bab2c5f143032bd2549016a5b857da`
-- APK 版本串：`2.0.8-5ccc9bf24+5099`
+- 来源提交：`ee2241f18fbb3560cc3017a06c3e7dd90b01b4e8`
+- APK 版本串：`2.0.9-ee2241f18+5218`
 - 签名证书 SHA-256 指纹：`0DB8F8B964EC8778AA69CA12BC017276826062193F66A8DF9F0A14C64AF47051`
 
 请选择与你设备匹配的 APK：
 
 | 设备类型 | Release 资产 |
 | --- | --- |
-| 大多数现代 Android 手机 | `PiliAvalon_android_2.0.8-5ccc9bf24+5099_arm64-v8a.apk` |
-| 较旧的 32 位 Android 设备 | `PiliAvalon_android_2.0.8-5ccc9bf24+5099_armeabi-v7a.apk` |
-| Android 模拟器或 x86_64 环境 | `PiliAvalon_android_2.0.8-5ccc9bf24+5099_x86_64.apk` |
+| 大多数现代 Android 手机 | `PiliAvalon_android_2.0.9-ee2241f18+5218_arm64-v8a.apk` |
+| 较旧的 32 位 Android 设备 | `PiliAvalon_android_2.0.9-ee2241f18+5218_armeabi-v7a.apk` |
+| Android 模拟器或 x86_64 环境 | `PiliAvalon_android_2.0.9-ee2241f18+5218_x86_64.apk` |
 
-`v1.0.0` 正式版只提供以上三个 ABI APK，不提供 universal APK。
+`v2.0.9+5218` 正式版只提供以上三个 ABI APK，不提供 universal APK。
 
 ## 当前特色
 
-PiliAvalon v1.0.0 的重点是 Phase 1 个人屏蔽能力，已在正式版中发布：
+PiliAvalon 2.0 系列正式版聚焦更完整的个人屏蔽能力，并同步到 PiliPlus 2.0.9 上游基线：
 
 - **结构化屏蔽规则**：支持标题/正文关键词、用户/UP 关键词、推荐理由、用户 UID、分区、标签等规则类型。
 - **推荐流屏蔽**：可对推荐列表、相关视频等推荐内容应用屏蔽规则。
-- **评论区屏蔽**：可对评论文本和用户相关信息应用屏蔽规则。
+- **数值与相关视频屏蔽**：支持时长、播放数、弹幕数等数值规则，并可独立控制视频详情页相关视频屏蔽。
+- **评论区屏蔽**：可对评论文本、用户信息、头像挂件和装扮卡片等评论侧信息应用屏蔽规则。
 - **设置入口与规则管理**：提供屏蔽设置页，可查看、添加、编辑、启用或停用规则。
 - **全局与分区开关**：支持全局开关，并可分别控制推荐与评论屏蔽范围。
-- **可逆与兼容路径**：保留既有规则兼容迁移，旧词元匹配不再作为普通新规则入口。
-- **上游对齐适配**：在 PiliPlus 代码基础上维护屏蔽功能，尽量降低与上游后续同步的冲突面。
+- **上游对齐适配**：合并 PiliPlus 2.0.9 上游更新，并保留已验证的屏蔽能力与兼容迁移路径。
 
 PiliAvalon 也继承 PiliPlus 已有的播放、搜索、动态、评论、收藏、稍后再看、多账号、缓存、WebDAV 设置备份等基础客户端能力。具体能力以当前 APK 实际表现为准。
 
