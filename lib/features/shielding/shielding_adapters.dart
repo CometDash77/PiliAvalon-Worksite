@@ -41,6 +41,16 @@ abstract final class ShieldingAdapters {
       danmakuCount = item.stat.danmu;
     }
 
+    // task-066 detail-introduction candidate metadata from homepage.
+    final description =
+        _nonEmpty(item.desc) ?? _nonEmpty(json['desc']?.toString());
+    final pubdate = item.pubdate ?? json['pubdate'] as int?;
+    final isUpowerExclusive =
+        json['charging_pay'] is Map && json['charging_pay']['level'] != null
+        ? true
+        : null;
+    final staffNames = _staffNames(json['staff']);
+
     return ShieldCandidate(
       scope: ShieldScope.recommendation,
       title: item.title,
@@ -58,6 +68,10 @@ abstract final class ShieldingAdapters {
       durationSeconds: durationSeconds,
       playbackCount: playbackCount,
       danmakuCount: danmakuCount,
+      description: description,
+      pubdate: pubdate,
+      staffNames: staffNames,
+      isUpowerExclusive: isUpowerExclusive,
     );
   }
 
@@ -67,7 +81,6 @@ abstract final class ShieldingAdapters {
         : reply.hasMember()
         ? reply.member.mid.toString()
         : null;
-
     final pendantValues = <String>[
       if (reply.hasMember() && reply.member.garbPendantImage.isNotEmpty)
         reply.member.garbPendantImage,
@@ -76,7 +89,6 @@ abstract final class ShieldingAdapters {
           reply.memberV2.garb.pendantImage.isNotEmpty)
         reply.memberV2.garb.pendantImage,
     ];
-
     final garbValues = <String>[
       if (reply.hasMember()) ...[
         if (reply.member.garbCardNumber.isNotEmpty) reply.member.garbCardNumber,
@@ -93,7 +105,6 @@ abstract final class ShieldingAdapters {
           reply.memberV2.garb.cardJumpUrl,
       ],
     ];
-
     return ShieldCandidate(
       scope: ShieldScope.comment,
       body: reply.hasContent() ? reply.content.message : null,
@@ -110,19 +121,31 @@ abstract final class ShieldingAdapters {
     );
   }
 
-  static ShieldCandidate fromRelatedVideo(HotVideoItemModel item) =>
-      ShieldCandidate(
-        scope: ShieldScope.recommendation,
-        title: item.title,
-        uid: item.owner.mid?.toString(),
-        authorName: item.owner.name,
-        authorTokens: _tokens([item.owner.name]),
-        category: item.tname,
-        tokens: _tokens([
-          item.title,
-          item.tname,
-        ]),
-      );
+  static ShieldCandidate fromRelatedVideo(
+    HotVideoItemModel item, {
+    ShieldScope scope = ShieldScope.recommendation,
+  }) => ShieldCandidate(
+    scope: scope,
+    title: item.title,
+    uid: item.owner.mid?.toString(),
+    authorName: item.owner.name,
+    authorTokens: _tokens([item.owner.name]),
+    category: item.tname,
+    tokens: _tokens([
+      item.title,
+      item.tname,
+    ]),
+    durationSeconds: item.duration > 0 ? item.duration : null,
+    playbackCount: item.stat.view,
+    danmakuCount: item.stat.danmu,
+    // task-066: populate detail-introduction fields from related-video model.
+    description: item.desc,
+    pubdate: item.pubdate,
+    staffNames: item.staffNames,
+    isUpowerExclusive: item.badge == '充电专属'
+        ? true
+        : (item.badge == null ? null : false),
+  );
 
   static List<T> filterList<T>(
     List<T> items, {
@@ -151,6 +174,24 @@ abstract final class ShieldingAdapters {
     enabled: ruleSet.recommendationEnabled,
     ruleSet: ruleSet,
     toCandidate: fromRelatedVideo,
+  );
+
+  /// Applies related-video shielding to a list of [HotVideoItemModel] items.
+  ///
+  /// Uses the independent [ShieldRuleSet.relatedVideoEnabled] switch
+  /// (not [recommendationEnabled]) and scopes candidates as
+  /// [ShieldScope.videoDetail].
+  /// The legacy [filterRecommendationVideos] remains unchanged for
+  /// homepage and ranking call sites.
+  static List<HotVideoItemModel> filterRelatedVideos(
+    List<HotVideoItemModel> items,
+    ShieldRuleSet ruleSet,
+  ) => filterList(
+    items,
+    enabled: ruleSet.relatedVideoEnabled,
+    ruleSet: ruleSet,
+    toCandidate: (item) =>
+        fromRelatedVideo(item, scope: ShieldScope.videoDetail),
   );
 
   static List<String> _tags(Map<String, dynamic> json) {
@@ -197,3 +238,20 @@ String? _recommendationReason({
 }
 
 String? _nonEmpty(String? value) => value?.isNotEmpty == true ? value : null;
+
+List<String> _staffNames(Object? raw) {
+  if (raw is! Iterable) return const [];
+  final values = <String>[];
+  for (final item in raw) {
+    if (item is Map) {
+      for (final key in const ['name', 'title']) {
+        final value = _nonEmpty(item[key]?.toString().trim());
+        if (value != null) values.add(value);
+      }
+    } else {
+      final value = _nonEmpty(item?.toString().trim());
+      if (value != null) values.add(value);
+    }
+  }
+  return List.unmodifiable(values);
+}

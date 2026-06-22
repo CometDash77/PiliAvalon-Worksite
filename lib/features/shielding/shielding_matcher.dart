@@ -116,10 +116,19 @@ abstract final class ShieldMatcher {
         yield* candidate.garbValues;
       case ShieldRuleType.commentMemberSex:
         yield ifNullEmpty(candidate.commentMemberSex);
+      case ShieldRuleType.descriptionKeyword:
+        yield ifNullEmpty(candidate.description);
+      case ShieldRuleType.isUpowerExclusive:
+        yield candidate.isUpowerExclusive == true ? 'true' : (
+          candidate.isUpowerExclusive == false ? 'false' : ''
+        );
+      case ShieldRuleType.staffKeyword:
+        yield* candidate.staffNames;
       case ShieldRuleType.duration:
       case ShieldRuleType.playbackCount:
       case ShieldRuleType.danmakuCount:
       case ShieldRuleType.commentMemberLevel:
+      case ShieldRuleType.publishTime:
         return;
     }
   }
@@ -133,6 +142,7 @@ abstract final class ShieldMatcher {
       ShieldRuleType.playbackCount => candidate.playbackCount,
       ShieldRuleType.danmakuCount => candidate.danmakuCount,
       ShieldRuleType.commentMemberLevel => candidate.commentMemberLevel,
+      ShieldRuleType.publishTime => candidate.pubdate,
       _ => null,
     };
     if (value != null) yield value;

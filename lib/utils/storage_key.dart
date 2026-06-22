@@ -14,7 +14,8 @@ abstract final class SettingBoxKey {
       defaultPicQa = 'defaultPicQa',
       enableHA = 'enableHA',
       audioOutput = 'audioOutput',
-      expandBuffer = 'expandBuffer',
+      bufferSize = 'bufferSize',
+      bufferSec = 'bufferSec',
       hardwareDecoding = 'hardwareDecoding',
       videoSync = 'videoSync',
       autosync = 'autosync',
@@ -28,7 +29,9 @@ abstract final class SettingBoxKey {
       pauseOnMinimize = 'pauseOnMinimize',
       pgcSkipType = 'pgcSkipType',
       audioPlayMode = 'audioPlayMode',
-      showBatteryLevel = 'showBatteryLevel';
+      showBatteryLevel = 'showBatteryLevel',
+      playerVolume = 'playerVolume',
+      maxVolume = 'maxVolume';
 
   static const String enableVerticalExpand = 'enableVerticalExpand',
       feedBackEnable = 'feedBackEnable',
@@ -49,6 +52,12 @@ abstract final class SettingBoxKey {
       minDurationForRcmd = 'minDurationForRcmd',
       minPlayForRcmd = 'minPlayForRcmd',
       minLikeRatioForRecommend = 'minLikeRatioForRecommend',
+      filterInteractionRateForRecommend = 'filterInteractionRateForRecommend',
+      minInteractionRateForRecommend = 'minInteractionRateForRecommend',
+      filterTripleRateForRecommend = 'filterTripleRateForRecommend',
+      minTripleRateForRecommend = 'minTripleRateForRecommend',
+      filterContentValueForRecommend = 'filterContentValueForRecommend',
+      minContentValueForRecommend = 'minContentValueForRecommend',
       exemptFilterForFollowed = 'exemptFilterForFollowed',
       banWordForRecommend = 'banWordForRecommend',
       applyFilterToRelatedVideos = 'applyFilterToRelatedVideos',
@@ -157,7 +166,8 @@ abstract final class SettingBoxKey {
       removeSafeArea = 'removeSafeArea',
       angleDegrees = 'angleDegrees';
 
-  static const String repeatExposureFilterEnabled = 'repeatExposureFilterEnabled',
+  static const String repeatExposureFilterEnabled =
+          'repeatExposureFilterEnabled',
       repeatExposureWindowDays = 'repeatExposureWindowDays',
       repeatExposureThreshold = 'repeatExposureThreshold',
       repeatExposureCoolingDays = 'repeatExposureCoolingDays',
@@ -267,6 +277,7 @@ abstract final class ShieldBoxKey {
       globalEnabled = 'piliavalon.shielding.v1.global_enabled',
       recommendationEnabled = 'piliavalon.shielding.v1.recommendation_enabled',
       commentEnabled = 'piliavalon.shielding.v1.comment_enabled',
+      relatedVideoEnabled = 'piliavalon.shielding.v1.related_video_enabled',
       version = 'piliavalon.shielding.v1.version',
       lastLoadedAt = 'piliavalon.shielding.v1.last_loaded_at';
 }

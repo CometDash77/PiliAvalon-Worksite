@@ -253,23 +253,10 @@ abstract final class VideoCardShieldQuickAction {
         ShieldRuleType.commentMemberLevel => '屏蔽评论用户等级 $pattern',
         ShieldRuleType.avatarPendant => '屏蔽评论头像挂件 $pattern',
         ShieldRuleType.garb => '屏蔽评论装扮卡片 $pattern',
-      };
-
-  static bool _isRecommendationQuickActionType(ShieldRuleType type) =>
-      switch (type) {
-        ShieldRuleType.keyword ||
-        ShieldRuleType.userKeyword ||
-        ShieldRuleType.reasonKeyword ||
-        ShieldRuleType.uid ||
-        ShieldRuleType.category ||
-        ShieldRuleType.tag ||
-        ShieldRuleType.duration ||
-        ShieldRuleType.playbackCount ||
-        ShieldRuleType.danmakuCount => true,
-        ShieldRuleType.commentMemberSex ||
-        ShieldRuleType.commentMemberLevel ||
-        ShieldRuleType.avatarPendant ||
-        ShieldRuleType.garb => false,
+        ShieldRuleType.descriptionKeyword => '屏蔽视频简介关键词「$pattern」',
+        ShieldRuleType.publishTime => '屏蔽视频发布时间 $pattern',
+        ShieldRuleType.isUpowerExclusive => '屏蔽充电专属状态 $pattern',
+        ShieldRuleType.staffKeyword => '屏蔽制作人员关键词「$pattern」',
       };
 
   static String _contextualRuleLabel(

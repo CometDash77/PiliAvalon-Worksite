@@ -109,6 +109,7 @@ class ReplyItemGrpc extends StatelessWidget {
           item: replyItem,
           onDelete: () => onDelete?.call(replyItem, null),
           isSubReply: false,
+          shieldSettingsStore: shieldSettingsStore,
         );
       },
     );
@@ -577,6 +578,7 @@ class ReplyItemGrpc extends StatelessWidget {
                       item: childReply,
                       onDelete: () => onDelete?.call(replyItem, index),
                       isSubReply: true,
+                      shieldSettingsStore: shieldSettingsStore,
                     );
                   },
                 );
@@ -917,16 +919,16 @@ class ReplyItemGrpc extends StatelessWidget {
       },
     );
 
-    if (urlKeys.isNotEmpty) {
-      List<String> unmatchedItems = urlKeys
-          .where((url) => !matchedUrls.contains(url))
-          .toList();
-      if (unmatchedItems.isNotEmpty) {
-        for (final patternStr in unmatchedItems) {
-          addUrl(patternStr, content.urls[patternStr]!);
-        }
-      }
-    }
+    // if (urlKeys.isNotEmpty) {
+    //   List<String> unmatchedItems = urlKeys
+    //       .where((url) => !matchedUrls.contains(url))
+    //       .toList();
+    //   if (unmatchedItems.isNotEmpty) {
+    //     for (final patternStr in unmatchedItems) {
+    //       addUrl(patternStr, content.urls[patternStr]!);
+    //     }
+    //   }
+    // }
 
     if (!hasNote && replyControl.isNote && replyControl.isNoteV2) {
       final Color color;
@@ -966,6 +968,7 @@ class ReplyItemGrpc extends StatelessWidget {
     required ReplyInfo item,
     required VoidCallback onDelete,
     required bool isSubReply,
+    ShieldSettingsStore? shieldSettingsStore,
   }) {
     late String message = item.content.message;
     final ownerMid = Int64(Accounts.main.mid);

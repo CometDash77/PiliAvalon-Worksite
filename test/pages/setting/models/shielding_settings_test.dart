@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui' show Size;
 
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/pages/setting/models/shielding_settings.dart';
@@ -197,13 +198,15 @@ void main() {
           '推荐理由',
           '标签',
           '分区',
+          '数值元数据',
+          '评论用户信息',
+          '评论装饰',
+          '视频详情信息',
           '评论关键词',
         ]),
       );
       expect(shieldingRuleCategoryLabels, isNot(contains('精确文本')));
       expect(shieldingRuleCategoryLabels, isNot(contains('旧规则兼容')));
-      expect(shieldingRuleCategoryLabels, isNot(contains('数值元数据')));
-      expect(shieldingRuleCategoryLabels, isNot(contains('评论用户信息')));
     });
 
     test('categorizes quick recommendation keyword exact as title keyword', () {
@@ -311,15 +314,17 @@ void main() {
         pattern: r'NO\.\d+',
       );
 
-      expect(shieldingRuleCategoryFor(pendantRule), '头像挂件');
-      expect(shieldingRuleCategoryFor(garbRule), '装扮卡片');
+      expect(shieldingRuleCategoryFor(pendantRule), '评论装饰');
+      expect(shieldingRuleCategoryFor(garbRule), '评论装饰');
     });
 
-    test('category labels include decoration types', () {
+    test('category labels group decoration types', () {
       expect(
         shieldingRuleCategoryLabels,
-        containsAll(['头像挂件', '装扮卡片']),
+        contains('评论装饰'),
       );
+      expect(shieldingRuleCategoryLabels, isNot(contains('头像挂件')));
+      expect(shieldingRuleCategoryLabels, isNot(contains('装扮卡片')));
     });
 
     test('categorizes duration as numeric metadata', () {
@@ -374,6 +379,69 @@ void main() {
         shieldRuleTypeLabel(ShieldRuleType.commentMemberLevel),
         '评论用户等级',
       );
+    });
+
+    test('task-066 detail-introduction rule type labels are visible', () {
+      expect(
+        shieldRuleTypeLabel(ShieldRuleType.descriptionKeyword),
+        '视频简介',
+      );
+      expect(
+        shieldRuleTypeLabel(ShieldRuleType.publishTime),
+        '发布时间',
+      );
+      expect(
+        shieldRuleTypeLabel(ShieldRuleType.isUpowerExclusive),
+        '充电专属',
+      );
+      expect(
+        shieldRuleTypeLabel(ShieldRuleType.staffKeyword),
+        '制作人员',
+      );
+    });
+
+    test('task-066 rule types categorize under 视频详情信息', () {
+      final descRule = ShieldRule(
+        id: 'desc-1',
+        type: ShieldRuleType.descriptionKeyword,
+        matchMode: ShieldMatchMode.contains,
+        scope: ShieldScope.recommendation,
+        action: ShieldAction.block,
+        pattern: '测试',
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+      );
+      final pubtimeRule = ShieldRule(
+        id: 'pubtime-1',
+        type: ShieldRuleType.publishTime,
+        matchMode: ShieldMatchMode.range,
+        scope: ShieldScope.recommendation,
+        action: ShieldAction.block,
+        pattern: '..1000',
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+      );
+      final upowerRule = ShieldRule(
+        id: 'upower-1',
+        type: ShieldRuleType.isUpowerExclusive,
+        matchMode: ShieldMatchMode.enumValue,
+        scope: ShieldScope.recommendation,
+        action: ShieldAction.block,
+        pattern: 'true',
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+      );
+      final staffRule = ShieldRule(
+        id: 'staff-1',
+        type: ShieldRuleType.staffKeyword,
+        matchMode: ShieldMatchMode.contains,
+        scope: ShieldScope.recommendation,
+        action: ShieldAction.block,
+        pattern: '张三',
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+      );
+
+      expect(shieldingRuleCategoryFor(descRule), '视频详情信息');
+      expect(shieldingRuleCategoryFor(pubtimeRule), '视频详情信息');
+      expect(shieldingRuleCategoryFor(upowerRule), '视频详情信息');
+      expect(shieldingRuleCategoryFor(staffRule), '视频详情信息');
     });
   });
 
@@ -452,6 +520,8 @@ void main() {
     });
 
     testWidgets('shows same-row shielding category navigation', (tester) async {
+      _setLargeTestSurface(tester);
+
       await tester.pumpWidget(
         GetMaterialApp(
           home: ShieldingSettingsPage(
@@ -466,16 +536,20 @@ void main() {
       expect(find.text('推荐理由'), findsOneWidget);
       expect(find.text('标签'), findsOneWidget);
       expect(find.text('分区'), findsOneWidget);
+      expect(find.text('数值元数据'), findsOneWidget);
+      expect(find.text('评论用户信息'), findsOneWidget);
+      expect(find.text('评论装饰'), findsOneWidget);
+      expect(find.text('视频详情信息'), findsOneWidget);
       expect(find.text('评论关键词'), findsOneWidget);
       expect(find.text('精确文本'), findsNothing);
       expect(find.text('旧规则兼容'), findsNothing);
-      expect(find.text('数值元数据'), findsNothing);
-      expect(find.text('评论用户信息'), findsNothing);
     });
 
-    testWidgets('general editor hides numeric and comment-user rule types', (
+    testWidgets('general editor shows full rule type set', (
       tester,
     ) async {
+      _setLargeTestSurface(tester);
+
       await tester.pumpWidget(
         GetMaterialApp(
           home: ShieldingSettingsPage(
@@ -491,14 +565,20 @@ void main() {
       await tester.tap(find.text('标题/正文关键词').last);
       await tester.pumpAndSettle();
 
-      expect(find.text('时长'), findsNothing);
-      expect(find.text('播放数'), findsNothing);
-      expect(find.text('弹幕数'), findsNothing);
-      expect(find.text('评论用户性别'), findsNothing);
-      expect(find.text('评论用户等级'), findsNothing);
+      expect(find.text('时长'), findsOneWidget);
+      expect(find.text('播放数'), findsOneWidget);
+      expect(find.text('弹幕数'), findsOneWidget);
+      expect(find.text('评论用户性别'), findsOneWidget);
+      expect(find.text('评论用户等级'), findsOneWidget);
+      expect(find.text('头像挂件'), findsOneWidget);
+      expect(find.text('装扮卡片'), findsOneWidget);
+      expect(find.text('视频简介'), findsOneWidget);
+      expect(find.text('发布时间'), findsOneWidget);
+      expect(find.text('充电专属'), findsOneWidget);
+      expect(find.text('制作人员'), findsOneWidget);
     });
 
-    testWidgets('category chips include decoration types', (tester) async {
+    testWidgets('category chips group decoration types', (tester) async {
       await tester.pumpWidget(
         GetMaterialApp(
           home: ShieldingSettingsPage(
@@ -508,9 +588,9 @@ void main() {
       );
       await tester.pump();
 
-      // Scroll the horizontal chip list to see all labels
-      expect(find.text('头像挂件'), findsOneWidget);
-      expect(find.text('装扮卡片'), findsOneWidget);
+      expect(find.text('评论装饰'), findsOneWidget);
+      expect(find.text('头像挂件'), findsNothing);
+      expect(find.text('装扮卡片'), findsNothing);
     });
 
     testWidgets('new-rule dialog type dropdown includes decoration types', (
@@ -577,4 +657,11 @@ class _MemoryBox implements ShieldSettingsBox {
   Future<void> delete(String key) async {
     values.remove(key);
   }
+}
+
+void _setLargeTestSurface(WidgetTester tester) {
+  tester.view.physicalSize = const Size(1600, 1200);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
 }

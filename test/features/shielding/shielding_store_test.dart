@@ -11,6 +11,7 @@ void main() {
         globalEnabled: false,
         recommendationEnabled: true,
         commentEnabled: false,
+        relatedVideoEnabled: false,
         version: 7,
         lastLoadedAt: loadedAt,
         rules: [
@@ -33,6 +34,7 @@ void main() {
       expect(decoded.globalEnabled, isFalse);
       expect(decoded.recommendationEnabled, isTrue);
       expect(decoded.commentEnabled, isFalse);
+      expect(decoded.relatedVideoEnabled, isFalse);
       expect(decoded.version, 7);
       expect(decoded.lastLoadedAt, loadedAt);
       expect(decoded.rules.single.source, ShieldRuleSource.imported);
@@ -163,6 +165,47 @@ void main() {
   });
 
   group('ShieldSettingsStore', () {
+    test('persists related video enabled flag through save and load', () async {
+      final box = _MemoryBox();
+      final store = ShieldSettingsStore(box: box);
+
+      await store.save(ShieldRuleSet(relatedVideoEnabled: false));
+      final loaded = await store.load();
+
+      expect(loaded.relatedVideoEnabled, isFalse);
+      expect(
+        box.values[ShieldSettingsStore.relatedVideoEnabledKey],
+        isFalse,
+      );
+    });
+
+    test('setRelatedVideoEnabled updates snapshot and storage', () async {
+      final box = _MemoryBox();
+      final store = ShieldSettingsStore(box: box);
+
+      await store.setRelatedVideoEnabled(false);
+
+      expect(store.snapshot().relatedVideoEnabled, isFalse);
+      expect(
+        box.values[ShieldSettingsStore.relatedVideoEnabledKey],
+        isFalse,
+      );
+    });
+
+    test('clear removes related video enabled flag', () async {
+      final box = _MemoryBox({
+        ShieldSettingsStore.relatedVideoEnabledKey: false,
+      });
+      final store = ShieldSettingsStore(box: box);
+
+      await store.clear();
+
+      expect(
+        box.values.containsKey(ShieldSettingsStore.relatedVideoEnabledKey),
+        isFalse,
+      );
+    });
+
     test('loads damaged raw payload as disabled fallback', () async {
       final box = _MemoryBox({
         ShieldSettingsStore.rulesKey: 'not-json',
@@ -796,9 +839,21 @@ void main() {
           scope: ShieldScope.recommendation,
           pattern: '相似',
         );
+        final description = await store.addQuickActionRule(
+          type: ShieldRuleType.descriptionKeyword,
+          scope: ShieldScope.videoDetail,
+          pattern: '搬运',
+        );
+        final staff = await store.addQuickActionRule(
+          type: ShieldRuleType.staffKeyword,
+          scope: ShieldScope.videoDetail,
+          pattern: '张三',
+        );
 
         expect(keyword?.matchMode, ShieldMatchMode.contains);
         expect(reason?.matchMode, ShieldMatchMode.contains);
+        expect(description?.matchMode, ShieldMatchMode.contains);
+        expect(staff?.matchMode, ShieldMatchMode.contains);
       });
 
       test('uid category tag and user keyword default to exact', () async {
@@ -827,6 +882,7 @@ void main() {
           ShieldRuleType.playbackCount,
           ShieldRuleType.danmakuCount,
           ShieldRuleType.commentMemberLevel,
+          ShieldRuleType.publishTime,
         ]) {
           final rule = await store.addQuickActionRule(
             type: type,
@@ -840,13 +896,19 @@ void main() {
       test('comment member sex defaults to enum mode', () async {
         final store = ShieldSettingsStore(box: _MemoryBox());
 
-        final rule = await store.addQuickActionRule(
+        final sexRule = await store.addQuickActionRule(
           type: ShieldRuleType.commentMemberSex,
           scope: ShieldScope.comment,
           pattern: '女',
         );
+        final upowerRule = await store.addQuickActionRule(
+          type: ShieldRuleType.isUpowerExclusive,
+          scope: ShieldScope.videoDetail,
+          pattern: 'true',
+        );
 
-        expect(rule?.matchMode, ShieldMatchMode.enumValue);
+        expect(sexRule?.matchMode, ShieldMatchMode.enumValue);
+        expect(upowerRule?.matchMode, ShieldMatchMode.enumValue);
       });
     });
   });

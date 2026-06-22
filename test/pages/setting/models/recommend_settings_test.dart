@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:PiliPlus/features/shielding/shielding_models.dart';
 import 'package:PiliPlus/features/shielding/shielding_store.dart';
+import 'package:PiliPlus/pages/setting/models/model.dart';
 import 'package:PiliPlus/pages/setting/models/recommend_settings.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
@@ -29,6 +30,12 @@ void main() {
     GStorage.setting.delete(SettingBoxKey.repeatExposureThreshold);
     GStorage.setting.delete(SettingBoxKey.repeatExposureCoolingDays);
     GStorage.setting.delete(SettingBoxKey.repeatExposureMaxCacheSize);
+    GStorage.setting.delete(SettingBoxKey.filterInteractionRateForRecommend);
+    GStorage.setting.delete(SettingBoxKey.minInteractionRateForRecommend);
+    GStorage.setting.delete(SettingBoxKey.filterTripleRateForRecommend);
+    GStorage.setting.delete(SettingBoxKey.minTripleRateForRecommend);
+    GStorage.setting.delete(SettingBoxKey.filterContentValueForRecommend);
+    GStorage.setting.delete(SettingBoxKey.minContentValueForRecommend);
     await ShieldSettingsStore().clear();
   });
 
@@ -54,7 +61,7 @@ void main() {
       final list = recommendSettings;
 
       final filterIdx = list.indexWhere(
-        (e) => e.effectiveTitle == '过滤器也应用于相关视频',
+        (e) => e.effectiveTitle == '相关视频屏蔽',
       );
       expect(filterIdx, isNot(-1));
 
@@ -62,6 +69,37 @@ void main() {
         (e) => e.effectiveTitle == '标签获取并发数',
       );
       expect(tagIdx1, greaterThan(filterIdx));
+    });
+
+    test(
+      'old applyFilterToRelatedVideos and new relatedVideoEnabled are independent',
+      () {
+        final list = recommendSettings;
+
+        final oldIdx = list.indexWhere(
+          (e) => e.effectiveTitle == '过滤器也应用于相关视频',
+        );
+        final newIdx = list.indexWhere(
+          (e) => e.effectiveTitle == '相关视频屏蔽',
+        );
+
+        expect(oldIdx, isNot(-1));
+        expect(newIdx, isNot(-1));
+        expect(oldIdx, isNot(equals(newIdx)));
+      },
+    );
+
+    test('new 相关视频屏蔽 switch appears after old filter switch', () {
+      final list = recommendSettings;
+
+      final oldIdx = list.indexWhere(
+        (e) => e.effectiveTitle == '过滤器也应用于相关视频',
+      );
+      final newIdx = list.indexWhere(
+        (e) => e.effectiveTitle == '相关视频屏蔽',
+      );
+
+      expect(newIdx, greaterThan(oldIdx));
     });
 
     test('concurrency entry shows default value of 5', () {
@@ -138,9 +176,86 @@ void main() {
       'total settings count includes new inline range filtering entries',
       () {
         final list = recommendSettings;
-        expect(list.length, 17);
+        expect(list.length, 24);
       },
     );
+
+    test('contains derived metric filtering entries', () {
+      final list = recommendSettings;
+      final titles = list.map((e) => e.effectiveTitle).toList();
+
+      expect(titles, contains('互动率过滤'));
+      expect(titles, contains('三连率过滤'));
+      expect(titles, contains('内容价值过滤'));
+    });
+
+    test('derived metric filtering entries default to disabled switches', () {
+      final list = recommendSettings;
+
+      final interaction = list.whereType<SplitModel>().firstWhere(
+        (e) => e.effectiveTitle == '互动率过滤',
+      );
+      final triple = list.whereType<SplitModel>().firstWhere(
+        (e) => e.effectiveTitle == '三连率过滤',
+      );
+      final contentValue = list.whereType<SplitModel>().firstWhere(
+        (e) => e.effectiveTitle == '内容价值过滤',
+      );
+
+      expect(
+        interaction.switchModel.setKey,
+        SettingBoxKey.filterInteractionRateForRecommend,
+      );
+      expect(interaction.switchModel.defaultVal, isFalse);
+      expect(
+        triple.switchModel.setKey,
+        SettingBoxKey.filterTripleRateForRecommend,
+      );
+      expect(triple.switchModel.defaultVal, isFalse);
+      expect(
+        contentValue.switchModel.setKey,
+        SettingBoxKey.filterContentValueForRecommend,
+      );
+      expect(contentValue.switchModel.defaultVal, isFalse);
+    });
+
+    test('derived metric entries show default thresholds', () {
+      final list = recommendSettings;
+
+      expect(
+        list.firstWhere((e) => e.effectiveTitle == '互动率过滤').effectiveSubtitle,
+        contains('当前: 1.0%'),
+      );
+      expect(
+        list.firstWhere((e) => e.effectiveTitle == '三连率过滤').effectiveSubtitle,
+        contains('当前: 3.0%'),
+      );
+      expect(
+        list.firstWhere((e) => e.effectiveTitle == '内容价值过滤').effectiveSubtitle,
+        contains('当前: 10.0%'),
+      );
+    });
+
+    test('derived metric entries reflect stored thresholds', () {
+      GStorage.setting.put(SettingBoxKey.minInteractionRateForRecommend, 2.5);
+      GStorage.setting.put(SettingBoxKey.minTripleRateForRecommend, 4.5);
+      GStorage.setting.put(SettingBoxKey.minContentValueForRecommend, 12.5);
+
+      final list = recommendSettings;
+
+      expect(
+        list.firstWhere((e) => e.effectiveTitle == '互动率过滤').effectiveSubtitle,
+        contains('当前: 2.5%'),
+      );
+      expect(
+        list.firstWhere((e) => e.effectiveTitle == '三连率过滤').effectiveSubtitle,
+        contains('当前: 4.5%'),
+      );
+      expect(
+        list.firstWhere((e) => e.effectiveTitle == '内容价值过滤').effectiveSubtitle,
+        contains('当前: 12.5%'),
+      );
+    });
 
     test('contains inline range filtering entries', () {
       final list = recommendSettings;
@@ -151,10 +266,52 @@ void main() {
       expect(titles, contains('弹幕量过滤'));
     });
 
+    test('contains related-video inline range filtering entries', () {
+      final list = recommendSettings;
+      final titles = list.map((e) => e.effectiveTitle).toList();
+
+      expect(titles, contains('相关视频时长过滤'));
+      expect(titles, contains('相关视频播放量过滤'));
+      expect(titles, contains('相关视频弹幕量过滤'));
+    });
+
+    test('related-video range entries appear after related-video switch', () {
+      final list = recommendSettings;
+
+      final switchIdx = list.indexWhere(
+        (e) => e.effectiveTitle == '相关视频屏蔽',
+      );
+      final durationIdx = list.indexWhere(
+        (e) => e.effectiveTitle == '相关视频时长过滤',
+      );
+      final playbackIdx = list.indexWhere(
+        (e) => e.effectiveTitle == '相关视频播放量过滤',
+      );
+      final danmakuIdx = list.indexWhere(
+        (e) => e.effectiveTitle == '相关视频弹幕量过滤',
+      );
+      final tagIdx = list.indexWhere(
+        (e) => e.effectiveTitle == '标签获取并发数',
+      );
+
+      expect(switchIdx, isNot(-1));
+      expect(durationIdx, greaterThan(switchIdx));
+      expect(playbackIdx, greaterThan(durationIdx));
+      expect(danmakuIdx, greaterThan(playbackIdx));
+      expect(tagIdx, greaterThan(danmakuIdx));
+    });
+
     test('range filtering entries show default subtitle', () {
       final list = recommendSettings;
 
-      for (final title in ['时长过滤', '播放量过滤', '弹幕量过滤']) {
+      for (final title in [
+        '时长过滤',
+        '播放量过滤',
+        '弹幕量过滤',
+        '相关视频时长过滤',
+        '相关视频播放量过滤',
+        '相关视频弹幕量过滤',
+      ]) {
         final entry = list.firstWhere((e) => e.effectiveTitle == title);
         expect(entry.effectiveSubtitle, '未设置');
       }
@@ -329,5 +486,206 @@ void main() {
       // Non-range rule should be ignored by _findRangeThresholds.
       expect(entry.effectiveSubtitle, '未设置');
     });
+
+    test(
+      'related-video entries read video detail scoped range rules',
+      () async {
+        await store.save(
+          ShieldRuleSet(
+            rules: [
+              _rangeRule(
+                id: 'related-duration',
+                type: ShieldRuleType.duration,
+                scope: ShieldScope.videoDetail,
+                pattern: '..30',
+              ),
+              _rangeRule(
+                id: 'related-playback',
+                type: ShieldRuleType.playbackCount,
+                scope: ShieldScope.videoDetail,
+                pattern: '600..',
+              ),
+              _rangeRule(
+                id: 'related-danmaku-lo',
+                type: ShieldRuleType.danmakuCount,
+                scope: ShieldScope.videoDetail,
+                pattern: '..20',
+              ),
+              _rangeRule(
+                id: 'related-danmaku-hi',
+                type: ShieldRuleType.danmakuCount,
+                scope: ShieldScope.videoDetail,
+                pattern: '300..',
+              ),
+            ],
+          ),
+        );
+
+        final list = recommendSettings;
+
+        expect(
+          list
+              .firstWhere((e) => e.effectiveTitle == '相关视频时长过滤')
+              .effectiveSubtitle,
+          '屏蔽 ≤ 30',
+        );
+        expect(
+          list
+              .firstWhere((e) => e.effectiveTitle == '相关视频播放量过滤')
+              .effectiveSubtitle,
+          '屏蔽 ≥ 600',
+        );
+        expect(
+          list
+              .firstWhere((e) => e.effectiveTitle == '相关视频弹幕量过滤')
+              .effectiveSubtitle,
+          '屏蔽 ≤ 20 及 ≥ 300',
+        );
+      },
+    );
+
+    test(
+      'recommendation range rules do not affect related-video entries',
+      () async {
+        await store.save(
+          ShieldRuleSet(
+            rules: [
+              _rangeRule(
+                id: 'recommendation-duration',
+                type: ShieldRuleType.duration,
+                scope: ShieldScope.recommendation,
+                pattern: '..30',
+              ),
+            ],
+          ),
+        );
+
+        final list = recommendSettings;
+
+        expect(
+          list
+              .firstWhere((e) => e.effectiveTitle == '相关视频时长过滤')
+              .effectiveSubtitle,
+          '未设置',
+        );
+        expect(
+          list.firstWhere((e) => e.effectiveTitle == '时长过滤').effectiveSubtitle,
+          '屏蔽 ≤ 30',
+        );
+      },
+    );
+
+    test(
+      'video detail range rules do not affect recommendation entries',
+      () async {
+        await store.save(
+          ShieldRuleSet(
+            rules: [
+              _rangeRule(
+                id: 'related-duration',
+                type: ShieldRuleType.duration,
+                scope: ShieldScope.videoDetail,
+                pattern: '..30',
+              ),
+            ],
+          ),
+        );
+
+        final list = recommendSettings;
+
+        expect(
+          list.firstWhere((e) => e.effectiveTitle == '时长过滤').effectiveSubtitle,
+          '未设置',
+        );
+        expect(
+          list
+              .firstWhere((e) => e.effectiveTitle == '相关视频时长过滤')
+              .effectiveSubtitle,
+          '屏蔽 ≤ 30',
+        );
+      },
+    );
+  });
+
+  group('related-video range shielding save behavior', () {
+    test('saving upper threshold writes video detail range rule', () async {
+      await saveRangeShieldingRulesForTesting(
+        store: ShieldSettingsStore(),
+        type: ShieldRuleType.duration,
+        scope: ShieldScope.videoDetail,
+        lower: '',
+        upper: '600',
+      );
+      final rules = (await ShieldSettingsStore().load()).rules;
+
+      expect(rules, hasLength(1));
+      expect(rules.single.type, ShieldRuleType.duration);
+      expect(rules.single.matchMode, ShieldMatchMode.range);
+      expect(rules.single.scope, ShieldScope.videoDetail);
+      expect(rules.single.action, ShieldAction.block);
+      expect(rules.single.pattern, '600..');
+    });
+
+    test('saving lower threshold writes video detail range rule', () async {
+      await saveRangeShieldingRulesForTesting(
+        store: ShieldSettingsStore(),
+        type: ShieldRuleType.playbackCount,
+        scope: ShieldScope.videoDetail,
+        lower: '30',
+        upper: '',
+      );
+      final rules = (await ShieldSettingsStore().load()).rules;
+
+      expect(rules, hasLength(1));
+      expect(rules.single.type, ShieldRuleType.playbackCount);
+      expect(rules.single.matchMode, ShieldMatchMode.range);
+      expect(rules.single.scope, ShieldScope.videoDetail);
+      expect(rules.single.action, ShieldAction.block);
+      expect(rules.single.pattern, '..30');
+    });
+
+    test(
+      'saving both thresholds writes two video detail range rules',
+      () async {
+        await saveRangeShieldingRulesForTesting(
+          store: ShieldSettingsStore(),
+          type: ShieldRuleType.danmakuCount,
+          scope: ShieldScope.videoDetail,
+          lower: '20',
+          upper: '300',
+        );
+        final rules = (await ShieldSettingsStore().load()).rules;
+
+        expect(rules, hasLength(2));
+        expect(
+          rules.map((rule) => rule.type).toSet(),
+          {ShieldRuleType.danmakuCount},
+        );
+        expect(
+          rules.map((rule) => rule.scope).toSet(),
+          {ShieldScope.videoDetail},
+        );
+        expect(
+          rules.map((rule) => rule.pattern).toSet(),
+          {'..20', '300..'},
+        );
+      },
+    );
   });
 }
+
+ShieldRule _rangeRule({
+  required String id,
+  required ShieldRuleType type,
+  required ShieldScope scope,
+  required String pattern,
+}) => ShieldRule(
+  id: id,
+  type: type,
+  matchMode: ShieldMatchMode.range,
+  scope: scope,
+  action: ShieldAction.block,
+  pattern: pattern,
+  enabled: true,
+  updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
+);

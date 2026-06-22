@@ -55,8 +55,32 @@ class RcmdStat extends BaseStat {
   RcmdStat.fromJson(Map<String, dynamic> json) {
     view = NumUtils.parseNum(json["cover_left_text_1"] ?? '');
     danmu = NumUtils.parseNum(json["cover_left_text_2"] ?? '');
+    if (json['stat'] case final Map<String, dynamic> stat) {
+      like = _readInt(stat['like']);
+      reply = _readInt(stat['reply']);
+      coin = _readNum(stat['coin']);
+      favorite = _readInt(stat['favorite']);
+    } else {
+      like = _readInt(json['like']);
+      reply = _readInt(json['reply']);
+      coin = _readNum(json['coin']);
+      favorite = _readInt(json['favorite']);
+    }
   }
 }
+
+int? _readInt(Object? value) => switch (value) {
+  int value => value,
+  num value => value.toInt(),
+  String value => int.tryParse(value),
+  _ => null,
+};
+
+num? _readNum(Object? value) => switch (value) {
+  num value => value,
+  String value => num.tryParse(value),
+  _ => null,
+};
 
 class RcmdOwner extends BaseOwner {
   RcmdOwner.fromJson(Map<String, dynamic> json) {

@@ -37,6 +37,17 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
     ShieldRuleType.uid,
     ShieldRuleType.category,
     ShieldRuleType.tag,
+    ShieldRuleType.duration,
+    ShieldRuleType.playbackCount,
+    ShieldRuleType.danmakuCount,
+    ShieldRuleType.commentMemberSex,
+    ShieldRuleType.commentMemberLevel,
+    ShieldRuleType.avatarPendant,
+    ShieldRuleType.garb,
+    ShieldRuleType.descriptionKeyword,
+    ShieldRuleType.publishTime,
+    ShieldRuleType.isUpowerExclusive,
+    ShieldRuleType.staffKeyword,
   ];
 
   late final _store = widget.store ?? ShieldSettingsStore();
@@ -403,8 +414,12 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
       ShieldRuleType.duration ||
       ShieldRuleType.playbackCount ||
       ShieldRuleType.danmakuCount ||
-      ShieldRuleType.commentMemberLevel => ShieldMatchMode.range,
-      ShieldRuleType.commentMemberSex => ShieldMatchMode.enumValue,
+      ShieldRuleType.commentMemberLevel ||
+      ShieldRuleType.publishTime => ShieldMatchMode.range,
+      ShieldRuleType.commentMemberSex ||
+      ShieldRuleType.isUpowerExclusive => ShieldMatchMode.enumValue,
+      ShieldRuleType.descriptionKeyword ||
+      ShieldRuleType.staffKeyword => ShieldMatchMode.contains,
       _ => ShieldMatchMode.exact,
     };
   }
@@ -415,8 +430,11 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
         type == ShieldRuleType.duration ||
             type == ShieldRuleType.playbackCount ||
             type == ShieldRuleType.danmakuCount ||
-            type == ShieldRuleType.commentMemberLevel,
-      ShieldMatchMode.enumValue => type == ShieldRuleType.commentMemberSex,
+            type == ShieldRuleType.commentMemberLevel ||
+            type == ShieldRuleType.publishTime,
+      ShieldMatchMode.enumValue =>
+        type == ShieldRuleType.commentMemberSex ||
+            type == ShieldRuleType.isUpowerExclusive,
       _ => true,
     };
   }

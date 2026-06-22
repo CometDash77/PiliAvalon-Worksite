@@ -24,6 +24,23 @@ and auditor labor agent where practical. Codex is the coordinator and reviewer.
 
 ## Next Session Defaults
 
+- Current verified Reasonix train: npm `next`, not `latest`. On 2026-06-21
+  `reasonix@next` resolved to `1.10.0-rc.1` and `reasonix --version` returned
+  `reasonix npm-v1.10.0-rc.1`.
+- If Reasonix exits `0` with no output after an update, inspect the global npm
+  package. On 2026-06-21 this meant the installed package files were zero
+  bytes. Reinstall `reasonix@next` with a clean temporary cache; do not fall
+  back to npm `latest`.
+- If `reasonix --help` fails with `Permission denied`, restore executable bit
+  on the shim:
+  `chmod +x ~/.nvm/versions/node/v22.22.3/lib/node_modules/reasonix/bin/reasonix.js`.
+- Verified `reasonix run` flags on 2026-06-21:
+  `--dir`, `--model`, `--max-steps`, `--metrics`, `--show-thinking`,
+  `-c/--continue`, and `--resume`.
+- `reasonix doctor` now prefers `~/.reasonix/config.toml` and may warn that
+  legacy `~/.config/reasonix/config.toml` is ignored. Treat unrelated
+  third-party MCP/plugin warnings as non-core unless the task needs those
+  plugins.
 - If the next session is mainly testing or verification, prefer GitHub Actions
   and prerelease evidence over local Flutter loops for final proof.
 - If waiting is needed, use `Start-Sleep` or sleep intervals of at least

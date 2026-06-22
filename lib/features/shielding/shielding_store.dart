@@ -45,6 +45,7 @@ class ShieldSettingsStore {
   static const commentEnabledKey = '$namespace.comment_enabled';
   static const versionKey = '$namespace.version';
   static const lastLoadedAtKey = '$namespace.last_loaded_at';
+  static const relatedVideoEnabledKey = '$namespace.related_video_enabled';
   static const legacyTextImportedKey = '$namespace.legacy_text_imported';
 
   final ShieldSettingsBox _box;
@@ -74,6 +75,9 @@ class ShieldSettingsStore {
             ruleSet.recommendationEnabled,
         commentEnabled:
             _box.get(commentEnabledKey) as bool? ?? ruleSet.commentEnabled,
+        relatedVideoEnabled:
+            _box.get(relatedVideoEnabledKey) as bool? ??
+            ruleSet.relatedVideoEnabled,
         version: _box.get(versionKey) as int? ?? ruleSet.version,
         lastLoadedAt: loadedEpoch == null
             ? loadedAt
@@ -99,6 +103,8 @@ class ShieldSettingsStore {
             recommendationEnabled:
                 _box.get(recommendationEnabledKey) as bool? ?? true,
             commentEnabled: _box.get(commentEnabledKey) as bool? ?? true,
+            relatedVideoEnabled:
+                _box.get(relatedVideoEnabledKey) as bool? ?? true,
             version: _box.get(versionKey) as int? ?? 1,
           ),
         ),
@@ -119,6 +125,9 @@ class ShieldSettingsStore {
             ruleSet.recommendationEnabled,
         commentEnabled:
             _box.get(commentEnabledKey) as bool? ?? ruleSet.commentEnabled,
+        relatedVideoEnabled:
+            _box.get(relatedVideoEnabledKey) as bool? ??
+            ruleSet.relatedVideoEnabled,
         version: _box.get(versionKey) as int? ?? ruleSet.version,
         lastLoadedAt: loadedEpoch == null
             ? ruleSet.lastLoadedAt
@@ -147,6 +156,7 @@ class ShieldSettingsStore {
         resolved.recommendationEnabled,
       );
       await _box.put(commentEnabledKey, resolved.commentEnabled);
+      await _box.put(relatedVideoEnabledKey, resolved.relatedVideoEnabled);
       await _box.put(versionKey, resolved.version);
       await _box.put(legacyTextImportedKey, true);
       _cachedSnapshot = resolved;
@@ -210,11 +220,17 @@ class ShieldSettingsStore {
     _cachedSnapshot = snapshot().copyWith(commentEnabled: enabled);
   }
 
+  Future<void> setRelatedVideoEnabled(bool enabled) async {
+    await _box.put(relatedVideoEnabledKey, enabled);
+    _cachedSnapshot = snapshot().copyWith(relatedVideoEnabled: enabled);
+  }
+
   Future<void> clear() async {
     await _box.delete(rulesKey);
     await _box.delete(globalEnabledKey);
     await _box.delete(recommendationEnabledKey);
     await _box.delete(commentEnabledKey);
+    await _box.delete(relatedVideoEnabledKey);
     await _box.delete(versionKey);
     await _box.delete(lastLoadedAtKey);
     await _box.delete(legacyTextImportedKey);
@@ -279,8 +295,12 @@ class ShieldSettingsStore {
       ShieldRuleType.duration ||
       ShieldRuleType.playbackCount ||
       ShieldRuleType.danmakuCount ||
-      ShieldRuleType.commentMemberLevel => ShieldMatchMode.range,
-      ShieldRuleType.commentMemberSex => ShieldMatchMode.enumValue,
+      ShieldRuleType.commentMemberLevel ||
+      ShieldRuleType.publishTime => ShieldMatchMode.range,
+      ShieldRuleType.commentMemberSex ||
+      ShieldRuleType.isUpowerExclusive => ShieldMatchMode.enumValue,
+      ShieldRuleType.descriptionKeyword ||
+      ShieldRuleType.staffKeyword => ShieldMatchMode.contains,
       _ => ShieldMatchMode.exact,
     };
   }
