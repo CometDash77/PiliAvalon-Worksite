@@ -81,7 +81,7 @@ void main() {
 
       final future = showVideoQaHalfScreenDialog(dialogContext, () {});
       await tester.pumpAndSettle();
-      Navigator.of(dialogContext).pop();
+      await tester.pageBack();
       await future;
       await tester.pumpAndSettle();
 
