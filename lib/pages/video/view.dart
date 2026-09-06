@@ -330,6 +330,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
 
   @override
   void dispose() {
+    videoDetailController.clearFullScreenQualitySwitch();
     plPlayerController
       ?..removeStatusLister(playerListener)
       ..removePositionListener(positionListener);
@@ -371,6 +372,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   void didPushNext() {
     super.didPushNext();
     isShowing = false;
+    videoDetailController.clearFullScreenQualitySwitch();
 
     removeObserverMobile(this);
 
@@ -414,6 +416,9 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     }
 
     PlPlayerController.setPlayCallBack(playCallBack);
+    if (PlatformUtils.isMobile) {
+      videoDetailController.setupFullScreenQualitySwitch();
+    }
 
     introController.startTimer();
 

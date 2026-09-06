@@ -64,6 +64,7 @@ import 'package:PiliPlus/utils/extension/size_ext.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
+import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/theme_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
@@ -79,6 +80,35 @@ import 'package:get/get.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart' hide Subtitle;
+
+int effectiveVideoQuality({
+  required bool isFullScreen,
+  required int fullscreenQuality,
+  required int? halfScreenQuality,
+}) {
+  if (isFullScreen || halfScreenQuality == null) return fullscreenQuality;
+  return min(halfScreenQuality, fullscreenQuality);
+}
+
+String videoQualityPreferenceKey({
+  required bool isMobile,
+  required bool isFullScreen,
+  required bool hasIndependentHalfScreen,
+  required bool isWiFi,
+}) {
+  if (!isMobile) return SettingBoxKey.defaultVideoQa;
+  if (!isFullScreen && hasIndependentHalfScreen) {
+    return SettingBoxKey.defaultVideoQaHalfScreen;
+  }
+  return isWiFi
+      ? SettingBoxKey.defaultVideoQa
+      : SettingBoxKey.defaultVideoQaCellular;
+}
+
+bool shouldUpgradeVideoQuality({
+  required int targetQuality,
+  required int actualQuality,
+}) => targetQuality > actualQuality;
 
 class VideoDetailController extends GetxController
     with GetTickerProviderStateMixin, BlockMixin {
@@ -408,6 +438,100 @@ class VideoDetailController extends GetxController
     return true;
   }
 
+  /// Register the fullscreen quality upgrade callback for the active video page.
+  ///
+  /// The player is a singleton, so the callback is rebound on route return and
+  /// is cleared only when it still belongs to this controller.
+  void setupFullScreenQualitySwitch() {
+    if (!PlatformUtils.isMobile) return;
+
+    _isFullScreenQualityOwner = true;
+    late final void Function(bool) callback;
+    callback = (bool isFullScreen) async {
+      if (!isFullScreen ||
+          isClosed ||
+          isQuerying ||
+          isFileSource ||
+          plPlayerController.isLive ||
+          !identical(plPlayerController.onFullScreenChanged, callback)) {
+        return;
+      }
+
+      final expectedBvid = bvid;
+      final expectedCid = cid.value;
+      final PlayUrlModel currentData;
+      try {
+        currentData = data;
+      } catch (_) {
+        return;
+      }
+      if (currentData.dash?.video?.isNotEmpty != true) return;
+
+      final bool isWiFi;
+      try {
+        isWiFi = await ConnectivityUtils.isWiFi;
+      } catch (_) {
+        return;
+      }
+      if (!_isActiveQualityOwner(expectedBvid, expectedCid) ||
+          !identical(plPlayerController.onFullScreenChanged, callback) ||
+          isQuerying ||
+          !plPlayerController.isFullScreen.value ||
+          !identical(data, currentData)) {
+        return;
+      }
+
+      final halfScreenQuality = Pref.defaultVideoQaHalfScreen;
+      if (halfScreenQuality == null) return;
+
+      final targetQuality = currentData.findAvailableVideoQuality(
+        isWiFi ? Pref.defaultVideoQa : Pref.defaultVideoQaCellular,
+      );
+      final actualQuality = currentVideoQa.value?.code;
+      if (actualQuality == null) return;
+      plPlayerController.cacheVideoQa = actualQuality;
+      if (!shouldUpgradeVideoQuality(
+        targetQuality: targetQuality,
+        actualQuality: actualQuality,
+      )) {
+        return;
+      }
+
+      plPlayerController.cacheVideoQa = targetQuality;
+      currentVideoQa.value = VideoQuality.fromCode(targetQuality);
+      updatePlayer();
+    };
+    _fullScreenQualityCallback = callback;
+    plPlayerController.onFullScreenChanged = callback;
+  }
+
+  void clearFullScreenQualitySwitch() {
+    _isFullScreenQualityOwner = false;
+    final callback = _fullScreenQualityCallback;
+    if (callback != null &&
+        identical(plPlayerController.onFullScreenChanged, callback)) {
+      plPlayerController.onFullScreenChanged = null;
+    }
+    _fullScreenQualityCallback = null;
+  }
+
+  /// Route manual quality persistence to the setting that owns the current UI.
+  Future<void> persistVideoQa(int quality) async {
+    if (plPlayerController.tempPlayerConf) return;
+    if (!PlatformUtils.isMobile) {
+      await GStorage.setting.put(SettingBoxKey.defaultVideoQa, quality);
+      return;
+    }
+
+    final key = videoQualityPreferenceKey(
+      isMobile: true,
+      isFullScreen: plPlayerController.isFullScreen.value,
+      hasIndependentHalfScreen: Pref.defaultVideoQaHalfScreen != null,
+      isWiFi: await ConnectivityUtils.isWiFi,
+    );
+    await GStorage.setting.put(key, quality);
+  }
+
   @pragma('vm:notify-debugger-on-exception')
   void _setVideoHeight() {
     try {
@@ -565,6 +689,10 @@ class VideoDetailController extends GetxController
       vsync: this,
       initialIndex: Pref.defaultShowComment ? 1 : 0,
     );
+
+    if (PlatformUtils.isMobile) {
+      setupFullScreenQualitySwitch();
+    }
   }
 
   Future<void> getMediaList({
@@ -953,6 +1081,16 @@ class VideoDetailController extends GetxController
   }
 
   bool isQuerying = false;
+  String? _lastQueryBvid;
+  int? _lastQueryCid;
+  void Function(bool isFullScreen)? _fullScreenQualityCallback;
+  bool _isFullScreenQualityOwner = false;
+
+  bool _isActiveQualityOwner(String expectedBvid, int expectedCid) =>
+      !isClosed &&
+      (!PlatformUtils.isMobile || _isFullScreenQualityOwner) &&
+      bvid == expectedBvid &&
+      cid.value == expectedCid;
 
   final languages = Rxn<List<LanguageItem>>();
   final currLang = Rxn<String>();
@@ -1013,15 +1151,31 @@ class VideoDetailController extends GetxController
 
   @pragma('vm:prefer-inline')
   Future<void> _queryVideoUrl(bool fromReset, bool autoFullScreenFlag) async {
+    final expectedBvid = bvid;
+    final expectedCid = cid.value;
+    if (_lastQueryBvid != expectedBvid || _lastQueryCid != expectedCid) {
+      if (PlatformUtils.isMobile) {
+        plPlayerController.cacheVideoQa = null;
+      }
+      _lastQueryBvid = expectedBvid;
+      _lastQueryCid = expectedCid;
+    }
+
     if (plPlayerController.enableSponsorBlock && isBlock && !fromReset) {
       querySponsorBlock(bvid: bvid, cid: cid.value);
     }
     if (plPlayerController.cacheVideoQa == null) {
       final isWiFi = await ConnectivityUtils.isWiFi;
+      if (!_isActiveQualityOwner(expectedBvid, expectedCid)) return;
+      final fullscreenQuality = isWiFi
+          ? Pref.defaultVideoQa
+          : Pref.defaultVideoQaCellular;
       plPlayerController
-        ..cacheVideoQa = isWiFi
-            ? Pref.defaultVideoQa
-            : Pref.defaultVideoQaCellular
+        ..cacheVideoQa = effectiveVideoQuality(
+          isFullScreen: plPlayerController.isFullScreen.value,
+          fullscreenQuality: fullscreenQuality,
+          halfScreenQuality: Pref.defaultVideoQaHalfScreen,
+        )
         ..cacheAudioQa = isWiFi
             ? Pref.defaultAudioQa
             : Pref.defaultAudioQaCellular;
@@ -1029,10 +1183,14 @@ class VideoDetailController extends GetxController
     }
 
     final result = await _getVideoUrl(VideoQuality.hdrVivid.code);
+    if (!_isActiveQualityOwner(expectedBvid, expectedCid)) return;
 
     if (result case Success(:final response)) {
       data = response;
-      if (data.dash != null) await _supplementVideoQualities();
+      if (data.dash != null) {
+        await _supplementVideoQualities();
+        if (!_isActiveQualityOwner(expectedBvid, expectedCid)) return;
+      }
 
       languages.value = data.language?.items;
       currLang.value = data.curLanguage;
@@ -1419,6 +1577,7 @@ class VideoDetailController extends GetxController
 
   @override
   void onClose() {
+    clearFullScreenQualitySwitch();
     cid.close();
     if (isFileSource) {
       cacheLocalProgress();
