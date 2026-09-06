@@ -70,10 +70,13 @@ class RuntimeSmokeLaunchTest(unittest.TestCase):
         self.assertNotIn('${PACKAGE_NAME}/.MainActivity', script)
         self.assertIn("android_runtime_smoke_launch.py", script)
 
-    def test_workflow_tracks_launch_helper_changes(self):
+    def test_workflow_requires_an_explicit_source_build(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
 
-        self.assertIn(".github/scripts/android_runtime_smoke_launch.py", workflow)
+        self.assertIn("  workflow_dispatch:", workflow)
+        self.assertNotIn("  push:", workflow)
+        self.assertIn("ARTIFACT_RUN_ID: ${{ inputs.artifact_run_id }}", workflow)
+        self.assertIn('.head_sha == $sha and .conclusion == "success"', workflow)
 
 
 if __name__ == "__main__":

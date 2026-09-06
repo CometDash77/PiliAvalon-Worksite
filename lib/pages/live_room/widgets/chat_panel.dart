@@ -1,6 +1,9 @@
+import 'package:PiliPlus/common/widgets/flutter/live_list_view.dart';
 import 'package:PiliPlus/common/widgets/flutter/popup_menu.dart';
 import 'package:PiliPlus/common/widgets/gesture/tap_gesture_recognizer.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
+import 'package:PiliPlus/common/widgets/scroll_physics.dart'
+    show platformClampingPhysics;
 import 'package:PiliPlus/http/live.dart';
 import 'package:PiliPlus/models_new/live/live_danmaku/danmaku_msg.dart';
 import 'package:PiliPlus/models_new/live/live_superchat/item.dart';
@@ -11,9 +14,9 @@ import 'package:PiliPlus/pages/video/widgets/header_control.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
-import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
+import 'package:material_ui/material_ui.dart';
 
 class LiveRoomChatPanel extends StatelessWidget {
   const LiveRoomChatPanel({
@@ -46,19 +49,27 @@ class LiveRoomChatPanel extends StatelessWidget {
         : colorScheme.inversePrimary;
     return Stack(
       children: [
-        Obx(
-          () => ListView.separated(
+        Obx(() {
+          final showDanmaku = liveRoomController.effectiveShowDanmaku;
+          final showSC = liveRoomController.effectiveShowSC;
+          return LiveListView.separated(
             key: const PageStorageKey(LiveRoomChatPanel),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            // multiply by 2 to account for separators
+            initialIndex: liveRoomController.trimDmIndex * 2,
+            padding: const .symmetric(horizontal: 12),
             controller: liveRoomController.scrollController,
-            separatorBuilder: (_, _) => const SizedBox(height: 8),
+            separatorBuilder: (_, index) =>
+                liveRoomController.messages[index] == null
+                ? const SizedBox.shrink()
+                : const SizedBox(height: 8),
             itemCount: liveRoomController.builtLength =
                 liveRoomController.messages.length,
-            physics: const ClampingScrollPhysics(),
+            physics: platformClampingPhysics,
             itemBuilder: (_, index) {
+              liveRoomController.chatSimpleIndex = index;
               final item = liveRoomController.messages[index];
               if (item is DanmakuMsg) {
-                if (!liveRoomController.effectiveShowDanmaku) {
+                if (!showDanmaku) {
                   return const SizedBox.shrink();
                 }
                 WidgetSpan? medal;
@@ -130,7 +141,7 @@ class LiveRoomChatPanel extends StatelessWidget {
                 );
               }
               if (item is SuperChatItem) {
-                if (!liveRoomController.effectiveShowSC) {
+                if (!showSC) {
                   return const SizedBox.shrink();
                 }
                 return SuperChatCard(
@@ -139,10 +150,10 @@ class LiveRoomChatPanel extends StatelessWidget {
                   onReport: () => liveRoomController.reportSC(item),
                 );
               }
-              throw item.runtimeType;
+              return const SizedBox.shrink();
             },
-          ),
-        ),
+          );
+        }),
         if (kDebugMode && liveRoomController.showSuperChat) ...[
           Positioned(
             top: 50,
@@ -286,10 +297,7 @@ class LiveRoomChatPanel extends StatelessWidget {
           spanChildren.add(
             TextSpan(
               text: nonMatchStr,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-              ),
+              style: const TextStyle(color: Colors.white, fontSize: 14),
             ),
           );
           return '';
@@ -299,10 +307,7 @@ class LiveRoomChatPanel extends StatelessWidget {
     } else {
       return TextSpan(
         text: obj.text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 14,
-        ),
+        style: const TextStyle(color: Colors.white, fontSize: 14),
       );
     }
   }
@@ -332,35 +337,23 @@ class LiveRoomChatPanel extends StatelessWidget {
       items: <PopupMenuEntry<Never>>[
         CustomPopupMenuItem(
           height: 38,
-          child: Text(
-            item.name,
-            style: const TextStyle(fontSize: 13),
-          ),
+          child: Text(item.name, style: const TextStyle(fontSize: 13)),
         ),
         const CustomPopupMenuDivider(height: 1),
         PopupMenuItem(
           height: 38,
           onTap: () => Utils.copyText(Utils.jsonEncoder.convert(item.toJson())),
-          child: const Text(
-            '复制弹幕信息',
-            style: TextStyle(fontSize: 13),
-          ),
+          child: const Text('复制弹幕信息', style: TextStyle(fontSize: 13)),
         ),
         PopupMenuItem(
           height: 38,
           onTap: () => Get.toNamed('/member?mid=${item.extra.mid}'),
-          child: const Text(
-            '去TA的个人空间',
-            style: TextStyle(fontSize: 13),
-          ),
+          child: const Text('去TA的个人空间', style: TextStyle(fontSize: 13)),
         ),
         PopupMenuItem(
           height: 38,
           onTap: () => onAtUser(item),
-          child: const Text(
-            '@TA',
-            style: TextStyle(fontSize: 13),
-          ),
+          child: const Text('@TA', style: TextStyle(fontSize: 13)),
         ),
         PopupMenuItem(
           height: 38,
@@ -377,10 +370,7 @@ class LiveRoomChatPanel extends StatelessWidget {
               res.toast();
             }
           },
-          child: const Text(
-            '屏蔽发送者',
-            style: TextStyle(fontSize: 13),
-          ),
+          child: const Text('屏蔽发送者', style: TextStyle(fontSize: 13)),
         ),
         PopupMenuItem(
           height: 38,
@@ -390,10 +380,7 @@ class LiveRoomChatPanel extends StatelessWidget {
             msg: item.text,
             extra: item.extra,
           ),
-          child: const Text(
-            '举报选中弹幕',
-            style: TextStyle(fontSize: 13),
-          ),
+          child: const Text('举报选中弹幕', style: TextStyle(fontSize: 13)),
         ),
       ],
     ).whenComplete(() {

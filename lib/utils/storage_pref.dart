@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math' show pow, sqrt;
 
 import 'package:PiliPlus/common/widgets/gesture/horizontal_drag_gesture_recognizer.dart'
     show deviceTouchSlop;
@@ -46,9 +45,9 @@ import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flex_seed_scheme/flex_seed_scheme.dart' show FlexSchemeVariant;
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hive_ce/hive.dart';
+import 'package:material_ui/material_ui.dart';
 
 abstract final class Pref {
   static final Box _setting = GStorage.setting;
@@ -107,8 +106,10 @@ abstract final class Pref {
 
   static List<double> get springDescription => List<double>.from(
     _setting.get(SettingBoxKey.springDescription) ??
-        [0.5, 100.0, 2.2 * sqrt(50)], // [mass, stiffness, damping]
+        // duration: 0.3, bounce: 0.0
+        const [1.0, 438.64908449286037, 41.88790204786391],
   );
+  //   [0.5, 100.0, 2.2 * math.sqrt(50)], // [mass, stiffness, damping]
 
   static List<double> get speedList => List<double>.from(
     _video.get(
@@ -245,20 +246,26 @@ abstract final class Pref {
     defaultValue: AudioQuality.k192.code,
   );
 
-  static String get defaultDecode => _setting.get(
-    SettingBoxKey.defaultDecode,
-    defaultValue: VideoDecodeFormatType.AVC.codes.first,
-  );
+  static List<VideoDecodeFormatType> get preferCodecs {
+    final codecs = _setting.get(SettingBoxKey.preferCodecs);
+    if (codecs is List) {
+      return codecs.map((i) => VideoDecodeFormatType.values.byName(i)).toList();
+    }
+    return const <VideoDecodeFormatType>[.AVC, .AV1];
+  }
 
-  static String get secondDecode => _setting.get(
-    SettingBoxKey.secondDecode,
-    defaultValue: VideoDecodeFormatType.AV1.codes.first,
-  );
+  static List<VideoDecodeFormatType> get preferCodecsCellular {
+    final codecs = _setting.get(SettingBoxKey.preferCodecsCellular);
+    if (codecs is List) {
+      return codecs.map((i) => VideoDecodeFormatType.values.byName(i)).toList();
+    }
+    return preferCodecs;
+  }
 
   static String get hardwareDecoding => _setting.get(
     SettingBoxKey.hardwareDecoding,
     defaultValue: Platform.isAndroid
-        ? HwDecType.autoSafe.hwdec
+        ? HwDecType.androidDefault
         : HwDecType.auto.hwdec,
   );
 
@@ -321,9 +328,6 @@ abstract final class Pref {
 
   static double get blockLimit =>
       _setting.get(SettingBoxKey.blockLimit, defaultValue: 0.0);
-
-  static double get refreshDragPercentage =>
-      _setting.get(SettingBoxKey.refreshDragPercentage, defaultValue: 0.25);
 
   static double get refreshDisplacement => _setting.get(
     SettingBoxKey.refreshDisplacement,
@@ -582,8 +586,26 @@ abstract final class Pref {
     defaultValue: LiveQuality.superHD.code,
   );
 
-  static int get appFontWeight =>
-      _setting.get(SettingBoxKey.appFontWeight, defaultValue: -1);
+  static FontWeight get appFontWeight {
+    // TODO: remove next 2 version
+    const appFontWeightV1 = 'appFontWeight';
+    final int? valV1 = _setting.get(appFontWeightV1);
+    if (valV1 != null) {
+      _setting.delete(appFontWeightV1);
+      if (valV1 == -1) {
+        return .normal;
+      } else {
+        _setting.put(SettingBoxKey.appFontWeightV2, valV1);
+        return .values[valV1];
+      }
+    }
+
+    final int? val = _setting.get(SettingBoxKey.appFontWeightV2);
+    if (val == null) {
+      return .normal;
+    }
+    return .values[val];
+  }
 
   static bool get enableDragSubtitle =>
       _setting.get(SettingBoxKey.enableDragSubtitle, defaultValue: false);
@@ -610,7 +632,7 @@ abstract final class Pref {
       _setting.get(SettingBoxKey.showPgcTimeline, defaultValue: true);
 
   static num get maxCacheSize =>
-      _setting.get(SettingBoxKey.maxCacheSize) ?? pow(1024, 3);
+      _setting.get(SettingBoxKey.maxCacheSize) ?? 1 << 30;
 
   static bool get optTabletNav =>
       _setting.get(SettingBoxKey.optTabletNav, defaultValue: true);
@@ -759,9 +781,6 @@ abstract final class Pref {
       !Platform.isIOS &&
       _setting.get(SettingBoxKey.dynamicColor, defaultValue: true);
 
-  static bool get autoClearCache =>
-      _setting.get(SettingBoxKey.autoClearCache, defaultValue: false);
-
   static bool get enableSystemProxy =>
       _setting.get(SettingBoxKey.enableSystemProxy, defaultValue: false);
 
@@ -772,6 +791,12 @@ abstract final class Pref {
       ReplySortType.values[_setting.get(
         SettingBoxKey.replySortType,
         defaultValue: ReplySortType.hot.index,
+      )];
+
+  static ReplySortType get reply2SortType =>
+      ReplySortType.values[_setting.get(
+        SettingBoxKey.reply2SortType,
+        defaultValue: ReplySortType.time.index,
       )];
 
   static DynamicBadgeMode get dynamicBadgeMode =>
@@ -1058,4 +1083,9 @@ abstract final class Pref {
 
   static double get maxVolume => // desktop
       _setting.get(SettingBoxKey.maxVolume, defaultValue: 2.0);
+
+  static List? get liveStream => _setting.get(SettingBoxKey.liveStream);
+
+  static bool get enableDocProvider =>
+      _setting.get(SettingBoxKey.enableDocProvider, defaultValue: false);
 }

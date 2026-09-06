@@ -16,6 +16,7 @@ on:
   push:
     branches:
       - main
+      - production
   pull_request:
     branches:
       - main
@@ -26,7 +27,7 @@ permissions:
 
 jobs:
   verify:
-    name: Focused Flutter verification
+    name: Flutter verification
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -44,26 +45,21 @@ jobs:
       - name: Flutter version
         run: flutter --version
 
-      - name: Install dependencies
-        run: flutter pub get
+      - name: Apply Android SDK and package patches
+        shell: pwsh
+        run: lib/scripts/patch.ps1 android
 
       - name: Verify dependency lock is clean
         run: git diff --exit-code pubspec.yaml pubspec.lock
 
-      - name: Run shielding tests
-        run: flutter test test/features/shielding
+      - name: Run Flutter regression suite
+        run: flutter test --no-pub
 
-      - name: Run settings model test
-        run: flutter test test/pages/setting/models/shielding_settings_test.dart
-
-      - name: Run recommend settings test
-        run: flutter test test/pages/setting/models/recommend_settings_test.dart
-
-      - name: Run bootstrap startup test
-        run: flutter test test/bootstrap/bootstrap_app_test.dart
+      - name: Test Android launcher resolution
+        run: python3 -m unittest discover -s tool -p android_runtime_smoke_launch_test.py
 
       - name: Analyze
-        run: flutter analyze --no-fatal-infos
+        run: flutter analyze --no-pub --no-fatal-infos
 
   android-x86-64:
     name: Build Android x86_64 artifact
@@ -92,14 +88,15 @@ jobs:
           flutter-version-file: pubspec.yaml
           cache: true
 
-      - name: Install dependencies
-        run: flutter pub get
+      - name: Apply Android SDK and package patches
+        shell: pwsh
+        run: lib/scripts/patch.ps1 android
 
       - name: Verify dependency lock is clean
         run: git diff --exit-code pubspec.yaml pubspec.lock
 
       - name: Build x86_64 APK
-        run: flutter build apk --release --split-per-abi --target-platform android-x64 --android-project-arg dev=1 --pub
+        run: flutter build apk --release --split-per-abi --target-platform android-x64 --android-project-arg dev=1 --no-pub
 
       - name: Stage x86_64 APK
         shell: bash

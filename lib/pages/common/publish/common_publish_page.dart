@@ -6,8 +6,8 @@ import 'package:PiliPlus/models/common/publish_panel_type.dart';
 import 'package:PiliPlus/utils/extension/context_ext.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:chat_bottom_container/chat_bottom_container.dart';
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:material_ui/material_ui.dart';
 
 abstract class CommonPublishPage<T> extends StatefulWidget {
   const CommonPublishPage({
@@ -40,6 +40,8 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
   bool hasPub = false;
   void initPubState();
 
+  late ThemeData theme;
+
   @override
   void initState() {
     super.initState();
@@ -47,7 +49,7 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
       WidgetsBinding.instance.addObserver(this);
     }
 
-    focusNode = FocusNode();
+    focusNode = FocusNode()..addListener(_onFocusChanged);
 
     initPubState();
 
@@ -61,7 +63,24 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    initTheme();
+  }
+
+  void initTheme() {
+    theme = Theme.of(context);
+  }
+
+  void _onFocusChanged() {
+    if (focusNode.hasFocus && readOnly.value) {
+      updatePanelType(.keyboard);
+    }
+  }
+
+  @override
   void dispose() {
+    focusNode.removeListener(_onFocusChanged);
     if (!hasPub) {
       onSave();
     }
@@ -74,7 +93,9 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
   }
 
   void _requestFocus() {
-    Future.delayed(const Duration(microseconds: 200), focusNode.requestFocus);
+    Future.delayed(const Duration(microseconds: 200), () {
+      if (mounted) focusNode.requestFocus();
+    });
   }
 
   @override
@@ -86,6 +107,7 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
               panelType.value == PanelType.none)) {
         controller.restoreChatPanel();
         WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
           if (focusNode.hasFocus) {
             focusNode.unfocus();
             _requestFocus();
@@ -185,9 +207,9 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
     );
   }
 
-  Widget buildMorePanel(ThemeData theme) => throw UnimplementedError();
+  Widget buildMorePanel() => throw UnimplementedError();
 
-  Widget buildPanelContainer(ThemeData theme, [Color? panelBgColor]) {
+  Widget buildPanelContainer([Color? panelBgColor]) {
     return ChatBottomPanelContainer<PanelType>(
       controller: controller,
       inputFocusNode: focusNode,
@@ -197,7 +219,7 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
           case PanelType.emoji:
             return buildEmojiPickerPanel();
           case PanelType.more:
-            return buildMorePanel(theme);
+            return buildMorePanel();
           default:
             return const SizedBox.shrink();
         }
@@ -216,7 +238,7 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
             break;
         }
       },
-      panelBgColor: panelBgColor ?? Theme.of(context).colorScheme.surface,
+      panelBgColor: panelBgColor ?? theme.colorScheme.surface,
       changeKeyboardPanelHeight: _changeKeyboardPanelHeight,
     );
   }
