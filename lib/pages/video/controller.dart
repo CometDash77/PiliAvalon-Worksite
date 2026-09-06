@@ -1174,7 +1174,9 @@ class VideoDetailController extends GetxController
         ..cacheVideoQa = effectiveVideoQuality(
           isFullScreen: plPlayerController.isFullScreen.value,
           fullscreenQuality: fullscreenQuality,
-          halfScreenQuality: Pref.defaultVideoQaHalfScreen,
+          halfScreenQuality: plPlayerController.isLive
+              ? null
+              : Pref.defaultVideoQaHalfScreen,
         )
         ..cacheAudioQa = isWiFi
             ? Pref.defaultAudioQa
