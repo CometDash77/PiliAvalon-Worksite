@@ -1,7 +1,7 @@
 import 'package:PiliPlus/common/widgets/flutter/list_tile.dart' as custom;
 import 'package:PiliPlus/pages/video/channel_quiet/channel_quiet_rule.dart';
 import 'package:PiliPlus/pages/video/channel_quiet/channel_quiet_store.dart';
-import 'package:flutter/material.dart' hide ListTile;
+import 'package:material_ui/material_ui.dart' hide ListTile;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 

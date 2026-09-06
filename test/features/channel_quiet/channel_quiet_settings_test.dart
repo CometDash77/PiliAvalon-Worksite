@@ -1,7 +1,8 @@
 import 'package:PiliPlus/pages/channel_quiet_settings/view.dart';
 import 'package:PiliPlus/pages/video/channel_quiet/channel_quiet_rule.dart';
 import 'package:PiliPlus/pages/video/channel_quiet/channel_quiet_store.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 
@@ -9,31 +10,47 @@ void main() {
   group('ChannelQuietSettingsPage', () {
     late ChannelQuietStore store;
     late _MemoryBox box;
+    late WidgetTester activeTester;
 
     setUp(() {
       box = _MemoryBox();
       store = ChannelQuietStore(box: box);
     });
 
-    Widget buildPage({bool showAppBar = false}) => GetMaterialApp(
-          home: ChannelQuietSettingsPage(
-            showAppBar: showAppBar,
-            store: store,
-          ),
-        );
+    tearDown(() async {
+      final tester = activeTester;
+      final dismissal = SmartDialog.dismiss(status: SmartStatus.allToast);
+      await tester.pumpAndSettle();
+      await dismissal;
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
 
-    testWidgets('shows loading indicator before data loads',
-        (WidgetTester tester) async {
-      await tester.pumpWidget(buildPage());
+    Widget buildPage(WidgetTester tester, {bool showAppBar = false}) {
+      activeTester = tester;
+      return GetMaterialApp(
+        builder: FlutterSmartDialog.init(),
+        home: ChannelQuietSettingsPage(
+          showAppBar: showAppBar,
+          store: store,
+        ),
+      );
+    }
+
+    testWidgets('shows loading indicator before data loads', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(buildPage(tester));
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.text('暂无频道规则'), findsNothing);
     });
 
-    testWidgets('shows empty state when no rules exist',
-        (WidgetTester tester) async {
+    testWidgets('shows empty state when no rules exist', (
+      WidgetTester tester,
+    ) async {
       await store.load(); // seed cache as empty
-      await tester.pumpWidget(buildPage());
+      await tester.pumpWidget(buildPage(tester));
       await tester.pumpAndSettle();
 
       expect(find.text('暂无频道规则'), findsOneWidget);
@@ -41,8 +58,9 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsNothing);
     });
 
-    testWidgets('lists stored rules with title, subtitle, and switch',
-        (WidgetTester tester) async {
+    testWidgets('lists stored rules with title, subtitle, and switch', (
+      WidgetTester tester,
+    ) async {
       await store.add(
         key: ChannelQuietRule.ugcKey(42),
         channelUid: '42',
@@ -58,7 +76,7 @@ void main() {
         hideDanmaku: true,
       );
 
-      await tester.pumpWidget(buildPage());
+      await tester.pumpWidget(buildPage(tester));
       await tester.pumpAndSettle();
 
       // Both rules visible
@@ -78,8 +96,9 @@ void main() {
       expect(find.textContaining('2 条规则'), findsOneWidget);
     });
 
-    testWidgets('toggle sets both hide flags via switch',
-        (WidgetTester tester) async {
+    testWidgets('toggle sets both hide flags via switch', (
+      WidgetTester tester,
+    ) async {
       await store.add(
         key: ChannelQuietRule.ugcKey(1),
         channelUid: '1',
@@ -88,7 +107,7 @@ void main() {
         hideDanmaku: false,
       );
 
-      await tester.pumpWidget(buildPage());
+      await tester.pumpWidget(buildPage(tester));
       await tester.pumpAndSettle();
 
       // Switch should be ON because hideComments is true
@@ -114,8 +133,9 @@ void main() {
       expect(rules.single.hideDanmaku, isFalse);
     });
 
-    testWidgets('toggle ON sets both hide flags to true',
-        (WidgetTester tester) async {
+    testWidgets('toggle ON sets both hide flags to true', (
+      WidgetTester tester,
+    ) async {
       await store.add(
         key: ChannelQuietRule.ugcKey(1),
         channelUid: '1',
@@ -124,7 +144,7 @@ void main() {
         hideDanmaku: false,
       );
 
-      await tester.pumpWidget(buildPage());
+      await tester.pumpWidget(buildPage(tester));
       await tester.pumpAndSettle();
 
       // Switch should be OFF
@@ -143,8 +163,9 @@ void main() {
       expect(find.textContaining('隐藏评论、弹幕'), findsOneWidget);
     });
 
-    testWidgets('edit dialog opens on tap and saves changes',
-        (WidgetTester tester) async {
+    testWidgets('edit dialog opens on tap and saves changes', (
+      WidgetTester tester,
+    ) async {
       await store.add(
         key: ChannelQuietRule.ugcKey(1),
         channelUid: '1',
@@ -153,7 +174,7 @@ void main() {
         hideDanmaku: false,
       );
 
-      await tester.pumpWidget(buildPage());
+      await tester.pumpWidget(buildPage(tester));
       await tester.pumpAndSettle();
 
       // Tap the rule to open editor
@@ -180,15 +201,16 @@ void main() {
       expect(find.text('Original'), findsNothing);
     });
 
-    testWidgets('delete via long-press shows confirmation and removes rule',
-        (WidgetTester tester) async {
+    testWidgets('delete via long-press shows confirmation and removes rule', (
+      WidgetTester tester,
+    ) async {
       await store.add(
         key: ChannelQuietRule.ugcKey(1),
         channelUid: '1',
         channelName: 'ToDelete',
       );
 
-      await tester.pumpWidget(buildPage());
+      await tester.pumpWidget(buildPage(tester));
       await tester.pumpAndSettle();
 
       expect(find.text('ToDelete'), findsOneWidget);
@@ -210,15 +232,16 @@ void main() {
       expect(find.text('暂无频道规则'), findsOneWidget);
     });
 
-    testWidgets('delete dialog cancel leaves rule intact',
-        (WidgetTester tester) async {
+    testWidgets('delete dialog cancel leaves rule intact', (
+      WidgetTester tester,
+    ) async {
       await store.add(
         key: ChannelQuietRule.ugcKey(1),
         channelUid: '1',
         channelName: 'KeepMe',
       );
 
-      await tester.pumpWidget(buildPage());
+      await tester.pumpWidget(buildPage(tester));
       await tester.pumpAndSettle();
 
       // Long-press, then cancel
@@ -255,7 +278,7 @@ void main() {
         hideDanmaku: true,
       );
 
-      await tester.pumpWidget(buildPage());
+      await tester.pumpWidget(buildPage(tester));
       await tester.pumpAndSettle();
 
       // 3 rules total, 2 hide comments, 2 hide danmaku
@@ -264,7 +287,9 @@ void main() {
       expect(find.textContaining('弹幕 2'), findsOneWidget);
     });
 
-    testWidgets('sort order: newest updated first', (WidgetTester tester) async {
+    testWidgets('sort order: newest updated first', (
+      WidgetTester tester,
+    ) async {
       // Add rule A first (older)
       await store.add(
         key: ChannelQuietRule.ugcKey(1),
@@ -282,7 +307,7 @@ void main() {
         channelName: 'Beta',
       );
 
-      await tester.pumpWidget(buildPage());
+      await tester.pumpWidget(buildPage(tester));
       await tester.pumpAndSettle();
 
       // Beta (newer) should appear before Alpha (older) in the list

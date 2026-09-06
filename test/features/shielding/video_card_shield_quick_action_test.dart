@@ -1,6 +1,7 @@
 import 'package:PiliPlus/common/widgets/video_card/shield_quick_action.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 
@@ -43,7 +44,8 @@ void main() {
       expect((await store.load()).rules, isEmpty);
     });
 
-    test('quickRule accepts explicit approved scope', () async {
+    testWidgets('quickRule accepts explicit approved scope', (tester) async {
+      await _pumpLauncher(tester, onTap: (_) {});
       final store = ShieldSettingsStore(box: _MemoryBox());
 
       await VideoCardShieldQuickAction.quickRule(
@@ -289,8 +291,16 @@ Future<void> _pumpLauncher(
   WidgetTester tester, {
   required void Function(BuildContext context) onTap,
 }) async {
+  addTearDown(() async {
+    final dismissal = SmartDialog.dismiss(status: SmartStatus.allToast);
+    await tester.pumpAndSettle();
+    await dismissal;
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
   await tester.pumpWidget(
     GetMaterialApp(
+      builder: FlutterSmartDialog.init(),
       home: Scaffold(
         body: Builder(
           builder: (context) => TextButton(

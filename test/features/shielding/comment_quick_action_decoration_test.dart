@@ -5,7 +5,8 @@ import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart';
 import 'package:PiliPlus/pages/video/reply/widgets/reply_item_grpc.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:fixnum/fixnum.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:hive_ce/hive.dart';
@@ -94,8 +95,16 @@ Future<void> _pumpReply(
   required ReplyInfo reply,
   ShieldSettingsStore? store,
 }) async {
+  addTearDown(() async {
+    final dismissal = SmartDialog.dismiss(status: SmartStatus.allToast);
+    await tester.pumpAndSettle();
+    await dismissal;
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
   await tester.pumpWidget(
     GetMaterialApp(
+      builder: FlutterSmartDialog.init(),
       home: Scaffold(
         body: ReplyItemGrpc(
           replyItem: reply,

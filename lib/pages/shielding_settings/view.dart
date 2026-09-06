@@ -3,7 +3,7 @@
 import 'package:PiliPlus/common/widgets/flutter/list_tile.dart' as custom;
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/pages/setting/models/shielding_settings.dart';
-import 'package:flutter/material.dart' hide ListTile;
+import 'package:material_ui/material_ui.dart' hide ListTile;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 
@@ -265,8 +265,7 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
     final rawMode = rule?.matchMode;
     ShieldMatchMode mode = rawMode == ShieldMatchMode.token
         ? ShieldMatchMode.regex
-        : rawMode ??
-            _defaultEditorMode(type);
+        : rawMode ?? _defaultEditorMode(type);
     ShieldScope scope = rule?.scope ?? ShieldScope.both;
     ShieldAction action = rule?.action ?? ShieldAction.block;
     bool enabled = rule?.enabled ?? true;
@@ -409,8 +408,8 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
 
   ShieldMatchMode _defaultEditorMode(ShieldRuleType type) {
     return switch (type) {
-      ShieldRuleType.keyword || ShieldRuleType.reasonKeyword =>
-        ShieldMatchMode.contains,
+      ShieldRuleType.keyword ||
+      ShieldRuleType.reasonKeyword => ShieldMatchMode.contains,
       ShieldRuleType.duration ||
       ShieldRuleType.playbackCount ||
       ShieldRuleType.danmakuCount ||

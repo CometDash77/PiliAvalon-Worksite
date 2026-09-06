@@ -62,7 +62,7 @@ void main() {
     final area = tester.widget<SelectionArea>(find.byType(SelectionArea));
     final toolbar = area.contextMenuBuilder!(region.context, region)
         as AdaptiveTextSelectionToolbar;
-    toolbar.buttonItems!.singleWhere((item) => item.label == '加入过滤').onPressed();
+    toolbar.buttonItems!.singleWhere((item) => item.label == '加入过滤').onPressed!();
     await tester.pumpAndSettle();
     expect(find.text('屏蔽评论关键词「$message」'), findsOneWidget);
     await tester.tap(find.text('确认'));
