@@ -4,12 +4,14 @@ import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/pages/setting/recommend_range_shielding.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() {
   group('RecommendRangeShieldingPage', () {
     testWidgets('shows empty state when no range rules exist', (tester) async {
       await tester.pumpWidget(
         GetMaterialApp(
+          theme: ThemeData(splashFactory: NoSplash.splashFactory),
           home: RecommendRangeShieldingPage(
             store: ShieldSettingsStore(box: _MemoryBox()),
           ),
@@ -46,7 +48,10 @@ void main() {
       );
 
       await tester.pumpWidget(
-        GetMaterialApp(home: RecommendRangeShieldingPage(store: store)),
+        GetMaterialApp(
+          theme: ThemeData(splashFactory: NoSplash.splashFactory),
+          home: RecommendRangeShieldingPage(store: store),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -107,7 +112,10 @@ void main() {
       );
 
       await tester.pumpWidget(
-        GetMaterialApp(home: RecommendRangeShieldingPage(store: store)),
+        GetMaterialApp(
+          theme: ThemeData(splashFactory: NoSplash.splashFactory),
+          home: RecommendRangeShieldingPage(store: store),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -122,6 +130,7 @@ void main() {
     ) async {
       await tester.pumpWidget(
         GetMaterialApp(
+          theme: ThemeData(splashFactory: InkRipple.splashFactory),
           home: RecommendRangeShieldingPage(
             store: ShieldSettingsStore(box: _MemoryBox()),
           ),

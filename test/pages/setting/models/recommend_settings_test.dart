@@ -77,7 +77,7 @@ void main() {
         final list = recommendSettings;
 
         final oldIdx = list.indexWhere(
-          (e) => e.effectiveTitle == '过滤器也应用于相关视频',
+          (e) => e.effectiveTitle == '过滤器也应用于详情页相关视频',
         );
         final newIdx = list.indexWhere(
           (e) => e.effectiveTitle == '相关视频屏蔽',
@@ -93,7 +93,7 @@ void main() {
       final list = recommendSettings;
 
       final oldIdx = list.indexWhere(
-        (e) => e.effectiveTitle == '过滤器也应用于相关视频',
+        (e) => e.effectiveTitle == '过滤器也应用于详情页相关视频',
       );
       final newIdx = list.indexWhere(
         (e) => e.effectiveTitle == '相关视频屏蔽',

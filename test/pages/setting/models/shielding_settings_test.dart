@@ -1,11 +1,11 @@
 import 'dart:convert';
-import 'dart:ui' show Size;
 
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/pages/setting/models/shielding_settings.dart';
 import 'package:PiliPlus/pages/shielding_settings/view.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() {
   group('shielding setting labels', () {
@@ -451,6 +451,7 @@ void main() {
     ) async {
       await tester.pumpWidget(
         GetMaterialApp(
+          theme: ThemeData(splashFactory: InkRipple.splashFactory),
           home: ShieldingSettingsPage(
             store: ShieldSettingsStore(box: _MemoryBox()),
           ),
@@ -472,6 +473,7 @@ void main() {
     ) async {
       await tester.pumpWidget(
         GetMaterialApp(
+          theme: ThemeData(splashFactory: NoSplash.splashFactory),
           home: ShieldingSettingsPage(
             store: ShieldSettingsStore(box: _MemoryBox()),
           ),
@@ -512,7 +514,10 @@ void main() {
       );
 
       await tester.pumpWidget(
-        GetMaterialApp(home: ShieldingSettingsPage(store: store)),
+        GetMaterialApp(
+          theme: ThemeData(splashFactory: NoSplash.splashFactory),
+          home: ShieldingSettingsPage(store: store),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -524,6 +529,7 @@ void main() {
 
       await tester.pumpWidget(
         GetMaterialApp(
+          theme: ThemeData(splashFactory: NoSplash.splashFactory),
           home: ShieldingSettingsPage(
             store: ShieldSettingsStore(box: _MemoryBox()),
           ),
@@ -552,6 +558,7 @@ void main() {
 
       await tester.pumpWidget(
         GetMaterialApp(
+          theme: ThemeData(splashFactory: NoSplash.splashFactory),
           home: ShieldingSettingsPage(
             store: ShieldSettingsStore(box: _MemoryBox()),
           ),
@@ -581,6 +588,7 @@ void main() {
     testWidgets('category chips group decoration types', (tester) async {
       await tester.pumpWidget(
         GetMaterialApp(
+          theme: ThemeData(splashFactory: NoSplash.splashFactory),
           home: ShieldingSettingsPage(
             store: ShieldSettingsStore(box: _MemoryBox()),
           ),
@@ -600,6 +608,7 @@ void main() {
 
       await tester.pumpWidget(
         GetMaterialApp(
+          theme: ThemeData(splashFactory: NoSplash.splashFactory),
           home: ShieldingSettingsPage(
             store: ShieldSettingsStore(box: _MemoryBox()),
           ),

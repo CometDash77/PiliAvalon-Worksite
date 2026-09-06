@@ -1,34 +1,27 @@
+import 'dart:convert';
+
 import 'package:PiliPlus/pages/channel_quiet_settings/view.dart';
 import 'package:PiliPlus/pages/video/channel_quiet/channel_quiet_rule.dart';
 import 'package:PiliPlus/pages/video/channel_quiet/channel_quiet_store.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart' hide testWidgets;
+import 'package:flutter_test/flutter_test.dart' as testing show testWidgets;
 import 'package:get/get.dart';
 
 void main() {
   group('ChannelQuietSettingsPage', () {
     late ChannelQuietStore store;
     late _MemoryBox box;
-    late WidgetTester activeTester;
 
     setUp(() {
       box = _MemoryBox();
       store = ChannelQuietStore(box: box);
     });
 
-    tearDown(() async {
-      final tester = activeTester;
-      final dismissal = SmartDialog.dismiss(status: SmartStatus.allToast);
-      await tester.pumpAndSettle();
-      await dismissal;
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pumpAndSettle();
-    });
-
     Widget buildPage(WidgetTester tester, {bool showAppBar = false}) {
-      activeTester = tester;
       return GetMaterialApp(
+        theme: ThemeData(splashFactory: NoSplash.splashFactory),
         builder: FlutterSmartDialog.init(),
         home: ChannelQuietSettingsPage(
           showAppBar: showAppBar,
@@ -291,20 +284,25 @@ void main() {
       WidgetTester tester,
     ) async {
       // Add rule A first (older)
-      await store.add(
+      final alpha = await store.add(
         key: ChannelQuietRule.ugcKey(1),
         channelUid: '1',
         channelName: 'Alpha',
       );
 
-      // Small delay so updatedAt differs
-      await Future<void>.delayed(const Duration(milliseconds: 10));
-
       // Add rule B second (newer)
-      await store.add(
+      final beta = await store.add(
         key: ChannelQuietRule.ugcKey(2),
         channelUid: '2',
         channelName: 'Beta',
+      );
+
+      await box.put(
+        ChannelQuietStore.rulesKey,
+        jsonEncode([
+          alpha.copyWith(updatedAt: DateTime.utc(2026, 1, 1)).toJson(),
+          beta.copyWith(updatedAt: DateTime.utc(2026, 1, 2)).toJson(),
+        ]),
       );
 
       await tester.pumpWidget(buildPage(tester));
@@ -324,6 +322,20 @@ double _textTop(WidgetTester tester, String text) {
   final finder = find.text(text);
   expect(finder, findsOneWidget);
   return tester.getCenter(finder).dy;
+}
+
+void testWidgets(String description, WidgetTesterCallback callback) {
+  testing.testWidgets(description, (tester) async {
+    try {
+      await callback(tester);
+    } finally {
+      final dismissal = SmartDialog.dismiss(status: SmartStatus.allToast);
+      await tester.pumpAndSettle();
+      await dismissal;
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    }
+  });
 }
 
 class _MemoryBox implements ChannelQuietBox {

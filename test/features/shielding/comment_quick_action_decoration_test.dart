@@ -7,7 +7,8 @@ import 'package:PiliPlus/utils/storage.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart' hide testWidgets;
+import 'package:flutter_test/flutter_test.dart' as testing show testWidgets;
 import 'package:get/get.dart';
 import 'package:hive_ce/hive.dart';
 
@@ -95,15 +96,9 @@ Future<void> _pumpReply(
   required ReplyInfo reply,
   ShieldSettingsStore? store,
 }) async {
-  addTearDown(() async {
-    final dismissal = SmartDialog.dismiss(status: SmartStatus.allToast);
-    await tester.pumpAndSettle();
-    await dismissal;
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pumpAndSettle();
-  });
   await tester.pumpWidget(
     GetMaterialApp(
+      theme: ThemeData(splashFactory: NoSplash.splashFactory),
       builder: FlutterSmartDialog.init(),
       home: Scaffold(
         body: ReplyItemGrpc(
@@ -132,6 +127,20 @@ ReplyInfo _reply({
   content: Content(message: 'hello'),
   replyControl: ReplyControl(),
 );
+
+void testWidgets(String description, WidgetTesterCallback callback) {
+  testing.testWidgets(description, (tester) async {
+    try {
+      await callback(tester);
+    } finally {
+      final dismissal = SmartDialog.dismiss(status: SmartStatus.allToast);
+      await tester.pumpAndSettle();
+      await dismissal;
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    }
+  });
+}
 
 class _MemoryBox implements ShieldSettingsBox {
   final values = <String, Object?>{};

@@ -2,7 +2,8 @@ import 'package:PiliPlus/common/widgets/video_card/shield_quick_action.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart' hide testWidgets;
+import 'package:flutter_test/flutter_test.dart' as testing show testWidgets;
 import 'package:get/get.dart';
 
 void main() {
@@ -291,15 +292,9 @@ Future<void> _pumpLauncher(
   WidgetTester tester, {
   required void Function(BuildContext context) onTap,
 }) async {
-  addTearDown(() async {
-    final dismissal = SmartDialog.dismiss(status: SmartStatus.allToast);
-    await tester.pumpAndSettle();
-    await dismissal;
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pumpAndSettle();
-  });
   await tester.pumpWidget(
     GetMaterialApp(
+      theme: ThemeData(splashFactory: NoSplash.splashFactory),
       builder: FlutterSmartDialog.init(),
       home: Scaffold(
         body: Builder(
@@ -312,6 +307,20 @@ Future<void> _pumpLauncher(
     ),
   );
   await tester.pump();
+}
+
+void testWidgets(String description, WidgetTesterCallback callback) {
+  testing.testWidgets(description, (tester) async {
+    try {
+      await callback(tester);
+    } finally {
+      final dismissal = SmartDialog.dismiss(status: SmartStatus.allToast);
+      await tester.pumpAndSettle();
+      await dismissal;
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    }
+  });
 }
 
 class _MemoryBox implements ShieldSettingsBox {
