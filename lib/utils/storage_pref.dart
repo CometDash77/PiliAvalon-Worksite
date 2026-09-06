@@ -236,6 +236,13 @@ abstract final class Pref {
     defaultValue: VideoQuality.high1080.code,
   );
 
+  /// Half-screen default quality. `null` means follow the fullscreen default.
+  static int? get defaultVideoQaHalfScreen {
+    final value = _setting.get(SettingBoxKey.defaultVideoQaHalfScreen);
+    if (value == null || value == -1) return null;
+    return value as int;
+  }
+
   static int get defaultAudioQa => _setting.get(
     SettingBoxKey.defaultAudioQa,
     defaultValue: AudioQuality.hiRes.code,
