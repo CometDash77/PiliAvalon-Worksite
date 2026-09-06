@@ -7,13 +7,14 @@ import 'package:PiliPlus/http/browser_ua.dart';
 import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/utils/accounts/account.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
+import 'package:PiliPlus/utils/release_selection.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
-import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
+import 'package:material_ui/material_ui.dart';
 
 abstract final class Update {
   // 检查更新
@@ -28,13 +29,19 @@ abstract final class Update {
           extra: {'account': const NoAccount()},
         ),
       );
-      if (res.data is Map || res.data.isEmpty) {
+      if (res.data is! List) {
         if (!isAuto) {
           SmartDialog.showToast('检查更新失败，GitHub接口未返回数据，请检查网络');
         }
         return;
       }
-      final data = res.data[0];
+      final data = latestStableRelease(res.data);
+      if (data == null) {
+        if (!isAuto) {
+          SmartDialog.showToast('暂无可用的稳定版本');
+        }
+        return;
+      }
       final int latest =
           DateTime.parse(data['created_at']).millisecondsSinceEpoch ~/ 1000;
       if (BuildConfig.buildTime >= latest) {

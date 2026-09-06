@@ -1,7 +1,11 @@
+import 'dart:io' show Platform;
+
 import 'package:PiliPlus/common/skeleton/video_reply.dart';
+import 'package:PiliPlus/common/sliver_single_child_delegate.dart';
 import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
+import 'package:PiliPlus/common/widgets/scaffold/mini_scaffold.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/image_type.dart';
 import 'package:PiliPlus/models_new/video/video_note_list/list.dart';
@@ -10,12 +14,11 @@ import 'package:PiliPlus/pages/video/note/controller.dart';
 import 'package:PiliPlus/pages/webview/view.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/bili_utils.dart';
-import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
-import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
-import 'package:flutter/material.dart';
+import 'package:desktop_webview_window/desktop_webview_window.dart' as dww;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
+import 'package:material_ui/material_ui.dart';
 
 class NoteListPage extends CommonSlidePage {
   const NoteListPage({
@@ -38,6 +41,17 @@ class NoteListPage extends CommonSlidePage {
 
 class _NoteListPageState extends State<NoteListPage>
     with SingleTickerProviderStateMixin, CommonSlideMixin {
+  static dww.Webview? _activeNoteWebview;
+  static bool _isOpeningNote = false;
+  static Object? _dwwOwner;
+
+  void _closeLinuxWebview({bool close = false}) {
+    if (close) _activeNoteWebview?.close();
+    _activeNoteWebview = null;
+    _isOpeningNote = false;
+    _dwwOwner = null;
+  }
+
   late final NoteListPageCtr _controller;
 
   @override
@@ -52,69 +66,74 @@ class _NoteListPageState extends State<NoteListPage>
   @override
   void dispose() {
     Get.delete<NoteListPageCtr>(tag: widget.heroTag);
+    if (_dwwOwner == this) {
+      _closeLinuxWebview(close: true);
+    }
     super.dispose();
   }
 
   @override
   Widget buildPage(ThemeData theme) {
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      body: Column(
-        children: [
-          SizedBox(
-            height: 45,
-            child: AppBar(
-              primary: false,
-              automaticallyImplyLeading: false,
-              titleSpacing: 16,
-              toolbarHeight: 45,
-              backgroundColor: Colors.transparent,
-              title: Obx(() {
-                final count = _controller.count.value;
-                return Text('笔记${count == -1 ? '' : '($count)'}');
-              }),
-              shape: Border(
-                bottom: BorderSide(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.1),
+    return Material(
+      child: MiniScaffold(
+        body: Column(
+          children: [
+            Container(
+              height: 45,
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: theme.colorScheme.outline.withValues(alpha: 0.1),
+                  ),
                 ),
               ),
-              actions: [
-                IconButton(
-                  tooltip: '关闭',
-                  icon: const Icon(Icons.close, size: 20),
-                  onPressed: Get.back,
-                ),
-                const SizedBox(width: 2),
-              ],
+              child: Row(
+                children: [
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Obx(() {
+                      final count = _controller.count.value;
+                      return Text(
+                        '笔记${count == -1 ? '' : '($count)'}',
+                        style: const TextStyle(fontSize: 16),
+                      );
+                    }),
+                  ),
+                  IconButton(
+                    tooltip: '关闭',
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: Get.back,
+                  ),
+                  const SizedBox(width: 2),
+                ],
+              ),
             ),
-          ),
-          Expanded(child: enableSlide ? slideList(theme) : buildList(theme)),
-        ],
+            Expanded(child: enableSlide ? slideList(theme) : buildList(theme)),
+          ],
+        ),
       ),
     );
   }
 
   late Key _key;
-  late bool _isNested;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final controller = PrimaryScrollController.of(context);
-    _isNested = controller is ExtendedNestedScrollController;
     _key = ValueKey(controller.hashCode);
   }
 
   @override
   Widget buildList(ThemeData theme) {
-    Widget child = refreshIndicator(
+    final child = refreshIndicator(
       onRefresh: _controller.onRefresh,
       child: CustomScrollView(
         key: _key,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.only(bottom: 100),
+            padding: const .only(bottom: 100),
             sliver: Obx(
               () => _buildBody(theme, _controller.loadingState.value),
             ),
@@ -122,11 +141,8 @@ class _NoteListPageState extends State<NoteListPage>
         ],
       ),
     );
-    if (_isNested) {
-      child = ExtendedVisibilityDetector(
-        uniqueKey: const Key('note-list'),
-        child: child,
-      );
+    if (!Accounts.main.isLogin) {
+      return child;
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -157,21 +173,7 @@ class _NoteListPageState extends State<NoteListPage>
                   borderRadius: BorderRadius.all(Radius.circular(6)),
                 ),
               ),
-              onPressed: () {
-                if (!Accounts.main.isLogin) {
-                  SmartDialog.showToast('账号未登录');
-                  return;
-                }
-                Scaffold.of(context).showBottomSheet(
-                  constraints: const BoxConstraints(),
-                  (context) => WebviewPage(
-                    oid: widget.oid,
-                    title: widget.title,
-                    url:
-                        'https://www.bilibili.com/h5/note-app?oid=${widget.oid}&pagefrom=ugcvideo&is_stein_gate=${widget.isStein ? 1 : 0}',
-                  ),
-                );
-              },
+              onPressed: _onTakeNote,
               child: const Text('开始记笔记'),
             ),
           ),
@@ -184,34 +186,39 @@ class _NoteListPageState extends State<NoteListPage>
     ThemeData theme,
     LoadingState<List<VideoNoteItemModel>?> loadingState,
   ) {
-    late final divider = Divider(
-      height: 1,
-      color: theme.colorScheme.outline.withValues(alpha: 0.1),
-    );
-    return switch (loadingState) {
-      Loading() => SliverPrototypeExtentList.builder(
-        prototypeItem: const VideoReplySkeleton(),
-        itemBuilder: (_, _) => const VideoReplySkeleton(),
-        itemCount: 8,
-      ),
-      Success(:final response) =>
-        response != null && response.isNotEmpty
-            ? SliverList.separated(
-                itemBuilder: (context, index) {
-                  if (index == response.length - 1) {
-                    _controller.onLoadMore();
-                  }
-                  return _itemWidget(theme, response[index]);
-                },
-                itemCount: response.length,
-                separatorBuilder: (context, index) => divider,
-              )
-            : HttpError(onReload: _controller.onReload),
-      Error(:final errMsg) => HttpError(
-        errMsg: errMsg,
-        onReload: _controller.onReload,
-      ),
-    };
+    switch (loadingState) {
+      case Loading():
+        return const SliverPrototypeExtentList(
+          prototypeItem: VideoReplySkeleton(),
+          delegate: SliverSingleChildDelegate(
+            count: 8,
+            child: VideoReplySkeleton(),
+          ),
+        );
+      case Success(:final response):
+        if (response != null && response.isNotEmpty) {
+          final divider = Divider(
+            height: 1,
+            color: theme.colorScheme.outline.withValues(alpha: 0.1),
+          );
+          return SliverList.separated(
+            itemBuilder: (context, index) {
+              if (index == response.length - 1) {
+                _controller.onLoadMore();
+              }
+              return _itemWidget(theme, response[index]);
+            },
+            itemCount: response.length,
+            separatorBuilder: (context, index) => divider,
+          );
+        }
+        return HttpError(onReload: _controller.onReload);
+      case Error(:final errMsg):
+        return HttpError(
+          errMsg: errMsg,
+          onReload: _controller.onReload,
+        );
+    }
   }
 
   Widget _itemWidget(ThemeData theme, VideoNoteItemModel item) {
@@ -263,13 +270,10 @@ class _NoteListPageState extends State<NoteListPage>
                             ),
                           ),
                           const SizedBox(width: 6),
-                          Image.asset(
-                            BiliUtils.levelName(
-                              item.author!.level!,
-                              isSeniorMember: item.author!.isSeniorMember == 1,
-                            ),
+                          BiliUtils.levelPicture(
+                            item.author!.level!,
+                            isSeniorMember: item.author!.isSeniorMember == 1,
                             height: 11,
-                            cacheHeight: 11.cacheSize(context),
                           ),
                         ],
                       ),
@@ -308,6 +312,47 @@ class _NoteListPageState extends State<NoteListPage>
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _onTakeNoteLinux(String url) async {
+    if (_activeNoteWebview != null) {
+      await _activeNoteWebview?.bringToForeground();
+      SmartDialog.showToast('已置顶笔记窗口');
+      return;
+    }
+    if (_isOpeningNote) return;
+    _isOpeningNote = true;
+    SmartDialog.showToast('已在新窗口打开');
+    try {
+      var webview = await WebviewPage.openLinux(
+        oid: widget.oid,
+        title: widget.title,
+        url: url,
+        onClose: _closeLinuxWebview,
+      );
+      if (mounted) {
+        _activeNoteWebview = webview;
+        _dwwOwner = this;
+      } else {
+        webview?.close();
+        webview = null;
+      }
+    } finally {
+      _isOpeningNote = false;
+    }
+  }
+
+  void _onTakeNote() {
+    final url =
+        'https://www.bilibili.com/h5/note-app?oid=${widget.oid}&pagefrom=ugcvideo&is_stein_gate=${widget.isStein ? 1 : 0}';
+    if (Platform.isLinux) {
+      _onTakeNoteLinux(url);
+      return;
+    }
+    MiniScaffold.of(context).showBottomSheet(
+      constraints: const BoxConstraints(),
+      (context) => WebviewPage(oid: widget.oid, title: widget.title, url: url),
     );
   }
 }

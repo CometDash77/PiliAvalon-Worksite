@@ -1,5 +1,5 @@
-import 'dart:async';
-import 'dart:convert';
+import 'dart:async' show Timer, StreamSubscription;
+import 'dart:convert' show jsonDecode;
 import 'dart:math' as math;
 
 import 'package:PiliPlus/common/widgets/dialog/report.dart';
@@ -33,6 +33,7 @@ import 'package:PiliPlus/utils/connectivity_utils.dart';
 import 'package:PiliPlus/utils/danmaku_utils.dart';
 import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/extension/iterable_ext.dart';
+import 'package:PiliPlus/utils/extension/rx_ext.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
@@ -43,9 +44,13 @@ import 'package:PiliPlus/utils/video_utils.dart';
 import 'package:canvas_danmaku/canvas_danmaku.dart';
 import 'package:easy_debounce/easy_throttle.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, kReleaseMode;
-import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
+import 'package:material_ui/material_ui.dart';
+
+const int _kMaxChatCount = 500;
+const int _kTrimCount = _kMaxChatCount + 50;
+const int _kSafeTrimIndex = 200;
 
 class LiveRoomController extends GetxController {
   LiveRoomController(this.heroTag);
@@ -54,9 +59,7 @@ class LiveRoomController extends GetxController {
   int roomId = Get.arguments;
   int? ruid;
   DanmakuController<DanmakuExtra>? danmakuController;
-  final plPlayerController = PlPlayerController.getInstance(
-    isLive: true,
-  );
+  final plPlayerController = PlPlayerController.getInstance(isLive: true);
 
   final isLoaded = false.obs;
   final roomInfoH5 = Rxn<RoomInfoH5Data>();
@@ -93,10 +96,7 @@ class LiveRoomController extends GetxController {
     }
     return Text(
       text,
-      style: const TextStyle(
-        fontSize: 12,
-        color: Colors.white,
-      ),
+      style: const TextStyle(fontSize: 12, color: Colors.white),
     );
   });
 
@@ -113,6 +113,10 @@ class LiveRoomController extends GetxController {
   final tempHideSC = false.obs;
   bool autoScroll = true;
   LiveMessageStream? _msgStream;
+
+  List<String> _keywordList = const [];
+  Set<int> _shieldUids = const {};
+
   late final ScrollController scrollController;
   late final RxInt pageIndex = 0.obs;
   PageController? pageController;
@@ -133,7 +137,7 @@ class LiveRoomController extends GetxController {
   late final showSuperChat = superChatType != SuperChatType.disable;
 
   bool get effectiveShowDanmaku => effectiveShowLiveDanmaku(
-    globalShow: plPlayerController.enableShowDanmaku.value,
+    globalShow: plPlayerController.enableShowLiveDanmaku.value,
     temporaryHide: tempHideDanmaku.value,
   );
 
@@ -153,14 +157,47 @@ class LiveRoomController extends GetxController {
     if (watchedShow.value case final watchedShow?) {
       return Text(
         watchedShow,
-        style: const TextStyle(
-          fontSize: 12,
-          color: Colors.white,
-        ),
+        style: const TextStyle(fontSize: 12, color: Colors.white),
       );
     }
     return const SizedBox.shrink();
   });
+
+  int chatSimpleIndex = 0;
+  int _trimDmIndex = 0;
+  int get trimDmIndex => _trimDmIndex;
+  void _trimDm() {
+    final trimCount = messages.length - _trimDmIndex;
+    if (trimCount > _kTrimCount) {
+      final endIndex = messages.length - _kMaxChatCount;
+      final canTrim = (chatSimpleIndex - endIndex) > _kSafeTrimIndex;
+      if (canTrim) {
+        messages.fillRangeOnly(_trimDmIndex, endIndex);
+        _trimDmIndex = endIndex;
+      }
+    }
+  }
+
+  StreamSubscription? _sizeSub;
+
+  void _onSizeChanged((int, int) value) {
+    final isVertical = value.$2 > value.$1;
+    isPortrait.value = isVertical;
+    plPlayerController.isVertical = isVertical;
+  }
+
+  void _startSizeSub() {
+    if (isPortrait.value) return;
+    _stopSizeSub();
+    _sizeSub = plPlayerController.videoPlayerController?.stream.size.listen(
+      _onSizeChanged,
+    );
+  }
+
+  void _stopSizeSub() {
+    _sizeSub?.cancel();
+    _sizeSub = null;
+  }
 
   @override
   void onInit() {
@@ -222,12 +259,16 @@ class LiveRoomController extends GetxController {
       startLiveTimer();
       isPortrait.value = response.isPortrait ?? false;
       stream = playurl.stream;
-      await initLiveUrl(
-        streamIndex: streamIndex,
-        formatIndex: formatIndex,
-        codecIndex: codecIndex,
-        liveUrlIndex: liveUrlIndex,
-      );
+      _initStreamIndex();
+      await Future.wait([
+        ?initLiveUrl(
+          streamIndex: streamIndex,
+          formatIndex: formatIndex,
+          codecIndex: codecIndex,
+          liveUrlIndex: liveUrlIndex,
+        ),
+        if (isLogin && !isLoaded.value) _fetchBlockRules(),
+      ]);
       isLoaded.value = true;
     } else {
       _showDialog(res.toString());
@@ -239,6 +280,33 @@ class LiveRoomController extends GetxController {
   int formatIndex = 0;
   int codecIndex = 0;
   int liveUrlIndex = 0;
+
+  void _initStreamIndex() {
+    final pref = Pref.liveStream;
+    if (pref != null) {
+      try {
+        final String protocolName = pref[0];
+        final String formatName = pref[1];
+        final String codecName = pref[2];
+        for (var (i, s) in stream.indexed) {
+          if (s.protocolName == protocolName) {
+            streamIndex = i;
+            for (var (j, f) in s.format.indexed) {
+              if (f.formatName == formatName) {
+                formatIndex = j;
+                for (var (k, c) in f.codec.indexed) {
+                  if (c.codecName == codecName) {
+                    codecIndex = k;
+                    return;
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+  }
 
   Future<void>? initLiveUrl({
     int streamIndex = 0,
@@ -260,15 +328,12 @@ class LiveRoomController extends GetxController {
     // 以服务端返回的码率为准
     currentQn = item.currentQn;
     acceptQnList = item.acceptQn.map((e) {
-      return (
-        code: e,
-        desc: LiveQuality.fromCode(e)?.desc ?? e.toString(),
-      );
+      return (code: e, desc: LiveQuality.fromCode(e)?.desc ?? e.toString());
     }).toList();
     currentQnDesc.value =
         LiveQuality.fromCode(currentQn)?.desc ?? currentQn.toString();
     videoUrl = VideoUtils.getLiveCdnUrl(item, index: liveUrlIndex);
-    return playerInit();
+    return playerInit()?.whenComplete(_startSizeSub);
   }
 
   Future<void> queryLiveInfoH5() async {
@@ -316,9 +381,7 @@ class LiveRoomController extends GetxController {
     EasyThrottle.throttle(
       'liveDm',
       const Duration(milliseconds: 500),
-      () => WidgetsBinding.instance.addPostFrameCallback(
-        _scrollToBottom,
-      ),
+      () => WidgetsBinding.instance.addPostFrameCallback(_scrollToBottom),
     );
   }
 
@@ -358,8 +421,10 @@ class LiveRoomController extends GetxController {
     final res = await LiveHttp.liveRoomDmPrefetch(roomId: roomId);
     if (res case Success(:final response)) {
       if (response != null && response.isNotEmpty) {
-        if (!tempHideDanmaku.value) {
-          messages.addAll(response);
+        if (effectiveShowDanmaku) {
+          messages.addAll(
+            response.where((item) => !isBlocked(item.text, item.extra.mid)),
+          );
           scrollToBottom();
         }
       }
@@ -371,9 +436,10 @@ class LiveRoomController extends GetxController {
   }
 
   Future<void> getSuperChatMsg() async {
-    if (tempHideSC.value) return;
+    if (!effectiveShowSC) return;
     final res = await LiveHttp.superChatMsg(roomId);
-    if (res.dataOrNull?.list case final list?) {
+    if (!effectiveShowSC) return;
+    if (res.dataOrNull?.list case final list? when list.isNotEmpty) {
       superChatMsg.addAll(list);
     }
   }
@@ -382,12 +448,21 @@ class LiveRoomController extends GetxController {
     superChatMsg.removeWhere((e) => e.expired);
   }
 
+  // Keep the stable indices used by LiveListView and upstream chat trimming.
+  void _clearChatMessages<T>() {
+    final items = messages.rawValue;
+    for (var i = _trimDmIndex; i < items.length; i++) {
+      if (items[i] is T) items[i] = null;
+    }
+    messages.refresh();
+  }
+
   void toggleTempHideDanmaku() {
-    if (!plPlayerController.enableShowDanmaku.value) return;
+    if (!plPlayerController.enableShowLiveDanmaku.value) return;
     tempHideDanmaku.toggle();
     if (tempHideDanmaku.value) {
       danmakuController?.clear();
-      messages.removeWhere((msg) => msg is DanmakuMsg);
+      _clearChatMessages<DanmakuMsg>();
     }
   }
 
@@ -402,8 +477,29 @@ class LiveRoomController extends GetxController {
       }
       fsSC.value = null;
       superChatMsg.clear();
-      messages.removeWhere((msg) => msg is SuperChatItem);
+      _clearChatMessages<SuperChatItem>();
     }
+  }
+
+  Future<void> _fetchBlockRules() async {
+    final res = await LiveHttp.getLiveInfoByUser(roomId);
+    if (res case Success(:final response?)) {
+      if (response.keywordList case final keywordList?) {
+        _keywordList = keywordList;
+      }
+      if (response.shieldUserList case final shieldUserList?) {
+        _shieldUids = shieldUserList.map((e) => e.uid).toSet();
+      }
+    }
+  }
+
+  void updateBlockRules(List<String> keywords, Set<int> uids) {
+    _keywordList = keywords;
+    _shieldUids = uids;
+  }
+
+  bool isBlocked(String text, Object uid) {
+    return _keywordList.any(text.contains) || _shieldUids.contains(uid);
   }
 
   void startLiveMsg() {
@@ -450,6 +546,7 @@ class LiveRoomController extends GetxController {
 
   @override
   void onClose() {
+    _stopSizeSub();
     closeLiveMsg();
     cancelLikeTimer();
     cancelLiveTimer();
@@ -497,6 +594,8 @@ class LiveRoomController extends GetxController {
   }
 
   void addDm(dynamic msg, [DanmakuContentItem<DanmakuExtra>? item]) {
+    _trimDm();
+
     if (plPlayerController.showDanmaku) {
       if (item != null && effectiveShowDanmaku) {
         danmakuController?.addDanmaku(item);
@@ -523,12 +622,15 @@ class LiveRoomController extends GetxController {
           final info = obj['info'];
           final first = info[0];
           final content = first[15];
-          final Map<String, dynamic> extra = jsonDecode(content['extra']);
           final user = content['user'];
           // final midHash = first[7];
           final uid = user['uid'];
-          final name = user['base']['name'];
           final msg = info[1];
+          if (isBlocked(msg, uid)) {
+            return;
+          }
+          final Map<String, dynamic> extra = jsonDecode(content['extra']);
+          final name = user['base']['name'];
           BaseEmote? uemote;
           if (first[13] case Map<String, dynamic> map) {
             uemote = BaseEmote.fromJson(map);
@@ -544,10 +646,7 @@ class LiveRoomController extends GetxController {
           Owner? reply;
           final replyMid = extra['reply_mid'];
           if (replyMid != null && replyMid != 0) {
-            reply = Owner(
-              mid: replyMid,
-              name: extra['reply_uname'],
-            );
+            reply = Owner(mid: replyMid, name: extra['reply_uname']);
           }
           addDm(
             DanmakuMsg(
@@ -643,10 +742,7 @@ class LiveRoomController extends GetxController {
   }
 
   void onLikeTapUp([_]) {
-    likeClickTimer ??= Timer(
-      const Duration(milliseconds: 800),
-      onLike,
-    );
+    likeClickTimer ??= Timer(const Duration(milliseconds: 800), onLike);
   }
 
   Future<void> onLike() async {
@@ -697,7 +793,9 @@ class LiveRoomController extends GetxController {
         },
         transitionDuration: fromEmote
             ? const Duration(milliseconds: 400)
-            : const Duration(milliseconds: 500),
+            : PlatformUtils.isDesktop
+            ? const Duration(milliseconds: 350)
+            : const Duration(milliseconds: 400),
       ),
     );
   }
@@ -711,6 +809,8 @@ class LiveRoomController extends GetxController {
       Get.context!,
       ban: false,
       ReportOptions.liveDanmakuReport,
+      withContent: ReportOptions.liveDanmakuReportCheck,
+      contentRequired: ReportOptions.liveDanmakuReportCheck,
       (reasonType, reasonDesc, banUid) {
         return LiveHttp.superChatReport(
           id: item.id,

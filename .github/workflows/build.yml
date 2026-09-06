@@ -1,14 +1,14 @@
 name: Build
 
 on:
-    pull_request:
-        types:
-            - opened
-            - synchronize
-            - reopened
-            - ready_for_review
-        paths-ignore:
-            - "**.md"
+    # pull_request:
+    #     types:
+    #         - opened
+    #         - synchronize
+    #         - reopened
+    #         - ready_for_review
+    #     paths-ignore:
+    #         - "**.md"
     workflow_dispatch:
         inputs:
             build_android:
@@ -41,6 +41,12 @@ on:
                 default: true
                 type: boolean
 
+            release_draft:
+                description: "Keep the Android release private as a draft for acceptance"
+                required: false
+                default: false
+                type: boolean
+
             tag:
                 description: "tag"
                 required: false
@@ -56,7 +62,7 @@ jobs:
 
         steps:
             - name: 代码迁出
-              uses: actions/checkout@v6
+              uses: actions/checkout@v7
               with:
                   fetch-depth: 0
 
@@ -104,12 +110,12 @@ jobs:
 
             - name: Flutter Build Release Apk
               if: ${{ github.event_name == 'workflow_dispatch' }}
-              run: flutter build apk --release --split-per-abi --dart-define-from-file=pili_release.json --pub
+              run: flutter build apk --release --split-per-abi --dart-define-from-file=pili_release.json --no-pub
 
             - name: Flutter Build Dev Apk
               if: ${{ github.event_name == 'pull_request' }}
               run: |
-                  flutter build apk --release --split-per-abi --android-project-arg dev=1 --pub
+                  flutter build apk --release --split-per-abi --android-project-arg dev=1 --no-pub
 
             - name: Rename
               run: |
@@ -119,10 +125,20 @@ jobs:
                   done
               shell: bash
 
+            - name: Flutter Build Universal Release Apk
+              if: github.event_name == 'workflow_dispatch'
+              run: |
+                  flutter build apk --release --dart-define-from-file=pili_release.json --no-pub
+                  mv build/app/outputs/flutter-apk/app-release.apk "PiliAvalon_android_${{ env.version }}_universal.apk"
+
             - name: Capture Android signing fingerprints
               if: github.event_name == 'workflow_dispatch'
               run: |
                   mkdir -p signing-evidence
+                  for abi in arm64-v8a armeabi-v7a x86_64 universal; do
+                    test -s "PiliAvalon_android_${{ env.version }}_${abi}.apk"
+                  done
+                  sha256sum PiliAvalon_android_*.apk > signing-evidence/apk-sha256.txt
                   for file in PiliAvalon_android_*.apk; do
                     "${ANDROID_HOME}/build-tools/$(ls "${ANDROID_HOME}/build-tools" | sort -V | tail -n 1)/apksigner" verify --print-certs "$file" > "signing-evidence/${file}.certs.txt"
                   done
@@ -186,11 +202,12 @@ jobs:
 
             - name: Release
               if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '' }}
-              uses: softprops/action-gh-release@v2
+              uses: softprops/action-gh-release@v3
               with:
                   tag_name: ${{ env.release_tag }}
                   target_commitish: ${{ github.sha }}
                   name: ${{ env.release_tag }}
+                  draft: ${{ inputs.release_draft }}
                   prerelease: true
                   make_latest: false
                   body_path: signing-evidence/remote-fingerprint-summary.md
@@ -216,6 +233,15 @@ jobs:
                   archive: false
                   name: Android_x86_64
                   path: PiliAvalon_android_*_x86_64.apk
+
+            - name: Upload universal APK
+              if: github.event_name == 'workflow_dispatch'
+              uses: actions/upload-artifact@v7
+              with:
+                  archive: false
+                  name: Android_universal
+                  path: PiliAvalon_android_*_universal.apk
+                  if-no-files-found: error
 
             - name: 上传签名证据
               if: github.event_name == 'workflow_dispatch'

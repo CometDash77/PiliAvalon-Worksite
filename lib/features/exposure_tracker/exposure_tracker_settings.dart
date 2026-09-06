@@ -1,20 +1,19 @@
 import 'package:PiliPlus/features/exposure_tracker/exposure_tracker.dart';
 import 'package:PiliPlus/pages/setting/models/model.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 
-typedef ExposureNumberInputModelBuilder =
-    SettingsModel Function({
-      required String title,
-      required IconData icon,
-      required String key,
-      required int defaultVal,
-      required int min,
-      required int max,
-      String? suffix,
-    });
+typedef ExposureNumberInputModelBuilder = SettingsModel Function({
+  required String title,
+  required IconData icon,
+  required String key,
+  required int defaultVal,
+  required int min,
+  required int max,
+  String? suffix,
+});
 
 List<SettingsModel> exposureTrackerSettings({
   required ExposureNumberInputModelBuilder buildNumberInputModel,

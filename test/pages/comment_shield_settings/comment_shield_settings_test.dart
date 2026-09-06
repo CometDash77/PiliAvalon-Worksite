@@ -7,10 +7,15 @@ import 'package:PiliPlus/pages/comment_shield_settings/view.dart';
 import 'package:PiliPlus/pages/setting/view.dart';
 import 'package:PiliPlus/router/app_pages.dart';
 import 'package:PiliPlus/utils/accounts.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:hive_ce/hive.dart';
+import 'package:material_ui/material_ui.dart';
+
+GetMaterialApp _testApp(Widget home) => GetMaterialApp(
+  theme: ThemeData(splashFactory: InkRipple.splashFactory),
+  home: home,
+);
 
 void main() {
   setUpAll(() async {
@@ -55,9 +60,7 @@ void main() {
       final store = CommentShieldingStore(box: _MemoryBox());
 
       await tester.pumpWidget(
-        GetMaterialApp(
-          home: CommentShieldSettingsPage(store: store),
-        ),
+        _testApp(CommentShieldSettingsPage(store: store)),
       );
       await tester.pump();
 
@@ -68,9 +71,7 @@ void main() {
       final store = CommentShieldingStore(box: _MemoryBox());
 
       await tester.pumpWidget(
-        GetMaterialApp(
-          home: CommentShieldSettingsPage(store: store),
-        ),
+        _testApp(CommentShieldSettingsPage(store: store)),
       );
       await tester.pump();
 
@@ -82,9 +83,7 @@ void main() {
       final store = CommentShieldingStore(box: _MemoryBox());
 
       await tester.pumpWidget(
-        GetMaterialApp(
-          home: CommentShieldSettingsPage(store: store),
-        ),
+        _testApp(CommentShieldSettingsPage(store: store)),
       );
       await tester.pump();
 
@@ -111,29 +110,15 @@ void main() {
       final store = CommentShieldingStore(box: box);
 
       await tester.pumpWidget(
-        GetMaterialApp(
-          home: CommentShieldSettingsPage(store: store),
-        ),
+        _testApp(CommentShieldSettingsPage(store: store)),
       );
       await tester.pump();
 
-      // Find and tap the switch for blockWithPicture
       final pictureSwitch = find.text('屏蔽含图片评论');
       expect(pictureSwitch, findsOneWidget);
 
-      // The Switch is part of a ListTile with that title - scroll to it and tap
       await tester.scrollUntilVisible(pictureSwitch, 100);
-      await tester.tap(
-        find
-            .descendant(
-              of: find.ancestor(
-                of: pictureSwitch,
-                matching: find.byType(ListTile),
-              ),
-              matching: find.byType(Switch),
-            )
-            .first,
-      );
+      await tester.tap(pictureSwitch);
       await tester.pumpAndSettle();
 
       // Verify the config was saved
@@ -149,9 +134,7 @@ void main() {
       await store.save(const CommentShieldingConfig(minCharCount: 8));
 
       await tester.pumpWidget(
-        GetMaterialApp(
-          home: CommentShieldSettingsPage(store: store),
-        ),
+        _testApp(CommentShieldSettingsPage(store: store)),
       );
       await tester.pump();
 
@@ -174,9 +157,7 @@ void main() {
       );
 
       await tester.pumpWidget(
-        GetMaterialApp(
-          home: CommentShieldSettingsPage(store: store),
-        ),
+        _testApp(CommentShieldSettingsPage(store: store)),
       );
       await tester.pump();
 

@@ -1,7 +1,9 @@
 import 'package:PiliPlus/common/widgets/video_card/shield_quick_action.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
+import 'package:flutter_test/flutter_test.dart' hide testWidgets;
+import 'package:flutter_test/flutter_test.dart' as testing show testWidgets;
 import 'package:get/get.dart';
 
 void main() {
@@ -43,7 +45,8 @@ void main() {
       expect((await store.load()).rules, isEmpty);
     });
 
-    test('quickRule accepts explicit approved scope', () async {
+    testWidgets('quickRule accepts explicit approved scope', (tester) async {
+      await _pumpLauncher(tester, onTap: (_) {});
       final store = ShieldSettingsStore(box: _MemoryBox());
 
       await VideoCardShieldQuickAction.quickRule(
@@ -291,6 +294,8 @@ Future<void> _pumpLauncher(
 }) async {
   await tester.pumpWidget(
     GetMaterialApp(
+      theme: ThemeData(splashFactory: NoSplash.splashFactory),
+      builder: FlutterSmartDialog.init(),
       home: Scaffold(
         body: Builder(
           builder: (context) => TextButton(
@@ -302,6 +307,20 @@ Future<void> _pumpLauncher(
     ),
   );
   await tester.pump();
+}
+
+void testWidgets(String description, WidgetTesterCallback callback) {
+  testing.testWidgets(description, (tester) async {
+    try {
+      await callback(tester);
+    } finally {
+      final dismissal = SmartDialog.dismiss(status: SmartStatus.allToast);
+      await tester.pumpAndSettle();
+      await dismissal;
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    }
+  });
 }
 
 class _MemoryBox implements ShieldSettingsBox {
