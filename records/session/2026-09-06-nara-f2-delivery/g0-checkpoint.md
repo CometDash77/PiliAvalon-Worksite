@@ -35,6 +35,12 @@
 | Nara/Worksite root license SHA-256 comparison | Passed; identical GPL-3.0 text digest. |
 | Flutter/Android local tool discovery | `adb`, `gradle`, `java` and a discoverable Flutter SDK were unavailable; this is an environment limitation, not a fabricated pass. |
 
+## Recorded result
+
+- G0 evidence commit: `e9e812dcfa4ead5c7bf5a7e4a6853417e936203c`
+- The commit contains only the four Worksite-owned files in this directory; no product source, workflow, dependency, governance file or unrelated ignored content was staged.
+- The staged evidence passed `git diff --cached --check` before commit.
+
 ## Next action
 
-Review and commit these Worksite-owned G0 evidence files, then implement the G1 settings slice in a separate checkpoint. No product source has been changed in G0. No F1/F3/F4/F5 work was started.
+Implement the G1 settings slice in a separate checkpoint: add the storage key and nullable normalized getter, add the mobile half-screen setting/dialog with `-1` follow semantics and no-write cancellation, then add focused behavior coverage before wiring playback transitions.
