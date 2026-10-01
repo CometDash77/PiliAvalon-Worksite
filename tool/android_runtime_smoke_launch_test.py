@@ -55,12 +55,44 @@ class RuntimeSmokeLaunchTest(unittest.TestCase):
             )
         )
 
+    def test_detail_more_selector_chooses_toolbar_over_related_card_menus(self):
+        helper = load_navigation_helper()
+        ui = """<hierarchy rotation="0">
+          <node class="android.widget.FrameLayout" bounds="[0,0][1080,2400]">
+          <node class="android.widget.Button" clickable="true"
+            content-desc="返回主页" bounds="[110,157][221,246]" />
+          <node class="android.widget.Button" clickable="true"
+            content-desc="显示菜单" bounds="[954,139][1080,265]" />
+          <node class="android.widget.ImageView" clickable="true"
+            content-desc="46:37\n徐光启\n播放\nUP：子非秋月"
+            bounds="[0,1452][1080,1741]">
+            <node class="android.widget.Button" clickable="true"
+              content-desc="显示菜单" bounds="[972,1665][1049,1741]" />
+          </node>
+          </node>
+        </hierarchy>"""
+
+        target = helper.find_video_detail_more_button(ui)
+
+        self.assertEqual(target["bounds"], "[954,139][1080,265]")
+        self.assertEqual((target["cx"], target["cy"]), (1017, 202))
+
+    def test_detail_more_selector_rejects_recommendation_feed(self):
+        helper = load_navigation_helper()
+
+        self.assertIsNone(
+            helper.find_video_detail_more_button(
+                '<hierarchy><node clickable="true" content-desc="显示菜单" '
+                'bounds="[954,139][1080,265]" /></hierarchy>'
+            )
+        )
+
     def test_temp_quiet_scenario_navigates_to_detail_before_opening_its_menu(self):
         script = SMOKE_SCRIPT.read_text(encoding="utf-8")
 
         self.assertIn("android_runtime_smoke_navigation.py --video-card", script)
         self.assertIn('grep -q "返回主页" "$current_ui" && open_more_from_ui', script)
-        self.assertIn('"显示菜单" "更多选项"', script)
+        self.assertIn("android_runtime_smoke_navigation.py --detail-more-menu", script)
         self.assertIn("action=tap_recommendation_video_card", script)
 
     def test_dev_package_fallback_uses_real_activity_class(self):

@@ -733,7 +733,7 @@ PY
         local source_ui="$1"
         local attempt="$2"
         local matches="$scenario_evidence_dir/more-matches-${attempt}.txt"
-        find_nodes_by_text "$source_ui" "$matches" "显示菜单" "更多选项" "更多设置" "More options" "Show menu"
+        python3 .github/scripts/android_runtime_smoke_navigation.py --detail-more-menu "$source_ui" > "$matches"
         if grep -qv '^#' "$matches" 2>/dev/null; then
           if tap_first_match "$matches" "$scenario_log"; then
             sleep 2
