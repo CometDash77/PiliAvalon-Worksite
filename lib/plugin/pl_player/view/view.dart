@@ -61,8 +61,6 @@ import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:PiliPlus/utils/mobile_observer.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
-import 'package:PiliPlus/utils/storage.dart';
-import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:canvas_danmaku/canvas_danmaku.dart';
 import 'package:collection/collection.dart';
@@ -834,15 +832,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
 
                       SmartDialog.showToast("画质已变为：${newQa.desc}");
 
-                      // update
-                      if (!plPlayerController.tempPlayerConf) {
-                        GStorage.setting.put(
-                          await ConnectivityUtils.isWiFi
-                              ? SettingBoxKey.defaultVideoQa
-                              : SettingBoxKey.defaultVideoQaCellular,
-                          quality,
-                        );
-                      }
+                      videoDetailController.persistVideoQa(quality);
                     },
                     child: Text(
                       item.newDesc ?? '',
