@@ -241,6 +241,7 @@ abstract final class VideoCardShieldQuickAction {
   static String _ruleLabel(ShieldRuleType type, String pattern) =>
       switch (type) {
         ShieldRuleType.uid => '屏蔽推荐用户 UID $pattern',
+        ShieldRuleType.roomId => '屏蔽直播间 ID $pattern',
         ShieldRuleType.keyword => '屏蔽推荐标题/正文关键词「$pattern」',
         ShieldRuleType.userKeyword => '屏蔽推荐用户/UP关键词「$pattern」',
         ShieldRuleType.reasonKeyword => '屏蔽推荐理由「$pattern」',
@@ -275,6 +276,7 @@ abstract final class VideoCardShieldQuickAction {
         ShieldRuleType.isUpowerExclusive ||
         ShieldRuleType.staffKeyword => true,
         ShieldRuleType.commentMemberSex ||
+        ShieldRuleType.roomId ||
         ShieldRuleType.commentMemberLevel ||
         ShieldRuleType.avatarPendant ||
         ShieldRuleType.garb => false,

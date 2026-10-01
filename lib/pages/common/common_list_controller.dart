@@ -19,6 +19,10 @@ abstract class CommonListController<R, T> extends CommonController<R, T> {
 
   void checkIsEnd(int length) {}
 
+  bool continueAfterEmptyDataList(R response) => false;
+
+  bool refreshAfterEmptyDataList(R response) => false;
+
   @override
   Future<void> queryData([bool isRefresh = true]) async {
     if (isLoading || (!isRefresh && isEnd)) return;
@@ -28,12 +32,17 @@ abstract class CommonListController<R, T> extends CommonController<R, T> {
       if (!customHandleResponse(isRefresh, res)) {
         final dataList = getDataList(response);
         if (dataList == null || dataList.isEmpty) {
-          isEnd = true;
+          final canContinue = dataList != null &&
+              continueAfterEmptyDataList(response);
+          isEnd = !canContinue;
           if (isRefresh) {
             loadingState.value = Success(dataList);
-          } else if (hasFooter == true) {
+          } else if (hasFooter == true ||
+              canContinue ||
+              refreshAfterEmptyDataList(response)) {
             loadingState.refresh();
           }
+          if (canContinue) page++;
           isLoading = false;
           return;
         }

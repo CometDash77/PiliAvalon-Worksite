@@ -194,6 +194,7 @@ void main() {
         shieldingRuleCategoryLabels,
         containsAll([
           '用户/UP',
+          '直播',
           '标题关键词',
           '推荐理由',
           '标签',
@@ -586,6 +587,8 @@ void main() {
     });
 
     testWidgets('category chips group decoration types', (tester) async {
+      _setLargeTestSurface(tester);
+
       await tester.pumpWidget(
         GetMaterialApp(
           theme: ThemeData(splashFactory: NoSplash.splashFactory),

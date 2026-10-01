@@ -1,9 +1,11 @@
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/image/image_save.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
+import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/http/live.dart';
 import 'package:PiliPlus/models_new/live/live_feed_index/card_data_list_item.dart';
 import 'package:PiliPlus/models_new/live/live_feed_index/feedback.dart';
+import 'package:PiliPlus/pages/live/live_card_shield_quick_action.dart';
 import 'package:PiliPlus/pages/search/widgets/search_text.dart';
 import 'package:PiliPlus/utils/extension/iterable_ext.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
@@ -16,11 +18,17 @@ import 'package:material_ui/material_ui.dart';
 class LiveCardVApp extends StatelessWidget {
   final CardLiveItem item;
   final bool showFirstFrame;
+  final bool enableShield;
+  final ShieldSettingsStore? shieldStore;
+  final Future<void> Function()? onRuleSaved;
 
   const LiveCardVApp({
     super.key,
     required this.item,
     this.showFirstFrame = false,
+    this.enableShield = false,
+    this.shieldStore,
+    this.onRuleSaved,
   });
 
   @override
@@ -65,6 +73,35 @@ class LiveCardVApp extends StatelessWidget {
                 ),
                 liveContent(theme),
               ],
+            ),
+          ),
+        ),
+        if (enableShield)
+          Positioned(
+          top: 2,
+          right: 2,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              color: Colors.black54,
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              key: const Key('live-card-shield-button'),
+              tooltip: '屏蔽主播或房间',
+              padding: const EdgeInsets.all(8),
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              onPressed: () => LiveCardShieldQuickAction.showChoice(
+                context: context,
+                uid: item.uid,
+                roomId: item.roomid,
+                store: shieldStore ?? ShieldSettingsStore(),
+                onRuleSaved: onRuleSaved ?? () async {},
+              ),
+              icon: const Icon(
+                Icons.shield_outlined,
+                size: 20,
+                color: Colors.white,
+              ),
             ),
           ),
         ),

@@ -243,16 +243,31 @@ class _LivePageState extends State<LivePage>
                       return LiveCardVApp(
                         item: item.cardData!.smallCardV1!,
                         showFirstFrame: controller.showFirstFrame,
+                        enableShield: true,
+                        shieldStore: controller.shieldStore,
+                        onRuleSaved: controller.applySavedLiveRules,
                       );
                     }
                     return LiveCardVApp(
                       item: item,
                       showFirstFrame: controller.showFirstFrame,
+                      enableShield: true,
+                      shieldStore: controller.shieldStore,
+                      onRuleSaved: controller.applySavedLiveRules,
                     );
                   },
                   itemCount: response.length,
                 )
+              : controller.filteredPageEmpty
+              ? SliverToBoxAdapter(
+                  child: _FilteredLiveEmptyState(controller: controller),
+                )
               : HttpError(onReload: controller.onReload),
+          if (controller.filteredPageNeedsLoadMore &&
+              response?.isNotEmpty == true)
+            SliverToBoxAdapter(
+              child: _FilteredLiveEmptyState(controller: controller),
+            ),
         ],
       ),
       Error(:final errMsg) => HttpError(
@@ -394,6 +409,38 @@ class _LivePageState extends State<LivePage>
                 );
               },
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FilteredLiveEmptyState extends StatelessWidget {
+  const _FilteredLiveEmptyState({required this.controller});
+
+  final LiveController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              controller.filteredPageEmpty
+                  ? '当前页直播均已屏蔽'
+                  : '部分直播已按屏蔽规则过滤',
+            ),
+            if (controller.filteredPageNeedsLoadMore &&
+                controller.hasMoreSourcePages &&
+                !controller.isEnd)
+              TextButton(
+                onPressed: controller.loadMoreAfterFilteredPage,
+                child: const Text('继续加载'),
+              ),
           ],
         ),
       ),

@@ -77,6 +77,7 @@ String shieldRuleTypeLabel(ShieldRuleType type) => switch (type) {
   ShieldRuleType.userKeyword => '用户/UP关键词',
   ShieldRuleType.reasonKeyword => '推荐理由',
   ShieldRuleType.uid => '用户 UID',
+  ShieldRuleType.roomId => '直播间 ID',
   ShieldRuleType.category => '分区',
   ShieldRuleType.tag => '标签',
   ShieldRuleType.avatarPendant => '头像挂件',
@@ -94,6 +95,7 @@ String shieldRuleTypeLabel(ShieldRuleType type) => switch (type) {
 
 const shieldingRuleCategoryLabels = [
   '用户/UP',
+  '直播',
   '标题关键词',
   '推荐理由',
   '标签',
@@ -110,6 +112,7 @@ String shieldingRuleCategoryFor(ShieldRule rule) {
       rule.type == ShieldRuleType.userKeyword) {
     return '用户/UP';
   }
+  if (rule.type == ShieldRuleType.roomId) return '直播';
   if (rule.type == ShieldRuleType.reasonKeyword) return '推荐理由';
   if (rule.type == ShieldRuleType.keyword &&
       rule.scope == ShieldScope.comment) {
@@ -142,6 +145,7 @@ String shieldingRuleCategoryFor(ShieldRule rule) {
   return switch (rule.type) {
     ShieldRuleType.keyword => '标题关键词',
     ShieldRuleType.userKeyword || ShieldRuleType.uid => '用户/UP',
+    ShieldRuleType.roomId => '直播',
     ShieldRuleType.reasonKeyword => '推荐理由',
     ShieldRuleType.category => '分区',
     ShieldRuleType.tag => '标签',

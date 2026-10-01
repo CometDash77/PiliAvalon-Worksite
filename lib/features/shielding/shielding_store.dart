@@ -180,14 +180,35 @@ class ShieldSettingsStore {
 
     final current = await load();
     final normalized = trimmed.toLowerCase();
-    final exists = current.rules.any(
-      (rule) =>
-          rule.type == type &&
+    ShieldRule? existingBlock;
+    for (final rule in current.rules) {
+      if (rule.type == type &&
           rule.scope == scope &&
           rule.matchMode == effectiveMode &&
-          rule.pattern.trim().toLowerCase() == normalized,
-    );
-    if (exists) return null;
+          rule.action == ShieldAction.block &&
+          rule.pattern.trim().toLowerCase() == normalized) {
+        existingBlock = rule;
+        break;
+      }
+    }
+    final existing = existingBlock;
+    if (existing != null && existing.enabled) return null;
+
+    if (existing != null) {
+      final enabledRule = existing.copyWith(
+        enabled: true,
+        updatedAt: DateTime.now(),
+        source: ShieldRuleSource.quickAction,
+      );
+      await save(
+        current.copyWith(
+          rules: current.rules
+              .map((rule) => rule.id == existing.id ? enabledRule : rule)
+              .toList(),
+        ),
+      );
+      return enabledRule;
+    }
 
     final rule = ShieldRule(
       id: 'quickAction-${DateTime.now().microsecondsSinceEpoch}',
