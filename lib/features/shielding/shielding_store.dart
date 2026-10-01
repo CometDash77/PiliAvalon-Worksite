@@ -191,10 +191,11 @@ class ShieldSettingsStore {
         break;
       }
     }
-    if (existingBlock != null && existingBlock.enabled) return null;
+    final existing = existingBlock;
+    if (existing != null && existing.enabled) return null;
 
-    if (existingBlock != null) {
-      final enabledRule = existingBlock.copyWith(
+    if (existing != null) {
+      final enabledRule = existing.copyWith(
         enabled: true,
         updatedAt: DateTime.now(),
         source: ShieldRuleSource.quickAction,
@@ -202,7 +203,7 @@ class ShieldSettingsStore {
       await save(
         current.copyWith(
           rules: current.rules
-              .map((rule) => rule.id == existingBlock.id ? enabledRule : rule)
+              .map((rule) => rule.id == existing.id ? enabledRule : rule)
               .toList(),
         ),
       );
