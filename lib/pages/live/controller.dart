@@ -118,7 +118,7 @@ class LiveController extends CommonListController with AccountMixin {
     _liveRules = await shieldStore.load();
     final state = loadingState.value;
     if (state case Success(:final response)) {
-      final currentItems = response as List? ?? const [];
+      final currentItems = response ?? const [];
       final visibleItems = currentItems.where((entry) {
         final item = switch (entry) {
           LiveCardList() => entry.cardData?.smallCardV1,

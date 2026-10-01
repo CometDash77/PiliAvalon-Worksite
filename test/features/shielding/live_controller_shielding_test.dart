@@ -209,7 +209,7 @@ LiveCardList _feedItem({required int uid, int? roomId}) => LiveCardList(
 );
 
 List<String> _uids(LiveController controller) =>
-    (controller.loadingState.value.dataOrNull as List? ?? const [])
+    (controller.loadingState.value.dataOrNull ?? const [])
         .map((item) => item is LiveCardList
             ? item.cardData?.smallCardV1?.uid.toString()
             : (item as CardLiveItem).uid.toString())
