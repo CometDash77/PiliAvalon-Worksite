@@ -141,8 +141,9 @@ class PgcIntroController extends CommonIntroController {
   // 分享视频
   @override
   void actionShareVideo(BuildContext context) {
-    String videoUrl =
-        '${HttpString.baseUrl}/bangumi/play/ep$epId${videoDetailCtr.playedTimePos}';
+    final videoUrl =
+        '${HttpString.baseUrl}/bangumi/play/ep$epId' +
+        videoDetailCtr.playedTimePos(false);
     showDialog(
       context: context,
       builder: (_) => SimpleDialog(
