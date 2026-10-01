@@ -1,12 +1,22 @@
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo;
+import 'package:PiliPlus/features/shielding/shielding_matcher.dart';
+import 'package:PiliPlus/features/shielding/shielding_models.dart';
 import 'package:PiliPlus/models/home/rcmd/result.dart';
 import 'package:PiliPlus/models/model_hot_video_item.dart';
 import 'package:PiliPlus/models/model_rec_video_item.dart';
-import 'package:PiliPlus/features/shielding/shielding_matcher.dart';
-import 'package:PiliPlus/features/shielding/shielding_models.dart';
+import 'package:PiliPlus/models_new/live/live_feed_index/card_data_list_item.dart';
 
 abstract final class ShieldingAdapters {
+  static ShieldCandidate fromLiveCard(CardLiveItem item) => ShieldCandidate(
+    scope: ShieldScope.live,
+    title: item.title,
+    uid: item.uid?.toString(),
+    roomId: item.roomid?.toString(),
+    authorName: item.uname,
+    category: item.areaName,
+  );
+
   static ShieldCandidate fromRecommendationJson(
     BaseRcmdVideoItemModel item,
     Map<String, dynamic> json,

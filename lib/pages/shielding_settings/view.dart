@@ -35,6 +35,7 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
     ShieldRuleType.userKeyword,
     ShieldRuleType.reasonKeyword,
     ShieldRuleType.uid,
+    ShieldRuleType.roomId,
     ShieldRuleType.category,
     ShieldRuleType.tag,
     ShieldRuleType.duration,
@@ -294,6 +295,9 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
                   text: shieldRuleTypeLabel,
                   onChanged: (value) => setDialogState(() {
                     type = value;
+                    if (type == ShieldRuleType.roomId) {
+                      scope = ShieldScope.live;
+                    }
                     if (!_modeFitsType(mode, type)) {
                       mode = _defaultEditorMode(type);
                     }
@@ -302,14 +306,18 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
                 _dropdown(
                   label: '匹配方式',
                   value: mode,
-                  values: _visibleMatchModes,
+                  values: type == ShieldRuleType.roomId
+                      ? const [ShieldMatchMode.exact]
+                      : _visibleMatchModes,
                   text: (value) => shieldMatchModeLabel(value, type: type),
                   onChanged: (value) => setDialogState(() => mode = value),
                 ),
                 _dropdown(
                   label: '作用范围',
                   value: scope,
-                  values: ShieldScope.values,
+                  values: type == ShieldRuleType.roomId
+                      ? const [ShieldScope.live]
+                      : ShieldScope.values,
                   text: shieldScopeLabel,
                   onChanged: (value) => setDialogState(() => scope = value),
                 ),
@@ -408,6 +416,7 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
 
   ShieldMatchMode _defaultEditorMode(ShieldRuleType type) {
     return switch (type) {
+      ShieldRuleType.roomId => ShieldMatchMode.exact,
       ShieldRuleType.keyword ||
       ShieldRuleType.reasonKeyword => ShieldMatchMode.contains,
       ShieldRuleType.duration ||
@@ -424,6 +433,9 @@ class _ShieldingSettingsPageState extends State<ShieldingSettingsPage> {
   }
 
   bool _modeFitsType(ShieldMatchMode mode, ShieldRuleType type) {
+    if (type == ShieldRuleType.roomId) {
+      return mode == ShieldMatchMode.exact;
+    }
     return switch (mode) {
       ShieldMatchMode.range =>
         type == ShieldRuleType.duration ||

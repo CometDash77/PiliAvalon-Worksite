@@ -3,6 +3,7 @@ enum ShieldRuleType {
   userKeyword,
   reasonKeyword,
   uid,
+  roomId,
   category,
   tag,
   avatarPendant,
@@ -246,6 +247,7 @@ class ShieldCandidate {
     this.body,
     this.reason,
     this.uid,
+    this.roomId,
     this.authorName,
     this.authorTokens = const [],
     this.category,
@@ -269,6 +271,7 @@ class ShieldCandidate {
   final String? body;
   final String? reason;
   final String? uid;
+  final String? roomId;
   final String? authorName;
   final List<String> authorTokens;
   final String? category;

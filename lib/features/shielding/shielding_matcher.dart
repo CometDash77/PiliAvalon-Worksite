@@ -62,6 +62,10 @@ abstract final class ShieldMatcher {
   static bool _matches(ShieldRule rule, ShieldCandidate candidate) {
     final pattern = rule.pattern.toLowerCase();
     if (pattern.trim().isEmpty) return false;
+    if (rule.type == ShieldRuleType.roomId) {
+      return rule.matchMode == ShieldMatchMode.exact &&
+          candidate.roomId == rule.pattern.trim();
+    }
     return switch (rule.matchMode) {
       ShieldMatchMode.exact => _matchValues(rule, candidate).any(
         (value) => value.toLowerCase() == pattern,
@@ -106,6 +110,8 @@ abstract final class ShieldMatcher {
         yield ifNullEmpty(candidate.reason);
       case ShieldRuleType.uid:
         yield ifNullEmpty(candidate.uid);
+      case ShieldRuleType.roomId:
+        yield ifNullEmpty(candidate.roomId);
       case ShieldRuleType.category:
         yield ifNullEmpty(candidate.category);
       case ShieldRuleType.tag:

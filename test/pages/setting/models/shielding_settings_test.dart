@@ -194,6 +194,7 @@ void main() {
         shieldingRuleCategoryLabels,
         containsAll([
           '用户/UP',
+          '直播',
           '标题关键词',
           '推荐理由',
           '标签',

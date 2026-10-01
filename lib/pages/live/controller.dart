@@ -1,4 +1,5 @@
 import 'package:PiliPlus/common/widgets/pair.dart';
+import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/http/live.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models_new/live/live_feed_index/card_data_list_item.dart';
@@ -13,6 +14,20 @@ import 'package:flutter/widgets.dart' show ScrollController;
 import 'package:get/get.dart';
 
 class LiveController extends CommonListController with AccountMixin {
+  LiveController({ShieldSettingsStore? shieldStore})
+    : shieldStore = shieldStore ?? ShieldSettingsStore() {
+    _liveRules = this.shieldStore.snapshot();
+  }
+
+  final ShieldSettingsStore shieldStore;
+  late ShieldRuleSet _liveRules;
+  int _sourceItemCount = 0;
+  bool? _sourceHasMore;
+
+  bool filteredPageEmpty = false;
+  bool filteredPageNeedsLoadMore = false;
+  bool _suppressAutomaticLoadMore = false;
+
   @override
   void onInit() {
     super.onInit();
@@ -40,35 +55,125 @@ class LiveController extends CommonListController with AccountMixin {
 
   @override
   void checkIsEnd(int length) {
-    if (count != null && length >= count!) {
+    if (count != null && _sourceItemCount >= count!) {
       isEnd = true;
     }
   }
 
   @override
   List? getDataList(response) {
-    return response.cardList;
+    final sourceItems = response.cardList as List?;
+    _sourceItemCount += sourceItems?.length ?? 0;
+    final visibleItems = sourceItems?.where((entry) {
+      final item = switch (entry) {
+        LiveCardList() => entry.cardData?.smallCardV1,
+        CardLiveItem() => entry,
+        _ => null,
+      };
+      if (item == null) return true;
+      return ShieldingAdapters.isVisible(
+        ShieldingAdapters.fromLiveCard(item),
+        _liveRules,
+      );
+    }).toList();
+    filteredPageEmpty =
+        sourceItems?.isNotEmpty == true && visibleItems?.isEmpty == true;
+    filteredPageNeedsLoadMore =
+        sourceItems != null && visibleItems != null &&
+        visibleItems.length < sourceItems.length;
+    _suppressAutomaticLoadMore = filteredPageNeedsLoadMore;
+    return visibleItems;
+  }
+
+  @override
+  bool continueAfterEmptyDataList(response) =>
+      filteredPageEmpty && hasMoreSourcePages;
+
+  @override
+  bool refreshAfterEmptyDataList(response) => true;
+
+  bool get hasMoreSourcePages {
+    if (areaIndex.value == 0) return _sourceHasMore ?? true;
+    final sourceCount = count;
+    return sourceCount == null || _sourceItemCount < sourceCount;
+  }
+
+  @override
+  Future<void> onLoadMore() async {
+    if (_suppressAutomaticLoadMore) return;
+    await super.onLoadMore();
+  }
+
+  Future<void> loadMoreAfterFilteredPage() async {
+    if (!filteredPageNeedsLoadMore || isEnd || isLoading) return;
+    _suppressAutomaticLoadMore = false;
+    final requestedPage = page;
+    await super.onLoadMore();
+    if (page == requestedPage && !isEnd) {
+      _suppressAutomaticLoadMore = true;
+    }
+  }
+
+  Future<void> applySavedLiveRules() async {
+    _liveRules = await shieldStore.load();
+    final state = loadingState.value;
+    if (state case Success(:final response)) {
+      final currentItems = response as List? ?? const [];
+      final visibleItems = currentItems.where((entry) {
+        final item = switch (entry) {
+          LiveCardList() => entry.cardData?.smallCardV1,
+          CardLiveItem() => entry,
+          _ => null,
+        };
+        if (item == null) return true;
+        return ShieldingAdapters.isVisible(
+          ShieldingAdapters.fromLiveCard(item),
+          _liveRules,
+        );
+      }).toList();
+      if (currentItems.isNotEmpty && visibleItems.isEmpty) {
+        filteredPageEmpty = true;
+      }
+      if (visibleItems.length < currentItems.length) {
+        filteredPageNeedsLoadMore = true;
+        _suppressAutomaticLoadMore = true;
+      }
+      loadingState.value = Success(visibleItems);
+    }
   }
 
   @override
   bool customHandleResponse(bool isRefresh, Success response) {
-    if (isRefresh) {
-      final res = response.response;
-      if (res is LiveIndexData) {
-        if (res.hasMore == 0) {
-          isEnd = true;
-        }
+    final res = response.response;
+    if (res is LiveIndexData) {
+      if (res.hasMore != null) {
+        _sourceHasMore = res.hasMore != 0;
+        if (!_sourceHasMore!) isEnd = true;
+      }
+      if (isRefresh) {
+        _sourceItemCount = 0;
+        filteredPageEmpty = false;
+        filteredPageNeedsLoadMore = false;
+        _suppressAutomaticLoadMore = false;
         topState.value = Pair(
           first: res.followItem,
           second: res.areaItem,
         );
-      } else if (res is LiveSecondData) {
+      }
+    } else if (res is LiveSecondData) {
+      if (isRefresh) {
+        _sourceItemCount = 0;
+        filteredPageEmpty = false;
+        filteredPageNeedsLoadMore = false;
+        _suppressAutomaticLoadMore = false;
         count = res.count;
         newTags = res.newTags;
         if (sortType != null) {
           tagIndex.value =
               newTags?.indexWhere((e) => e.sortType == sortType) ?? -1;
         }
+      } else if (res.count != null) {
+        count = res.count;
       }
     }
     return false;
@@ -92,6 +197,11 @@ class LiveController extends CommonListController with AccountMixin {
     count = null;
     page = 1;
     isEnd = false;
+    _sourceItemCount = 0;
+    _sourceHasMore = null;
+    filteredPageEmpty = false;
+    filteredPageNeedsLoadMore = false;
+    _suppressAutomaticLoadMore = false;
     if (areaIndex.value != 0) {
       queryTop().whenComplete(followController.jumpToTop);
       return queryData();
@@ -115,7 +225,7 @@ class LiveController extends CommonListController with AccountMixin {
     }
   }
 
-  void onSelectArea(int index, CardLiveItem? cardLiveItem) {
+  Future<void> onSelectArea(int index, CardLiveItem? cardLiveItem) async {
     if (isLoading) {
       return; // areaIndex conflict
     }
@@ -132,10 +242,15 @@ class LiveController extends CommonListController with AccountMixin {
     count = null;
     page = 1;
     isEnd = false;
-    queryData();
+    _sourceItemCount = 0;
+    _sourceHasMore = null;
+    filteredPageEmpty = false;
+    filteredPageNeedsLoadMore = false;
+    _suppressAutomaticLoadMore = false;
+    await queryData();
   }
 
-  void onSelectTag(int index, String? sortType) {
+  Future<void> onSelectTag(int index, String? sortType) async {
     if (isLoading) {
       return;
     }
@@ -145,7 +260,12 @@ class LiveController extends CommonListController with AccountMixin {
     count = null;
     page = 1;
     isEnd = false;
-    queryData();
+    _sourceItemCount = 0;
+    _sourceHasMore = null;
+    filteredPageEmpty = false;
+    filteredPageNeedsLoadMore = false;
+    _suppressAutomaticLoadMore = false;
+    await queryData();
   }
 
   @override
