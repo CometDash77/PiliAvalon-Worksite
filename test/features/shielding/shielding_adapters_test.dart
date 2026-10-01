@@ -80,6 +80,48 @@ void main() {
       expect(candidate.reason, isNull);
     });
 
+    test('parses app card_goto and suppresses the vertical-card reason', () {
+      final item = RcmdVideoItemAppModel.fromJson({
+        'player_args': {'aid': 1, 'cid': 2, 'duration': 60},
+        'bvid': 'BV1',
+        'cover': '',
+        'cover_left_text_1': '1',
+        'cover_left_text_2': '1',
+        'title': '竖屏视频',
+        'args': {'up_id': 88, 'up_name': '玩家'},
+        'rcmd_reason': '竖屏',
+        'card_goto': 'av',
+        'param': '1',
+        'uri': '',
+      });
+
+      expect(item.goto, 'av');
+      expect(item.owner.name, '玩家');
+      expect(item.rcmdReason, isNull);
+    });
+
+    test('uses app card_goto to parse bangumi badge and owner label', () {
+      final item = RcmdVideoItemAppModel.fromJson({
+        'player_args': {'aid': 1, 'cid': 2, 'duration': 60},
+        'bvid': 'BV1',
+        'cover': '',
+        'cover_left_text_1': '1',
+        'cover_left_text_2': '1',
+        'title': '番剧',
+        'desc_button': {'text': '番剧出品'},
+        'args': {'up_id': 88, 'up_name': '出品方'},
+        'rcmd_reason': '',
+        'card_goto': 'bangumi',
+        'cover_right_text': '番剧',
+        'param': '1',
+        'uri': '',
+      });
+
+      expect(item.goto, 'bangumi');
+      expect(item.owner.name, '番剧出品');
+      expect(item.pgcBadge, '番剧');
+    });
+
     test('web recommendation UP regex blocks owner name substring', () {
       final item = RcmdVideoItemModel.fromJson({
         'id': 1,

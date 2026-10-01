@@ -21,8 +21,10 @@ class RcmdVideoItemAppModel extends BaseRcmdVideoItemModel {
     duration = json['player_args']?['duration'] ?? 0;
     //duration = json['cover_right_text'];
     title = json['title'];
-    owner = RcmdOwner.fromJson(json);
+    goto = json['card_goto'] ?? json['goto'];
+    owner = RcmdOwner.fromJson(json, goto);
     rcmdReason = json['rcmd_reason'];
+    if (rcmdReason == '竖屏') rcmdReason = null;
     //     json['bottom_rcmd_reason'] ??
     //     json['top_rcmd_reason'];
     if (rcmdReason != null && rcmdReason!.contains('赞')) {
@@ -35,12 +37,11 @@ class RcmdVideoItemAppModel extends BaseRcmdVideoItemModel {
     // 如果是，就无需再显示推荐原因，交由view统一处理即可
     if (isFollowed) rcmdReason = null;
 
-    goto = json['goto'];
     param = int.parse(json['param']);
     uri = json['uri'];
     talkBack = json['talk_back'];
 
-    if (json['goto'] == 'bangumi') {
+    if (goto == 'bangumi') {
       pgcBadge = json['cover_right_text'];
     }
 
@@ -84,8 +85,8 @@ num? _readNum(Object? value) => switch (value) {
 };
 
 class RcmdOwner extends BaseOwner {
-  RcmdOwner.fromJson(Map<String, dynamic> json) {
-    name = json['goto'] == 'av'
+  RcmdOwner.fromJson(Map<String, dynamic> json, String? goto) {
+    name = goto == 'av'
         ? (json['args']?['up_name'] ?? '')
         : (json['desc_button']?['text'] ?? '');
     mid = json['args']?['up_id'] ?? 0;
