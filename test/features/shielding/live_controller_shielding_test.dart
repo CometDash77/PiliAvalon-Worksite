@@ -129,7 +129,7 @@ void main() {
     expect(_uids(controller), ['43']);
     expect(controller.isEnd, isFalse);
 
-    await controller.onLoadMore();
+    await controller.loadMoreAfterFilteredPage();
     expect(_uids(controller), ['43', '44', '45']);
     expect(controller.isEnd, isTrue);
 
@@ -222,6 +222,9 @@ class _TestLiveController extends LiveController {
 
   final List<LoadingState> responses;
   final requestedPages = <int>[];
+
+  @override
+  Future<void> queryTop() async {}
 
   @override
   Future<LoadingState> customGetData() async {

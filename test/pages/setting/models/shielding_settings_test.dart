@@ -587,6 +587,8 @@ void main() {
     });
 
     testWidgets('category chips group decoration types', (tester) async {
+      _setLargeTestSurface(tester);
+
       await tester.pumpWidget(
         GetMaterialApp(
           theme: ThemeData(splashFactory: NoSplash.splashFactory),
