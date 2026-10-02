@@ -154,7 +154,11 @@ class RuntimeSmokeLaunchTest(unittest.TestCase):
         self.assertIn("  workflow_dispatch:", workflow)
         self.assertNotIn("  push:", workflow)
         self.assertIn("ARTIFACT_RUN_ID: ${{ inputs.artifact_run_id }}", workflow)
-        self.assertIn('.head_sha == $sha and .conclusion == "success"', workflow)
+        self.assertIn("HARNESS_REF: ${{ inputs.harness_ref || github.ref }}", workflow)
+        self.assertIn("ref: ${{ inputs.harness_ref || github.sha }}", workflow)
+        self.assertIn(".path == \".github/workflows/build.yml\" and .conclusion == \"success\"", workflow)
+        self.assertIn("jq -r '.head_sha' runtime-smoke/evidence/build-run.json", workflow)
+        self.assertIn("git rev-parse HEAD | tee runtime-smoke/evidence/harness-sha.txt", workflow)
 
 
 if __name__ == "__main__":
