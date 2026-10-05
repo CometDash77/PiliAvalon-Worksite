@@ -90,6 +90,7 @@ String shieldRuleTypeLabel(ShieldRuleType type) => switch (type) {
   ShieldRuleType.publishTime => '发布时间',
   ShieldRuleType.isUpowerExclusive => '充电专属',
   ShieldRuleType.staffKeyword => '制作人员',
+  ShieldRuleType.roomId => '直播间',
 };
 
 const shieldingRuleCategoryLabels = [
@@ -103,6 +104,7 @@ const shieldingRuleCategoryLabels = [
   '评论装饰',
   '视频详情信息',
   '评论关键词',
+  '直播间',
 ];
 
 String shieldingRuleCategoryFor(ShieldRule rule) {
@@ -111,6 +113,7 @@ String shieldingRuleCategoryFor(ShieldRule rule) {
     return '用户/UP';
   }
   if (rule.type == ShieldRuleType.reasonKeyword) return '推荐理由';
+  if (rule.type == ShieldRuleType.roomId) return '直播间';
   if (rule.type == ShieldRuleType.keyword &&
       rule.scope == ShieldScope.comment) {
     return '评论关键词';
@@ -145,6 +148,7 @@ String shieldingRuleCategoryFor(ShieldRule rule) {
     ShieldRuleType.reasonKeyword => '推荐理由',
     ShieldRuleType.category => '分区',
     ShieldRuleType.tag => '标签',
+    ShieldRuleType.roomId => '直播间',
     ShieldRuleType.avatarPendant || ShieldRuleType.garb => '评论装饰',
     ShieldRuleType.duration ||
     ShieldRuleType.playbackCount ||
