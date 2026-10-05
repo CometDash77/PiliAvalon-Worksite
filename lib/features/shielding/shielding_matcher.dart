@@ -124,6 +124,8 @@ abstract final class ShieldMatcher {
         );
       case ShieldRuleType.staffKeyword:
         yield* candidate.staffNames;
+      case ShieldRuleType.roomId:
+        yield ifNullEmpty(candidate.roomId);
       case ShieldRuleType.duration:
       case ShieldRuleType.playbackCount:
       case ShieldRuleType.danmakuCount:

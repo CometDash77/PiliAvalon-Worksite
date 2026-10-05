@@ -16,6 +16,8 @@ enum ShieldRuleType {
   publishTime,
   isUpowerExclusive,
   staffKeyword,
+  // feature-specific stable live room identity (see map #69)
+  roomId,
 }
 
 enum ShieldMatchMode {
@@ -262,6 +264,7 @@ class ShieldCandidate {
     this.pubdate,
     this.staffNames = const [],
     this.isUpowerExclusive,
+    this.roomId,
   });
 
   final ShieldScope scope;
@@ -286,6 +289,8 @@ class ShieldCandidate {
   final int? pubdate;
   final List<String> staffNames;
   final bool? isUpowerExclusive;
+  // feature-specific stable live room identity (see map #69)
+  final String? roomId;
 }
 
 class ShieldMatchResult {
