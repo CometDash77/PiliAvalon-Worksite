@@ -1,5 +1,6 @@
 import 'dart:async' show FutureOr, Timer;
 
+import 'package:PiliPlus/features/shielding/shielding_recommend_tag_enricher.dart';
 import 'package:PiliPlus/http/fav.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/user.dart';
@@ -147,8 +148,12 @@ abstract class CommonIntroController extends GetxController
   }
 
   Future<void> queryVideoTags() async {
-    final result = await UserHttp.videoTags(bvid: bvid, cid: cid.value);
-    videoTags.value = result.dataOrNull;
+    // The single shared tag entry point: a tag the recommendation surface
+    // already fetched for this video part is reused instead of re-requested.
+    videoTags.value = await RecommendationTagEnricher.fetchSharedTags(
+      bvid: bvid,
+      cid: cid.value,
+    );
   }
 
   Future<void> viewLater() async {

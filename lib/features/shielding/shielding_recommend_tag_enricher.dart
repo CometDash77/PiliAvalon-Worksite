@@ -1,22 +1,19 @@
-import 'dart:async';
-
+import 'package:PiliPlus/features/shielding/recommendation_tag_store.dart';
 import 'package:PiliPlus/features/shielding/shielding_matcher.dart';
 import 'package:PiliPlus/features/shielding/shielding_models.dart';
-import 'package:PiliPlus/http/loading_state.dart';
-import 'package:PiliPlus/http/user.dart';
 import 'package:PiliPlus/models_new/video/video_tag/data.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
+
+// The tag-cache settings live with the store that spends the budget; they are
+// re-exported here because this file is the entry point callers already import.
+export 'package:PiliPlus/features/shielding/recommendation_tag_store.dart'
+    show tagEnrichCacheMaxBytes, tagEnrichCacheMaxMb;
 
 // -- internal constants (not user-facing) ---------------------------
 const bool _tagEnrichmentEnabled = true;
 const int _defaultConcurrency = 5;
 const int _defaultTimeoutSeconds = 3;
-const Duration _tagCacheTTL = Duration(minutes: 30);
-const int _defaultTagCacheMaxMb = 10;
-const int _maxTagCacheMaxMb = 50;
-const int _bytesPerMb = 1024 * 1024;
-const int _estimatedEntryOverheadBytes = 96;
 
 /// Reads the configured concurrency cap from settings, clamping to [1, 10].
 int get tagEnrichConcurrency {
@@ -39,73 +36,52 @@ Duration get tagEnrichTimeout {
   return Duration(seconds: raw.clamp(1, 10));
 }
 
-/// Reads the configured estimated tag-cache budget in MB, clamped to [1, 50].
-int get tagEnrichCacheMaxMb {
-  final raw = GStorage.setting.get(
-    SettingBoxKey.tagEnrichCacheMaxMb,
-    defaultValue: _defaultTagCacheMaxMb,
-  );
-  if (raw is! int) return _defaultTagCacheMaxMb;
-  return raw.clamp(1, _maxTagCacheMaxMb);
-}
-
-int get tagEnrichCacheMaxBytes => tagEnrichCacheMaxMb * _bytesPerMb;
-
-// -- cache entry -----------------------------------------------------
-
-class _TagCacheEntry {
-  const _TagCacheEntry({
-    required this.tagNames,
-    required this.fetchedAt,
-    required this.estimatedBytes,
-  });
-
-  final List<String> tagNames;
-  final DateTime fetchedAt;
-  final int estimatedBytes;
-}
-
 /// Drives detail-tag enrichment + tag-only second-pass shielding for
 /// recommendation survivors.
 ///
-/// The default [fetchTags] uses [UserHttp.videoTags].  Tests inject a
-/// stub so they never hit the network.
+/// Fetching, caching and de-duplication all live in [RecommendationTagStore],
+/// which the recommendation surface and the video detail page share; this class
+/// only does "get the tags, then judge *those* tags with the current batch".
+/// The default [fetchTags] is [defaultVideoTagFetch] (which calls
+/// `UserHttp.videoTags`); tests inject a stub so they never hit the network.
 class RecommendationTagEnricher {
   RecommendationTagEnricher({
-    Future<LoadingState<List<VideoTagItem>?>> Function(
-      String bvid,
-      Object? cid,
-    )?
-    fetchTags,
-  }) : _fetchTags =
-           fetchTags ??
-           ((String bvid, Object? cid) =>
-               UserHttp.videoTags(bvid: bvid, cid: cid));
+    TagFetchFn? fetchTags,
+    RecommendationTagStore? store,
+  }) : _fetchTags = fetchTags ?? defaultVideoTagFetch,
+       _store = store ?? _sharedStore;
 
-  final Future<LoadingState<List<VideoTagItem>?>> Function(
-    String bvid,
+  final TagFetchFn _fetchTags;
+  final RecommendationTagStore _store;
+
+  static final RecommendationTagStore _sharedStore =
+      RecommendationTagStore.instance;
+
+  // ---- public API --------------------------------------------------
+
+  /// The one shared tag entry point: recommendation surfaces and the video
+  /// detail page both go through it, so a tag fetched for one is reused by the
+  /// other within the cache lifetime.
+  ///
+  /// No request is issued on a cache hit or when the call merges into an
+  /// in-flight request. [fetcher] overrides the transport for this call and is
+  /// only consulted by the caller that actually starts the request.
+  static Future<List<VideoTagItem>?> fetchSharedTags({
+    required String bvid,
     Object? cid,
-  )
-  _fetchTags;
+    TagFetchFn? fetcher,
+  }) => _sharedStore.fetch(bvid, cid, fetcher: fetcher);
 
-  static final Map<String, _TagCacheEntry> _cache = {};
-  static int _cacheBytes = 0;
-
-  /// Clears the shared static cache. Intended for tests; production
-  /// code should not need to call this.
-  static void resetCache() {
-    _cache.clear();
-    _cacheBytes = 0;
-  }
+  /// Clears the shared tag cache. Intended for tests and the settings page's
+  /// "clear cache" action.
+  static void resetCache() => _sharedStore.clear();
 
   /// Returns the current number of cached entries. Intended for tests.
-  static int get cacheEntryCount => _cache.length;
+  static int get cacheEntryCount => _sharedStore.entryCount;
 
   /// Returns estimated cache bytes. This is a deterministic capacity
   /// budget, not exact Dart heap accounting.
-  static int get cacheEstimatedBytes => _cacheBytes;
-
-  // ---- public API --------------------------------------------------
+  static int get cacheEstimatedBytes => _sharedStore.estimatedBytes;
 
   /// Returns the subset of [survivors] that pass the tag-only second
   /// shielding pass after their detail tags are enriched.
@@ -121,45 +97,29 @@ class RecommendationTagEnricher {
   }) async {
     if (!_tagEnrichmentEnabled || survivors.isEmpty) return survivors;
 
-    _evictExpiredCache();
-    _evictOverflow();
-
     // We use a dense result array indexed by the survivor position so
-    // that ordering is preserved.
+    // that ordering is preserved; a null slot means "dropped".
     final results = List<T?>.filled(survivors.length, null);
     final pendingIndices = <int>[];
 
     for (int i = 0; i < survivors.length; i++) {
       final item = survivors[i];
-      final bvid = getBvid(item);
-      if (bvid == null) {
-        // No bvid → cannot fetch → fail-open (keep the item).
+      if (getBvid(item) == null) {
+        // No bvid → nothing to fetch → fail-open (keep the item).
         results[i] = item;
-        continue;
-      }
-
-      final cached = _cache[bvid];
-      if (cached != null) {
-        if (_tagOnlySecondPass(cached.tagNames, shieldRuleSet)) {
-          results[i] = item;
-        }
-        // else: blocked by detail tags → drop
       } else {
         pendingIndices.add(i);
       }
     }
 
-    if (pendingIndices.isNotEmpty) {
-      await _fetchWithConcurrency(
-        survivors,
-        pendingIndices,
-        results,
-        shieldRuleSet,
-        getBvid,
-        getCid,
-      );
-      _evictOverflow();
-    }
+    await _enrichSurvivors(
+      survivors,
+      pendingIndices,
+      results,
+      shieldRuleSet,
+      getBvid,
+      getCid,
+    );
 
     return results.whereType<T>().toList();
   }
@@ -177,7 +137,7 @@ class RecommendationTagEnricher {
     return ShieldMatcher.match(candidate, shieldRuleSet).visible;
   }
 
-  Future<void> _fetchWithConcurrency<T>(
+  Future<void> _enrichSurvivors<T>(
     List<T> survivors,
     List<int> pendingIndices,
     List<T?> results,
@@ -185,7 +145,10 @@ class RecommendationTagEnricher {
     String? Function(T item) getBvid,
     Object? Function(T item) getCid,
   ) async {
-    // Protect against mutation during concurrent work.
+    if (pendingIndices.isEmpty) return;
+
+    // Workers pop from the tail of this local copy, so no two workers ever
+    // take the same index.
     final queue = pendingIndices.toList();
 
     Future<void> worker() async {
@@ -193,97 +156,46 @@ class RecommendationTagEnricher {
         final index = queue.removeLast();
         final item = survivors[index];
         final bvid = getBvid(item)!; // safe: null-bvid items never reach here
-        final cid = getCid(item);
 
-        List<String>? tagNames;
-        try {
-          final res = await _fetchTags(bvid, cid).timeout(tagEnrichTimeout);
-          final tags = res.dataOrNull;
-          if (tags != null && tags.isNotEmpty) {
-            tagNames = tags
-                .map((t) => t.tagName)
-                .whereType<String>()
-                .where((n) => n.trim().isNotEmpty)
-                .toList();
-            if (tagNames.isEmpty) tagNames = null;
-          }
-        } catch (_) {
-          // fail-open: any error leaves tagNames as null
-        }
-
-        if (tagNames != null && tagNames.isNotEmpty) {
-          // Success: cache and then run second pass.
-          _putCacheEntry(bvid, tagNames);
-          if (_tagOnlySecondPass(tagNames, shieldRuleSet)) {
-            results[index] = item;
-          }
-          // else: blocked by detail tags → drop
-        } else {
-          // No usable tags (empty, fetch failed, etc.) → fail-open.
+        final tagNames = await _loadTagNames(bvid, getCid(item));
+        if (tagNames == null) {
+          // No usable tags (negative cache hit, failure, empty, timeout)
+          // → fail-open.
+          results[index] = item;
+        } else if (_tagOnlySecondPass(tagNames, shieldRuleSet)) {
           results[index] = item;
         }
+        // else: blocked by detail tags → dropped.
       }
     }
 
     final concurrency = tagEnrichConcurrency;
-    final workerCount = concurrency < pendingIndices.length
-        ? concurrency
-        : pendingIndices.length;
-    await Future.wait(
-      List.generate(workerCount, (_) => worker()),
-    );
+    final workerCount = concurrency < queue.length ? concurrency : queue.length;
+    await Future.wait(List.generate(workerCount, (_) => worker()));
   }
 
-  static void _putCacheEntry(String bvid, List<String> tagNames) {
-    final estimatedBytes = _estimateEntryBytes(bvid, tagNames);
-    final previous = _cache[bvid];
-    if (previous != null) {
-      _cacheBytes -= previous.estimatedBytes;
+  /// The usable tag names of one video part, or null when there are none.
+  ///
+  /// Duplicate keys inside one batch — and identical keys in another batch
+  /// still in flight — share a single upstream request through the store.
+  ///
+  /// The timeout only stops *this* caller from waiting: the shared request
+  /// keeps running and still writes its result into the shared cache.
+  Future<List<String>?> _loadTagNames(String bvid, Object? cid) async {
+    try {
+      final tags = await _store
+          .fetch(bvid, cid, fetcher: _fetchTags)
+          .timeout(tagEnrichTimeout);
+      if (tags == null || tags.isEmpty) return null;
+      final tagNames = tags
+          .map((t) => t.tagName)
+          .whereType<String>()
+          .where((n) => n.trim().isNotEmpty)
+          .toList();
+      return tagNames.isEmpty ? null : tagNames;
+    } catch (_) {
+      // Timeout (or anything unexpected) → fail-open: no tags, keep the item.
+      return null;
     }
-    _cache[bvid] = _TagCacheEntry(
-      tagNames: tagNames,
-      fetchedAt: DateTime.now(),
-      estimatedBytes: estimatedBytes,
-    );
-    _cacheBytes += estimatedBytes;
-  }
-
-  static int _estimateEntryBytes(String bvid, List<String> tagNames) {
-    var bytes = _estimatedEntryOverheadBytes + bvid.length * 3;
-    for (final tag in tagNames) {
-      bytes += _estimatedEntryOverheadBytes ~/ 4;
-      bytes += tag.length * 3;
-    }
-    return bytes;
-  }
-
-  static void _evictExpiredCache() {
-    final cutoff = DateTime.now().subtract(_tagCacheTTL);
-    final expiredKeys = <String>[];
-    for (final entry in _cache.entries) {
-      if (entry.value.fetchedAt.isBefore(cutoff)) {
-        expiredKeys.add(entry.key);
-      }
-    }
-    for (final key in expiredKeys) {
-      final removed = _cache.remove(key);
-      if (removed != null) {
-        _cacheBytes -= removed.estimatedBytes;
-      }
-    }
-    if (_cacheBytes < 0) _cacheBytes = 0;
-  }
-
-  static void _evictOverflow() {
-    final maxBytes = tagEnrichCacheMaxBytes;
-    if (_cacheBytes <= maxBytes) return;
-    final sorted = _cache.entries.toList()
-      ..sort((a, b) => a.value.fetchedAt.compareTo(b.value.fetchedAt));
-    for (final entry in sorted) {
-      if (_cacheBytes <= maxBytes) break;
-      _cache.remove(entry.key);
-      _cacheBytes -= entry.value.estimatedBytes;
-    }
-    if (_cacheBytes < 0) _cacheBytes = 0;
   }
 }
