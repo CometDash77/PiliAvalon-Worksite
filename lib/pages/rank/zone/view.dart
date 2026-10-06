@@ -1,6 +1,7 @@
 import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/video_card/video_card_h.dart';
+import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/model_hot_video_item.dart';
 import 'package:PiliPlus/pages/rank/zone/controller.dart';
@@ -65,6 +66,7 @@ class _ZonePageState extends State<ZonePage>
                   if (item is HotVideoItemModel) {
                     return VideoCardH(
                       videoItem: item,
+                      jevSurface: JevSurface.pgc,
                       onRemove: () => controller.loadingState
                         ..value.data!.removeAt(index)
                         ..refresh(),

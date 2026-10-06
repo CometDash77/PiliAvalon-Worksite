@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:PiliPlus/features/shielding/home_feed_comment_gate.dart';
+import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/features/shielding/recommendation_tag_store.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/features/shielding/shielding_recommend_tag_enricher.dart';
@@ -56,7 +57,10 @@ class _CountingTagFetcher {
   int requests = 0;
   final List<String> keyLog = [];
 
-  Future<LoadingState<List<VideoTagItem>?>> call(String bvid, Object? cid) async {
+  Future<LoadingState<List<VideoTagItem>?>> call(
+    String bvid,
+    Object? cid,
+  ) async {
     requests++;
     keyLog.add(RecommendationTagStore.cacheKey(bvid, cid));
     // 标签本身不触发屏蔽：本量具量请求数，不量命中率。
@@ -108,14 +112,15 @@ class _TestStat extends BaseStat {
   }
 }
 
-RecommendationFeedEntry<_TestVideo> _entry(int index) => RecommendationFeedEntry(
-  item: _TestVideo(index),
-  candidate: ShieldCandidate(
-    scope: ShieldScope.recommendation,
-    title: 'video $index',
-    uid: '42',
-  ),
-);
+RecommendationFeedEntry<_TestVideo> _entry(int index) =>
+    RecommendationFeedEntry(
+      item: _TestVideo(index),
+      candidate: ShieldCandidate(
+        scope: ShieldScope.recommendation,
+        title: 'video $index',
+        uid: '42',
+      ),
+    );
 
 RecommendationBatch _batch() => RecommendationBatch(
   ruleSet: ShieldRuleSet(
@@ -132,17 +137,20 @@ RecommendationSurface<RecommendationFeedEntry<_TestVideo>> _homeFeedSurface({
   required _CountingTagFetcher tagFetcher,
   required _CountingCommentLoader commentLoader,
 }) {
-  final production = RecommendationSurfaces.homeFeed<_TestVideo>();
+  final production = RecommendationSurfaces.homeFeed<_TestVideo>(
+    jevSurface: JevSurface.homeWeb,
+  );
   return RecommendationSurface<RecommendationFeedEntry<_TestVideo>>(
     judge: production.judge,
-    enrichTags: (entries, batch) => RecommendationTagEnricher(
-      fetchTags: tagFetcher.call,
-    ).enrichAndFilter(
-      entries,
-      batch.ruleSet,
-      getBvid: (entry) => entry.item.bvid,
-      getCid: (entry) => entry.item.cid,
-    ),
+    enrichTags: (entries, batch) =>
+        RecommendationTagEnricher(
+          fetchTags: tagFetcher.call,
+        ).enrichAndFilter(
+          entries,
+          batch.ruleSet,
+          getBvid: (entry) => entry.item.bvid,
+          getCid: (entry) => entry.item.cid,
+        ),
     gateComments: (entries, batch) => HomeFeedCommentGate.filter(
       entries,
       config: _guardOn,
@@ -179,14 +187,15 @@ Future<_PageResult> _runPage({
   final tagBefore = tagFetcher.requests;
   final commentBefore = commentLoader.requested.length;
 
-  final kept = await RecommendationPipeline<RecommendationFeedEntry<_TestVideo>>(
-    supplyBatch: _batch,
-    surface: _homeFeedSurface(
-      tagFetcher: tagFetcher,
-      commentLoader: commentLoader,
-    ),
-    candidateSource: (batch) => candidates,
-  ).run();
+  final kept =
+      await RecommendationPipeline<RecommendationFeedEntry<_TestVideo>>(
+        supplyBatch: _batch,
+        surface: _homeFeedSurface(
+          tagFetcher: tagFetcher,
+          commentLoader: commentLoader,
+        ),
+        candidateSource: (batch) => candidates,
+      ).run();
 
   return _PageResult(
     kept.length,
@@ -356,17 +365,37 @@ void main() {
 
     test('其余推荐面没有每页上游请求阶段', () {
       // 结构断言：这三个面在产品的面定义里根本不挂标签/评论阶段。
-      expect(RecommendationSurfaces.hotAndRanking().enrichTags, isNull);
-      expect(RecommendationSurfaces.hotAndRanking().gateComments, isNull);
-      expect(RecommendationSurfaces.relatedVideos().enrichTags, isNull);
-      expect(RecommendationSurfaces.relatedVideos().gateComments, isNull);
+      expect(
+        RecommendationSurfaces.hotAndRanking(jevSurface: JevSurface.hot)
+            .enrichTags,
+        isNull,
+      );
+      expect(
+        RecommendationSurfaces.hotAndRanking(jevSurface: JevSurface.hot)
+            .gateComments,
+        isNull,
+      );
+      expect(
+        RecommendationSurfaces.relatedVideos(jevSurface: JevSurface.related)
+            .enrichTags,
+        isNull,
+      );
+      expect(
+        RecommendationSurfaces.relatedVideos(jevSurface: JevSurface.related)
+            .gateComments,
+        isNull,
+      );
       // 首页面则挂着两个阶段——差异就是每页请求数差异的来源。
       expect(
-        RecommendationSurfaces.homeFeed<_TestVideo>().enrichTags,
+        RecommendationSurfaces.homeFeed<_TestVideo>(
+          jevSurface: JevSurface.homeWeb,
+        ).enrichTags,
         isNotNull,
       );
       expect(
-        RecommendationSurfaces.homeFeed<_TestVideo>().gateComments,
+        RecommendationSurfaces.homeFeed<_TestVideo>(
+          jevSurface: JevSurface.homeWeb,
+        ).gateComments,
         isNotNull,
       );
     });

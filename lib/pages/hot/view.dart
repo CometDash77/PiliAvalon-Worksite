@@ -4,6 +4,7 @@ import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/common/widgets/video_card/video_card_h.dart';
 import 'package:PiliPlus/common/widgets/view_safe_area.dart';
+import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/home_tab_type.dart';
 import 'package:PiliPlus/models/model_hot_video_item.dart';
@@ -132,6 +133,7 @@ class _HotPageState extends State<HotPage>
                   }
                   return VideoCardH(
                     videoItem: response[index],
+                    jevSurface: JevSurface.hot,
                     onRemove: () => controller.loadingState
                       ..value.data!.removeAt(index)
                       ..refresh(),

@@ -3,6 +3,7 @@ import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/common/widgets/video_card/video_card_h.dart';
 import 'package:PiliPlus/common/widgets/view_sliver_safe_area.dart';
+import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/video/source_type.dart';
 import 'package:PiliPlus/models/model_hot_video_item.dart';
@@ -53,6 +54,7 @@ class _PopularPreciousPageState extends State<PopularPreciousPage>
             final item = response[index];
             return VideoCardH(
               videoItem: item,
+              jevSurface: JevSurface.hot,
               onTap: () {
                 PageUtils.toVideoPage(
                   bvid: item.bvid,

@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:PiliPlus/common/widgets/custom_icon.dart';
+import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/http/user.dart';
 import 'package:PiliPlus/http/video.dart';
 import 'package:PiliPlus/models/home/rcmd/result.dart';
+import 'package:PiliPlus/models/model_rec_video_item.dart';
 import 'package:PiliPlus/models/model_video.dart';
 import 'package:PiliPlus/models_new/space/space_archive/item.dart';
 import 'package:PiliPlus/pages/mine/controller.dart';
@@ -29,13 +33,36 @@ class VideoPopupMenu extends StatelessWidget {
   final BaseSimpleVideoItemModel videoItem;
   final VoidCallback? onRemove;
 
+  /// 传入即启用 JEV 偏好漏斗：该卡片所在的推荐面。
+  final JevSurface? jevSurface;
+
   const VideoPopupMenu({
     super.key,
     required this.iconSize,
     required this.videoItem,
     this.onRemove,
+    this.jevSurface,
     this.menuItemHeight = 45,
   });
+
+  /// 卡片显式「不感兴趣」→ JEV 偏好漏斗；tap 即记，不等平台结果。
+  void _recordJevDislike({String? selectedReason}) {
+    final surface = jevSurface;
+    if (surface == null) {
+      return;
+    }
+    final displayedReason = videoItem is BaseRcmdVideoItemModel
+        ? (videoItem as BaseRcmdVideoItemModel).rcmdReason
+        : null;
+    unawaited(
+      JevCardFunnel.instance.recordCardDislike(
+        title: videoItem.title,
+        displayedReason: displayedReason,
+        selectedReason: selectedReason,
+        surface: surface,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -124,6 +151,9 @@ class VideoPopupMenu extends StatelessWidget {
                             text: r?.name ?? f?.name ?? '未知',
                             onTap: (_) async {
                               Get.back();
+                              _recordJevDislike(
+                                selectedReason: r?.name ?? f?.name,
+                              );
                               SmartDialog.showLoading(msg: '正在提交');
                               final res = await VideoHttp.feedDislike(
                                 reasonId: r?.id,
@@ -217,6 +247,7 @@ class VideoPopupMenu extends StatelessWidget {
                                   FilledButton.tonal(
                                     onPressed: () async {
                                       Get.back();
+                                      _recordJevDislike();
                                       SmartDialog.showLoading(msg: '正在提交');
                                       final res = await VideoHttp.dislikeVideo(
                                         bvid: videoItem.bvid!,
