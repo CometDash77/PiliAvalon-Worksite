@@ -16,7 +16,14 @@ abstract final class ReplyGrpc {
   );
   static bool enableFilter = replyRegExp.pattern.isNotEmpty;
   static bool useLegacyTextFilter = false;
-  static ShieldRuleSet Function()? shieldRuleSetProvider;
+
+  /// 兼容转发：与 `RecommendFilter.shieldRuleSetProvider` 指向同一个槽位。
+  static ShieldRuleSet Function()? get shieldRuleSetProvider =>
+      ShieldingRuntime.shieldRuleSetProvider;
+
+  static set shieldRuleSetProvider(ShieldRuleSet Function()? provider) {
+    ShieldingRuntime.shieldRuleSetProvider = provider;
+  }
 
   // static Future replyInfo({required int rpid}) {
   //   return _request(
@@ -40,8 +47,7 @@ abstract final class ReplyGrpc {
   }
 
   static bool needRemoveGrpc(ReplyInfo reply) {
-    final ruleSet =
-        shieldRuleSetProvider?.call() ?? ShieldSettingsStore().snapshot();
+    final ruleSet = ShieldingRuntime.instance.ruleSet();
     final commentShieldingEnabled = ruleSet.isScopeEnabled(ShieldScope.comment);
     return (commentShieldingEnabled &&
             useLegacyTextFilter &&

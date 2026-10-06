@@ -1,10 +1,7 @@
 import 'dart:convert';
 
 import 'package:PiliPlus/common/constants.dart';
-import 'package:PiliPlus/features/exposure_tracker/exposure_tracker.dart';
-import 'package:PiliPlus/features/shielding/home_feed_comment_gate.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
-import 'package:PiliPlus/features/shielding/shielding_recommend_tag_enricher.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo;
 import 'package:PiliPlus/http/api.dart';
@@ -37,7 +34,6 @@ import 'package:PiliPlus/utils/app_sign.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
-import 'package:PiliPlus/utils/recommend_filter.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
@@ -72,45 +68,34 @@ abstract final class VideoHttp {
       }),
     );
     if (res.data['code'] == 0) {
-      final shieldRuleSet = ShieldSettingsStore().snapshot();
-      final List<RcmdVideoItemModel> survivors = <RcmdVideoItemModel>[];
-      for (final i in res.data['data']['item']) {
-        //过滤掉live与ad，以及拉黑用户
-        if (i['goto'] == 'av' &&
-            (i['owner'] != null &&
-                !GlobalData().blackMids.contains(i['owner']['mid']))) {
-          RcmdVideoItemModel videoItem = RcmdVideoItemModel.fromJson(i);
-          final visible = ShieldingAdapters.isVisible(
-            ShieldingAdapters.fromRecommendationJson(
-              videoItem,
-              (i as Map).cast<String, dynamic>(),
-            ),
-            shieldRuleSet,
+      final pipeline =
+          RecommendationPipeline<RecommendationFeedEntry<RcmdVideoItemModel>>(
+            supplyBatch: ShieldingRuntime.instance.batch,
+            surface: RecommendationSurfaces.homeFeed(),
+            candidateSource: (batch) {
+              final candidates =
+                  <RecommendationFeedEntry<RcmdVideoItemModel>>[];
+              for (final i in res.data['data']['item']) {
+                //过滤掉live与ad，以及拉黑用户
+                if (i['goto'] == 'av' &&
+                    (i['owner'] != null &&
+                        !GlobalData().blackMids.contains(i['owner']['mid']))) {
+                  RcmdVideoItemModel videoItem = RcmdVideoItemModel.fromJson(i);
+                  candidates.add(
+                    RecommendationFeedEntry(
+                      item: videoItem,
+                      candidate: ShieldingAdapters.fromRecommendationJson(
+                        videoItem,
+                        (i as Map).cast<String, dynamic>(),
+                      ),
+                    ),
+                  );
+                }
+              }
+              return candidates;
+            },
           );
-          if (!RecommendFilter.filter(videoItem) && visible) {
-            survivors.add(videoItem);
-          }
-        }
-      }
-      final enricher = RecommendationTagEnricher();
-      final list = await enricher.enrichAndFilter(
-        survivors,
-        shieldRuleSet,
-        getBvid: (item) => item.bvid,
-        getCid: (item) => item.cid,
-      );
-      final gatedList = await HomeFeedCommentGate.filter(
-        list,
-        config: CommentShieldingStore().snapshot(),
-        ruleSet: shieldRuleSet,
-        getAid: (item) => item.aid,
-      );
-      return Success(
-        ExposureTracker.instance.filterAndRecord(
-          gatedList,
-          getBvid: (item) => item.bvid,
-        ),
-      );
+      return Success((await pipeline.run()).feedItems);
     } else {
       return Error(res.data['message']);
     }
@@ -169,54 +154,48 @@ abstract final class VideoHttp {
       ),
     );
     if (res.data['code'] == 0) {
-      final shieldRuleSet = ShieldSettingsStore().snapshot();
-      final List<RcmdVideoItemAppModel> survivors = <RcmdVideoItemAppModel>[];
-      for (final i in res.data['data']['items']) {
-        // 屏蔽推广和拉黑用户
-        if (i['card_goto'] != 'ad_av' &&
-            i['card_goto'] != 'ad_web_s' &&
-            i['ad_info'] == null &&
-            i['can_play'] == 1 &&
-            (i['args'] != null &&
-                !GlobalData().blackMids.contains(i['args']['up_id']))) {
-          if (useLegacyZoneTextFilter &&
-              enableFilter &&
-              i['args']?['tname'] != null &&
-              zoneRegExp.hasMatch(i['args']['tname'])) {
-            continue;
-          }
-          RcmdVideoItemAppModel videoItem = RcmdVideoItemAppModel.fromJson(i);
-          final visible = ShieldingAdapters.isVisible(
-            ShieldingAdapters.fromRecommendationJson(
-              videoItem,
-              (i as Map).cast<String, dynamic>(),
-            ),
-            shieldRuleSet,
+      final pipeline =
+          RecommendationPipeline<
+            RecommendationFeedEntry<RcmdVideoItemAppModel>
+          >(
+            supplyBatch: ShieldingRuntime.instance.batch,
+            surface: RecommendationSurfaces.homeFeed(),
+            candidateSource: (batch) {
+              final candidates =
+                  <RecommendationFeedEntry<RcmdVideoItemAppModel>>[];
+              for (final i in res.data['data']['items']) {
+                // 屏蔽推广和拉黑用户
+                if (i['card_goto'] != 'ad_av' &&
+                    i['card_goto'] != 'ad_web_s' &&
+                    i['ad_info'] == null &&
+                    i['can_play'] == 1 &&
+                    (i['args'] != null &&
+                        !GlobalData().blackMids.contains(i['args']['up_id']))) {
+                  if (useLegacyZoneTextFilter &&
+                      enableFilter &&
+                      i['args']?['tname'] != null &&
+                      zoneRegExp.hasMatch(i['args']['tname'])) {
+                    continue;
+                  }
+                  RcmdVideoItemAppModel videoItem =
+                      RcmdVideoItemAppModel.fromJson(
+                        i,
+                      );
+                  candidates.add(
+                    RecommendationFeedEntry(
+                      item: videoItem,
+                      candidate: ShieldingAdapters.fromRecommendationJson(
+                        videoItem,
+                        (i as Map).cast<String, dynamic>(),
+                      ),
+                    ),
+                  );
+                }
+              }
+              return candidates;
+            },
           );
-          if (!RecommendFilter.filter(videoItem) && visible) {
-            survivors.add(videoItem);
-          }
-        }
-      }
-      final enricher = RecommendationTagEnricher();
-      final list = await enricher.enrichAndFilter(
-        survivors,
-        shieldRuleSet,
-        getBvid: (item) => item.bvid,
-        getCid: (item) => item.cid,
-      );
-      final gatedList = await HomeFeedCommentGate.filter(
-        list,
-        config: CommentShieldingStore().snapshot(),
-        ruleSet: shieldRuleSet,
-        getAid: (item) => item.aid,
-      );
-      return Success(
-        ExposureTracker.instance.filterAndRecord(
-          gatedList,
-          getBvid: (item) => item.bvid,
-        ),
-      );
+      return Success((await pipeline.run()).feedItems);
     } else {
       return Error(res.data['message']);
     }
@@ -232,27 +211,37 @@ abstract final class VideoHttp {
       queryParameters: {'pn': pn, 'ps': ps},
     );
     if (res.data['code'] == 0) {
-      List<HotVideoItemModel> list = <HotVideoItemModel>[];
-      for (final i in res.data['data']['list']) {
-        if (!GlobalData().blackMids.contains(i['owner']['mid']) &&
-            !RecommendFilter.filterTitle(i['title']) &&
-            !RecommendFilter.filterLikeRatio(
-              i['stat']['like'],
-              i['stat']['view'],
-            )) {
-          if (useLegacyZoneTextFilter &&
-              enableFilter &&
-              i['tname'] != null &&
-              zoneRegExp.hasMatch(i['tname'])) {
-            continue;
+      final pipeline = RecommendationPipeline<HotVideoItemModel>(
+        supplyBatch: ShieldingRuntime.instance.batch,
+        surface: RecommendationSurfaces.hotAndRanking(),
+        candidateSource: (batch) {
+          final List<HotVideoItemModel> list = <HotVideoItemModel>[];
+          for (final i in res.data['data']['list']) {
+            if (!GlobalData().blackMids.contains(i['owner']['mid']) &&
+                !RecommendationFilter.filterTitle(
+                  batch.ruleSet,
+                  batch.config,
+                  i['title'],
+                ) &&
+                !RecommendationFilter.filterLikeRatio(
+                  batch.ruleSet,
+                  batch.config,
+                  i['stat']['like'],
+                  i['stat']['view'],
+                )) {
+              if (useLegacyZoneTextFilter &&
+                  enableFilter &&
+                  i['tname'] != null &&
+                  zoneRegExp.hasMatch(i['tname'])) {
+                continue;
+              }
+              list.add(HotVideoItemModel.fromJson(i));
+            }
           }
-          list.add(HotVideoItemModel.fromJson(i));
-        }
-      }
-      final shieldRuleSet = ShieldSettingsStore().snapshot();
-      return Success(
-        ShieldingAdapters.filterRecommendationVideos(list, shieldRuleSet),
+          return list;
+        },
       );
+      return Success(await pipeline.run());
     } else {
       return Error(res.data['message']);
     }
@@ -384,27 +373,19 @@ abstract final class VideoHttp {
       queryParameters: {'bvid': bvid},
     );
     if (res.data['code'] == 0) {
-      final items = (res.data['data'] as List?)?.map(
-        (i) => HotVideoItemModel.fromJson(i),
+      final items = (res.data['data'] as List?)
+          ?.map((i) => HotVideoItemModel.fromJson(i))
+          .toList();
+      if (items == null) {
+        return const Success(null);
+      }
+      final pipeline = RecommendationPipeline<HotVideoItemModel>(
+        supplyBatch: ShieldingRuntime.instance.batch,
+        surface: RecommendationSurfaces.relatedVideos(),
+        candidateSource: (batch) =>
+            RecommendationSurfaces.relatedVideoCandidates(items, batch),
       );
-      final list = RecommendFilter.applyFilterToRelatedVideos
-          ? items
-                ?.where(
-                  (i) =>
-                      !RecommendFilter.filterLikeRatio(
-                        i.stat.like,
-                        i.stat.view,
-                      ) &&
-                      !(i.duration > 0 &&
-                          i.duration < RecommendFilter.minDurationForRcmd),
-                )
-                .toList()
-          : items?.toList();
-      final shieldRuleSet = ShieldSettingsStore().snapshot();
-      final visibleList = list == null
-          ? null
-          : ShieldingAdapters.filterRelatedVideos(list, shieldRuleSet);
-      return Success(visibleList);
+      return Success(await pipeline.run());
     } else {
       return Error(res.data['message']);
     }
@@ -927,10 +908,16 @@ abstract final class VideoHttp {
     return null;
   }
 
-  static bool _canAddRank(Map i) {
+  static bool _canAddRank(Map i, RecommendationBatch batch) {
     if (!GlobalData().blackMids.contains(i['owner']['mid']) &&
-        !RecommendFilter.filterTitle(i['title']) &&
-        !RecommendFilter.filterLikeRatio(
+        !RecommendationFilter.filterTitle(
+          batch.ruleSet,
+          batch.config,
+          i['title'],
+        ) &&
+        !RecommendationFilter.filterLikeRatio(
+          batch.ruleSet,
+          batch.config,
           i['stat']['like'],
           i['stat']['view'],
         )) {
@@ -954,24 +941,28 @@ abstract final class VideoHttp {
       queryParameters: await WbiSign.makSign({'rid': rid, 'type': 'all'}),
     );
     if (res.data['code'] == 0) {
-      List<HotVideoItemModel> list = <HotVideoItemModel>[];
-      for (final i in res.data['data']['list']) {
-        if (_canAddRank(i)) {
-          list.add(HotVideoItemModel.fromJson(i));
-          // final List? others = i['others'];
-          // if (others != null && others.isNotEmpty) {
-          //   for (final j in others) {
-          //     if (_canAddRank(j)) {
-          //       list.add(HotVideoItemModel.fromJson(j));
-          //     }
-          //   }
-          // }
-        }
-      }
-      final shieldRuleSet = ShieldSettingsStore().snapshot();
-      return Success(
-        ShieldingAdapters.filterRecommendationVideos(list, shieldRuleSet),
+      final pipeline = RecommendationPipeline<HotVideoItemModel>(
+        supplyBatch: ShieldingRuntime.instance.batch,
+        surface: RecommendationSurfaces.hotAndRanking(),
+        candidateSource: (batch) {
+          final List<HotVideoItemModel> list = <HotVideoItemModel>[];
+          for (final i in res.data['data']['list']) {
+            if (_canAddRank(i, batch)) {
+              list.add(HotVideoItemModel.fromJson(i));
+              // final List? others = i['others'];
+              // if (others != null && others.isNotEmpty) {
+              //   for (final j in others) {
+              //     if (_canAddRank(j, batch)) {
+              //       list.add(HotVideoItemModel.fromJson(j));
+              //     }
+              //   }
+              // }
+            }
+          }
+          return list;
+        },
       );
+      return Success(await pipeline.run());
     } else {
       return Error(res.data['message']);
     }
