@@ -196,9 +196,13 @@ void main() {
 
       expect(result.map((e) => e.title), ['a', 'c']);
       expect(capture.calls, 1);
-      final context =
-          ((capture.bodies.single['questions'] as List).single as Map);
-      expect(context['id'], 'candidate_1');
+      final questions =
+          (capture.bodies.single['questions'] as List).cast<Map>();
+      expect(questions.map((question) => question['id']), [
+        'candidate_1',
+        'candidate_2',
+        'candidate_3',
+      ]);
     });
 
     test('transport 失败时全部保留（fail-open）', () async {
@@ -264,6 +268,10 @@ void main() {
               as Map;
       expect(context, {'title': '某番剧'});
 
+      // 两次 screen 共用 capture，先清掉第一次的请求再断言第二次。
+      capture.bodies.clear();
+      capture.calls = 0;
+
       await JevFinalScreen.pgcIndex(
         evaluator: _Harness(surfaces: {JevSurface.pgc}).evaluator(capture),
       ).screen([
@@ -285,7 +293,7 @@ void main() {
       ).screen([
         BgmRecommend.fromJson({
           'title': '某曲',
-          'labelList': [
+          'label_list': [
             {'name': '纯音乐'},
           ],
         }),
