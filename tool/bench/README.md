@@ -3,8 +3,9 @@
 本目录是开发期量具，不被 `lib/` 引用，也不参与 `flutter test`（`test/` 之外）。三个文件：
 
 - `shield_matcher_bench.dart` —— 微基准：固定 72 条规则 × 20 候选，输出每轮 / 单次判定中位数（µs）。
-- `_reference_shield_matcher.dart` —— `lib/features/shielding/shielding_matcher.dart` 在
-  commit `e998665ab`（票 #52 改造前）的逐字冻结副本。**不得修改**，否则差分等价结论失效。
+- `_reference_shield_matcher.dart` —— `lib/features/shielding/shielding_matcher.dart` 在票 #52 改造前的逐字冻结副本
+  （初始冻结自 `e998665ab`；2026-10-06 仅补入 production 新增的 `roomId` 值分支，见文末追记）。
+  **除该处外不得修改**，否则差分等价结论失效。
 - `shield_matcher_equivalence.dart` —— 差分夹：同一批 ruleSet / candidate 同时喂给冻结副本与当前实现，
   比较 `visible#blockedBy.id#allowedBy.id#errors(ruleId:message)` 签名。
 
@@ -59,8 +60,9 @@ flutter analyze --no-pub --no-fatal-infos
 ## 差分夹覆盖了什么
 
 - 4000 组随机规则集 × 24 候选（96,000 次比较）。
-- 穷举 17 type × 6 mode × 24 pattern × 7 scope = 17,136 条规则的规则集 × 24 候选 × 3 轮，规则实例跨候选复用，
-  专门压 rule-identity 缓存。
+- 穷举 type × 6 mode × 24 pattern × 7 scope 的规则集 × 24 候选 × 3 轮，规则实例跨候选复用，专门压
+  rule-identity 缓存（按 `ShieldRuleType.values` 逐项生成：main 线 17 type = 17,136 条规则；production 线
+  多一个 `roomId`，18 type = 18,144 条规则）。
 - 惰性 tokens 自洽：60 组随机规则集 + 穷举规则集 × 24 候选；eager 列表与 provider 并存时 eager 胜出；
   同一 ruleSet/候选重复判定结果稳定。
 - provider 调用计数：无 token 规则时不得调用；有 token 规则时每次判定至多一次。
@@ -97,3 +99,28 @@ flutter analyze --no-pub --no-fatal-infos
 
 本仓库 `.gitignore:189` 忽略整个 `docs/`（`git ls-files docs` 为空），因此 `docs/diagnostics/*.md`
 无法随代码进入版本库，任何指向它的验收记录都无法被复核。证据放在与量具同目录的受控文件中。
+
+## 追记 2026-10-06：基线换成 production 线，冻结副本补一行
+
+理由：本图的产品线是 `production`，而 production 已给 `ShieldRuleType` 增加 `roomId`（直播房间身份，
+见 `lib/features/shielding/live_shielding.dart` @ `d0820e6c9`）。只基于 main 冻结的旧副本因此成了
+非穷举开关，编译直接失败：`tool/bench/_reference_shield_matcher.dart:107:13: Error: The type
+'ShieldRuleType' is not exhaustively matched by the switch cases since it doesn't match
+'ShieldRuleType.roomId'`（`flutter analyze` 同样把这条报成 error）。处理：在该冻结副本的同一个值开关里
+补入与 production 改造前逐字相同的两行 `case ShieldRuleType.roomId: yield ifNullEmpty(candidate.roomId);`，
+其余一字未动 —— 参照件描述的仍是「#52 之前的 matcher 行为」，只是行为基线从 main 线换到了 production 线。
+
+同一批在 production 线（`origin/production` = `d0820e6c9` + 票 #73）复跑的数值，**与上表中 2026-10-03
+那组不是同一时机、也不构成前后对照**，仅作「当前树可复跑」的凭据：
+
+| 指标 | 2026-10-06 production 线复跑 |
+| --- | --- |
+| 每轮判定中位数（20 候选 × 72 规则） | 148.7 µs（min 143.7 / max 549.4，7 组采样） |
+| 单次 `match` 中位数 | 7.43 µs（warmup 200 次判定） |
+| 差分比较 / 不一致（sweep 规则 18,144） | 100,024 / 0 |
+| `flutter test --no-pub`（全库） | 539 通过（production 线含直播屏蔽测试） |
+
+差分夹的规则生成按 `ShieldRuleType.values` 逐项穷举，所以补行后它**自动覆盖了 `roomId` 规则**：sweep 规则数
+17,136 → 18,144（正好多 1 type × 6 mode × 24 pattern × 7 scope = 1,008 条），比较次数不变且 0 不一致 ——
+即 `roomId` 的判定等价性由本夹本身证明。真机层面的 roomId 屏蔽另有
+`test/features/shielding/live_shielding_test.dart` 与 `test/features/shielding/shielding_adapters_test.dart` 覆盖。
