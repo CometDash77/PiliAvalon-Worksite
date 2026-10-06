@@ -139,13 +139,25 @@ abstract final class JevRequest {
   static const String questionIdField = 'id';
   static const String questionTextField = 'question';
 
+  /// Per-candidate context carried inside its keyed question. Title is
+  /// mandatory; snippet and tags ride along only when the card already has
+  /// them. Never an id, a link, an uploader, or any long metadata (issue #34).
+  static const String candidateField = 'candidate';
+  static const String candidateTitleField = 'title';
+  static const String candidateSnippetField = 'snippet';
+  static const String candidateTagsField = 'tags';
+
   /// Ordinal question id, e.g. `candidate_1`. Never derived from a video id,
   /// a title, or any other card identity.
   static String candidateKey(int index) => 'candidate_${index + 1}';
 
-  static Map<String, Object?> question(String id) => <String, Object?>{
+  static Map<String, Object?> question(
+    String id, {
+    Map<String, Object?>? candidate,
+  }) => <String, Object?>{
     questionIdField: id,
     questionTextField: JevQuestion.text,
+    candidateField: ?candidate,
   };
 
   static Map<String, Object?> body({
@@ -157,4 +169,13 @@ abstract final class JevRequest {
     modelField: model,
     questionsField: questions,
   };
+}
+
+/// Answer-side field names, parsed leniently: a Noul answer carries 'noul',
+/// a Choice/Score answer additionally carries 'confidence' (issue #31, gap
+/// G-04). Anything unreadable fails open in the evaluator.
+abstract final class JevResponse {
+  static const String answersField = 'answers';
+  static const String noulField = 'noul';
+  static const String confidenceField = 'confidence';
 }

@@ -1,5 +1,6 @@
 export 'jev_contract.dart';
 export 'jev_credential_store.dart';
+export 'jev_evaluator.dart';
 export 'jev_http_probe.dart';
 export 'jev_preference_profile.dart';
 export 'jev_preference_store.dart';

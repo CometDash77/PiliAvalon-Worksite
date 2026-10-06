@@ -99,6 +99,44 @@ void main() {
       ]);
     });
 
+    test('终审阶段固定在评论门之后、曝光记录之前', () async {
+      final log = <String>[];
+
+      final pipeline = RecommendationPipeline<int>(
+        supplyBatch: _batch,
+        surface: RecommendationSurface<int>(
+          judge: (item, batch) => true,
+          enrichTags: (kept, batch) {
+            log.add('enrich:$kept');
+            return kept;
+          },
+          gateComments: (kept, batch) {
+            log.add('gate:$kept');
+            return kept;
+          },
+          finalScreen: (kept, batch) {
+            log.add('final:$kept');
+            return kept.where((item) => item != 4).toList();
+          },
+          recordExposure: (kept, batch) {
+            log.add('exposure:$kept');
+            return kept;
+          },
+        ),
+        candidateSource: (batch) => [2, 4, 6],
+      );
+
+      final result = await pipeline.run();
+
+      expect(result, [2, 6]);
+      expect(log, [
+        'enrich:[2, 4, 6]',
+        'gate:[2, 4, 6]',
+        'final:[2, 4, 6]',
+        'exposure:[2, 6]',
+      ]);
+    });
+
     test('后续阶段只看到判定留下的候选，异步阶段保持顺序与内容', () async {
       final snapshot = <String, List<int>>{};
 
