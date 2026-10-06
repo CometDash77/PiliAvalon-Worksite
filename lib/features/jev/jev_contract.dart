@@ -117,6 +117,13 @@ abstract final class JevLimits {
 
   /// Upper bound for the serialised preference state (gap G-03).
   static const int maxStateBytes = 2048;
+
+  /// A stored preference theme is capped to this many runes (gap G-05).
+  static const int maxThemeChars = 16;
+
+  /// Approximate counts saturate here (gap G-05): the profile keeps a magnitude,
+  /// not an exact tally.
+  static const int maxThemeCount = 999;
 }
 
 /// Request/response shape used by this implementation.

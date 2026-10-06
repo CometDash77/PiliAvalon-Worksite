@@ -16,6 +16,7 @@ class JevSettingsPage extends StatefulWidget {
     this.store,
     this.credentialStore,
     this.validator,
+    this.preferenceStore,
     this.onMessage,
   });
 
@@ -23,6 +24,9 @@ class JevSettingsPage extends StatefulWidget {
   final JevSettingsStore? store;
   final JevCredentialStore? credentialStore;
   final JevKeyValidator? validator;
+
+  /// The local negative-feedback profile surface (issue #33).
+  final JevPreferenceStore? preferenceStore;
 
   /// Replaces the toast sink in tests.
   final ValueChanged<String>? onMessage;
@@ -36,11 +40,15 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   late final JevCredentialStore _credentials =
       widget.credentialStore ?? SecureJevCredentialStore();
   late final JevKeyValidator _validator = widget.validator ?? JevKeyValidator();
+  late final JevPreferenceStore _preferences =
+      widget.preferenceStore ??
+      JevPreferenceStore(box: _store.box, settings: _store);
 
   final TextEditingController _keyController = TextEditingController();
 
   late JevSettings _settings = JevSettingsStore.snapshot;
   JevSelectionState _selection = const JevSelectionState();
+  JevPreferenceProfile _profile = JevPreferenceProfile.empty;
   JevKeyStoreStatus _keyStoreStatus = JevKeyStoreStatus.available;
   JevValidationResult? _validation;
   bool _busy = false;
@@ -70,6 +78,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
 
   Future<void> _load() async {
     final settings = await _store.load();
+    final profile = await _preferences.load();
     final status = await _credentials.status();
     String? storedKey;
     if (status == JevKeyStoreStatus.available) {
@@ -87,6 +96,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     }
     setState(() {
       _settings = JevSettingsStore.snapshot;
+      _profile = profile;
       _keyStoreStatus = status;
       _hasStoredKey = storedKey != null;
       if (storedKey != null) {
@@ -242,6 +252,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         ),
         children: [
           ..._buildSwitchSection(),
+          const Divider(height: 1),
+          ..._buildProfileSection(),
           const Divider(height: 1),
           ..._buildProviderSection(errorColor),
           const Divider(height: 1),
@@ -401,6 +413,93 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       ),
   ];
 
+  String _themeAge(JevPreferenceTheme theme) {
+    final days = DateTime.now().difference(theme.lastFeedbackAt).inDays;
+    final age = days <= 0 ? '今天' : '$days 天前';
+    final count = theme.count;
+    return '≈$count 次 · 最后反馈 $age';
+  }
+
+  Future<void> _deleteTheme(String theme) async {
+    await _preferences.deleteTheme(theme);
+    if (!mounted) return;
+    setState(() => _profile = JevPreferenceStore.snapshot);
+  }
+
+  Future<void> _clearProfile() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('清空本地偏好档'),
+        content: const Text('清空后不再向 Jev 发送任何负主题。平台侧已提交的反馈不受影响，也不会被撤销。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('清空'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _preferences.clear();
+    if (!mounted) return;
+    setState(() => _profile = JevPreferenceStore.snapshot);
+  }
+
+  /// The local explicit negative profile is visible and deletable at all times,
+  /// including while Jev is off — that is when it stops collecting, not when it
+  /// stops existing (issue #33).
+  List<Widget> _buildProfileSection() => [
+    const Padding(
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Text('本地负反馈档（只收集推荐卡片上的显式「不感兴趣」）'),
+    ),
+    if (!_settings.enabled)
+      const custom.ListTile(
+        dense: true,
+        leading: Icon(Icons.pause_circle_outline),
+        title: Text('Jev 已关闭：暂停收集，档与过期计时保留'),
+      ),
+    if (_profile.isEmpty)
+      const custom.ListTile(
+        dense: true,
+        leading: Icon(Icons.inbox_outlined),
+        title: Text('档为空'),
+        subtitle: Text('详情页点踩、评论互动、跳过与观看行为都不进这份档'),
+      )
+    else ...[
+      for (final theme in _profile.themes)
+        custom.ListTile(
+          dense: true,
+          leading: const Icon(Icons.label_outline),
+          title: Text(theme.theme),
+          subtitle: Text(_themeAge(theme)),
+          trailing: IconButton(
+            tooltip: '删除该主题',
+            icon: const Icon(Icons.delete_outline),
+            onPressed: () => _deleteTheme(theme.theme),
+          ),
+        ),
+      const Padding(
+        padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
+        child: Text(
+          '最多保留 20 个主题：满额时先淘汰最近反馈最早的一个，6 个月没有新反馈的主题自动删除。',
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: TextButton(
+          onPressed: _clearProfile,
+          child: const Text('清空偏好档'),
+        ),
+      ),
+    ],
+  ];
+
   List<Widget> _buildComplianceSection() => const [
     custom.ListTile(
       dense: true,
@@ -411,6 +510,11 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       dense: true,
       leading: Icon(Icons.info_outline),
       title: Text('密钥只在已选提供方上验证，失败时绝不会拿去另一个提供方重试'),
+    ),
+    custom.ListTile(
+      dense: true,
+      leading: Icon(Icons.info_outline),
+      title: Text('平台侧「撤销」只取消平台反馈，不回滚本地主题计数：档里的计数只能由你手动删除'),
     ),
   ];
 

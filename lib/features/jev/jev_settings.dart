@@ -124,6 +124,10 @@ class JevSettingsStore {
     }
   }
 
+  /// The non-secret settings box. The preference store shares this box, so a
+  /// caller that injects a settings store never reaches the other one.
+  JevSettingsBox get box => _box;
+
   static const String namespace = 'piliavalon.jev.v1';
   static const String enabledKey = '$namespace.enabled';
   static const String providerKey = '$namespace.provider';

@@ -49,7 +49,10 @@ class _FakeCredentialStore implements JevCredentialStore {
 }
 
 void main() {
-  setUp(JevSettingsStore.resetCache);
+  setUp(() {
+    JevSettingsStore.resetCache();
+    JevPreferenceStore.resetCache();
+  });
 
   Future<void> pumpPage(
     WidgetTester tester, {
@@ -228,5 +231,79 @@ void main() {
     expect(credentials.deleteCount, 1);
     expect(credentials.stored, isNull);
     expect(find.text('尚未保存密钥'), findsOneWidget);
+  });
+
+  testWidgets('the local profile lists its themes and deletes one', (
+    tester,
+  ) async {
+    final box = _MemoryBox();
+    box.values[JevPreferenceStore.profileKey] = JevPreferenceProfile.empty
+        .recordTheme(
+          '甲主题',
+          now: DateTime.now().subtract(const Duration(days: 3)),
+        )
+        .recordTheme(
+          '乙主题',
+          now: DateTime.now().subtract(const Duration(days: 1)),
+        )
+        .encode();
+
+    await pumpPage(
+      tester,
+      store: JevSettingsStore(box: box),
+      credentials: _FakeCredentialStore(),
+      validator: JevKeyValidator(
+        probe: ({
+          required JevProvider provider,
+          required String apiKey,
+        }) async => const JevProbeResult(JevProbeOutcome.ok),
+      ),
+      messages: <String>[],
+    );
+
+    expect(find.text('Jev 已关闭：暂停收集，档与过期计时保留'), findsOneWidget);
+    expect(find.text('甲主题'), findsOneWidget);
+    expect(find.text('乙主题'), findsOneWidget);
+
+    // Newest feedback first, so the first delete icon belongs to 乙主题.
+    await tester.tap(find.byIcon(Icons.delete_outline).first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('乙主题'), findsNothing);
+    expect(find.text('甲主题'), findsOneWidget);
+    expect(box.values.containsKey(JevPreferenceStore.profileKey), isTrue);
+  });
+
+  testWidgets('clearing the local profile removes the stored themes', (
+    tester,
+  ) async {
+    final box = _MemoryBox();
+    box.values[JevPreferenceStore.profileKey] = JevPreferenceProfile.empty
+        .recordTheme(
+          '甲主题',
+          now: DateTime.now().subtract(const Duration(days: 3)),
+        )
+        .encode();
+
+    await pumpPage(
+      tester,
+      store: JevSettingsStore(box: box),
+      credentials: _FakeCredentialStore(),
+      validator: JevKeyValidator(
+        probe: ({
+          required JevProvider provider,
+          required String apiKey,
+        }) async => const JevProbeResult(JevProbeOutcome.ok),
+      ),
+      messages: <String>[],
+    );
+
+    await tester.tap(find.widgetWithText(TextButton, '清空偏好档'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, '清空'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('档为空'), findsOneWidget);
+    expect(box.values.containsKey(JevPreferenceStore.profileKey), isFalse);
   });
 }

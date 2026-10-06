@@ -1,6 +1,8 @@
 export 'jev_contract.dart';
 export 'jev_credential_store.dart';
 export 'jev_http_probe.dart';
+export 'jev_preference_profile.dart';
+export 'jev_preference_store.dart';
 export 'jev_key_format.dart';
 export 'jev_key_validator.dart';
 export 'jev_provider_selection.dart';
