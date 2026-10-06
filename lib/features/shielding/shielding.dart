@@ -1,6 +1,11 @@
 export 'comment_shielding_config.dart';
+export 'recommendation_filter.dart';
+export 'recommendation_filter_config.dart';
+export 'recommendation_pipeline.dart';
+export 'recommendation_surfaces.dart';
 export 'shielding_adapters.dart';
 export 'shielding_matcher.dart';
 export 'shielding_migration.dart';
 export 'shielding_models.dart';
+export 'shielding_runtime.dart';
 export 'shielding_store.dart';
