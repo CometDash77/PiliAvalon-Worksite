@@ -175,6 +175,7 @@ dependencies:
       url: https://github.com/bggRGjQaUbCoE/window_manager.git
       path: packages/window_manager
       ref: main
+  flutter_secure_storage: ^11.2.0
 
 dependency_overrides:
   flutter_inappwebview_android:

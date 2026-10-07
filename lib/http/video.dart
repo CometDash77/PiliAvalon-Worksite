@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:PiliPlus/common/constants.dart';
+import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo;
@@ -71,7 +72,9 @@ abstract final class VideoHttp {
       final pipeline =
           RecommendationPipeline<RecommendationFeedEntry<RcmdVideoItemModel>>(
             supplyBatch: ShieldingRuntime.instance.batch,
-            surface: RecommendationSurfaces.homeFeed(),
+            surface: RecommendationSurfaces.homeFeed(
+              jevSurface: JevSurface.homeWeb,
+            ),
             candidateSource: (batch) {
               final candidates =
                   <RecommendationFeedEntry<RcmdVideoItemModel>>[];
@@ -159,7 +162,9 @@ abstract final class VideoHttp {
             RecommendationFeedEntry<RcmdVideoItemAppModel>
           >(
             supplyBatch: ShieldingRuntime.instance.batch,
-            surface: RecommendationSurfaces.homeFeed(),
+            surface: RecommendationSurfaces.homeFeed(
+              jevSurface: JevSurface.homeApp,
+            ),
             candidateSource: (batch) {
               final candidates =
                   <RecommendationFeedEntry<RcmdVideoItemAppModel>>[];
@@ -213,7 +218,9 @@ abstract final class VideoHttp {
     if (res.data['code'] == 0) {
       final pipeline = RecommendationPipeline<HotVideoItemModel>(
         supplyBatch: ShieldingRuntime.instance.batch,
-        surface: RecommendationSurfaces.hotAndRanking(),
+        surface: RecommendationSurfaces.hotAndRanking(
+          jevSurface: JevSurface.hot,
+        ),
         candidateSource: (batch) {
           final List<HotVideoItemModel> list = <HotVideoItemModel>[];
           for (final i in res.data['data']['list']) {
@@ -381,7 +388,9 @@ abstract final class VideoHttp {
       }
       final pipeline = RecommendationPipeline<HotVideoItemModel>(
         supplyBatch: ShieldingRuntime.instance.batch,
-        surface: RecommendationSurfaces.relatedVideos(),
+        surface: RecommendationSurfaces.relatedVideos(
+          jevSurface: JevSurface.related,
+        ),
         candidateSource: (batch) =>
             RecommendationSurfaces.relatedVideoCandidates(items, batch),
       );
@@ -943,7 +952,9 @@ abstract final class VideoHttp {
     if (res.data['code'] == 0) {
       final pipeline = RecommendationPipeline<HotVideoItemModel>(
         supplyBatch: ShieldingRuntime.instance.batch,
-        surface: RecommendationSurfaces.hotAndRanking(),
+        surface: RecommendationSurfaces.hotAndRanking(
+          jevSurface: JevSurface.ranking,
+        ),
         candidateSource: (batch) {
           final List<HotVideoItemModel> list = <HotVideoItemModel>[];
           for (final i in res.data['data']['list']) {
@@ -981,10 +992,11 @@ abstract final class VideoHttp {
       }),
     );
     if (res.data['code'] == 0) {
+      final list = (res.data['result']?['list'] as List?)
+          ?.map((e) => PgcRankItemModel.fromJson(e))
+          .toList();
       return Success(
-        (res.data['result']?['list'] as List?)
-            ?.map((e) => PgcRankItemModel.fromJson(e))
-            .toList(),
+        list == null ? null : await JevFinalScreen.pgcRank().screen(list),
       );
     } else {
       return Error(res.data['message']);
@@ -1004,10 +1016,11 @@ abstract final class VideoHttp {
       }),
     );
     if (res.data['code'] == 0) {
+      final list = (res.data['data']?['list'] as List?)
+          ?.map((e) => PgcRankItemModel.fromJson(e))
+          .toList();
       return Success(
-        (res.data['data']?['list'] as List?)
-            ?.map((e) => PgcRankItemModel.fromJson(e))
-            .toList(),
+        list == null ? null : await JevFinalScreen.pgcRank().screen(list),
       );
     } else {
       return Error(res.data['message']);
@@ -1081,7 +1094,13 @@ abstract final class VideoHttp {
       ),
     );
     if (res.data['code'] == 0) {
-      return Success(PopularSeriesOneData.fromJson(res.data['data']));
+      final data = PopularSeriesOneData.fromJson(res.data['data']);
+      if (data.list != null) {
+        data.list = await JevFinalScreen.hotVideo(
+          surface: JevSurface.hot,
+        ).screen(data.list!);
+      }
+      return Success(data);
     } else {
       return Error(res.data['message']);
     }
@@ -1106,7 +1125,13 @@ abstract final class VideoHttp {
       ),
     );
     if (res.data['code'] == 0) {
-      return Success(PopularPreciousData.fromJson(res.data['data']));
+      final data = PopularPreciousData.fromJson(res.data['data']);
+      if (data.list != null) {
+        data.list = await JevFinalScreen.hotVideo(
+          surface: JevSurface.hot,
+        ).screen(data.list!);
+      }
+      return Success(data);
     } else {
       return Error(res.data['message']);
     }

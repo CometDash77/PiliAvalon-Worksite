@@ -42,21 +42,30 @@ class RecommendationSurface<T> {
     required this.judge,
     this.enrichTags,
     this.gateComments,
+    this.finalScreen,
     this.recordExposure,
   });
 
   final RecommendationJudge<T> judge;
   final RecommendationStage<T>? enrichTags;
   final RecommendationStage<T>? gateComments;
+
+  /// 所有更便宜的过滤之后的最后一道判定（#65 的 Jev；#51 要的挂载点）。
+  ///
+  /// 固定运行在 [gateComments] 之后、[recordExposure] 之前：曝光记录不得看到
+  /// 被隐藏的候选。失败必须在本阶段内部 fail-open——原样返回列表，绝不把异常
+  /// 穿过流水线打挂整个面。
+  final RecommendationStage<T>? finalScreen;
+
   final RecommendationStage<T>? recordExposure;
 }
 
 /// 把任意推荐面按同一条流水线跑完：
 ///
 /// 1. 取规则集 + 设置（整批只有这一次）；2. 取列表；3. 逐条判定；4. 标签富集；
-/// 5. 评论门；6. 曝光记录。
+/// 5. 评论门；6. 终审（#65 的 Jev）；7. 曝光记录。
 ///
-/// 阶段 3-5 由面自己提供，没有这一行为的面直接不传，而不是在流水线里分叉。
+/// 阶段 3-6 由面自己提供，没有这一行为的面直接不传，而不是在流水线里分叉。
 /// 没有任何阶段提前返回：空列表也照样走完全程，与它替换掉的手写调用点一致。
 class RecommendationPipeline<T> {
   const RecommendationPipeline({
@@ -87,6 +96,11 @@ class RecommendationPipeline<T> {
     final gateComments = surface.gateComments;
     if (gateComments != null) {
       kept = await gateComments(kept, batch);
+    }
+
+    final finalScreen = surface.finalScreen;
+    if (finalScreen != null) {
+      kept = await finalScreen(kept, batch);
     }
 
     final recordExposure = surface.recordExposure;

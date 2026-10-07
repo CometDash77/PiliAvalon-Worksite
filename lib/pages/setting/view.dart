@@ -9,6 +9,7 @@ import 'package:PiliPlus/pages/comment_shield_settings/view.dart';
 import 'package:PiliPlus/pages/login/controller.dart';
 import 'package:PiliPlus/pages/setting/common_setting.dart';
 import 'package:PiliPlus/pages/setting/widgets/multi_select_dialog.dart';
+import 'package:PiliPlus/pages/jev_settings/view.dart';
 import 'package:PiliPlus/pages/shielding_settings/view.dart';
 import 'package:PiliPlus/pages/webdav/view.dart';
 import 'package:PiliPlus/utils/accounts.dart';
@@ -70,6 +71,11 @@ class _SettingPageState extends State<SettingPage> {
       type: SettingType.recommendSetting,
       subtitle: '推荐来源（web/app）、刷新保留内容、过滤器',
       icon: Icon(Icons.explore_outlined),
+    ),
+    _SettingsModel(
+      type: SettingType.jevSetting,
+      subtitle: '语义筛选开关、提供方与密钥、隐私说明',
+      icon: Icon(Icons.psychology_outlined),
     ),
     _SettingsModel(
       type: SettingType.videoSetting,
@@ -143,6 +149,9 @@ class _SettingPageState extends State<SettingPage> {
                       ),
                       SettingType.shieldingSetting =>
                         const ShieldingSettingsPage(showAppBar: false),
+                      SettingType.jevSetting => const JevSettingsPage(
+                        showAppBar: false,
+                      ),
                       SettingType.channelQuietSetting =>
                         const ChannelQuietSettingsPage(showAppBar: false),
                       SettingType.commentShieldSetting =>
@@ -176,6 +185,7 @@ class _SettingPageState extends State<SettingPage> {
           .styleSetting ||
           .extraSetting => CommonSetting(settingType: type),
           .shieldingSetting => const ShieldingSettingsPage(),
+          .jevSetting => const JevSettingsPage(),
           .channelQuietSetting => const ChannelQuietSettingsPage(),
           .commentShieldSetting => const CommentShieldSettingsPage(),
           .webdavSetting => const WebDavSettingPage(),

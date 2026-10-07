@@ -8,6 +8,7 @@ import 'package:PiliPlus/common/widgets/scroll_physics.dart'
 import 'package:PiliPlus/common/widgets/sliver/sliver_floating_header.dart';
 import 'package:PiliPlus/common/widgets/video_card/video_card_h.dart';
 import 'package:PiliPlus/common/widgets/view_sliver_safe_area.dart';
+import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/video/source_type.dart';
 import 'package:PiliPlus/models/model_hot_video_item.dart';
@@ -68,6 +69,7 @@ class _PopularSeriesPageState extends State<PopularSeriesPage> with GridMixin {
               final item = response[index];
               return VideoCardH(
                 videoItem: item,
+                jevSurface: JevSurface.hot,
                 onTap: () {
                   final config = _controller.config.value;
                   PageUtils.toVideoPage(

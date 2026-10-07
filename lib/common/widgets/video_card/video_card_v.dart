@@ -4,6 +4,7 @@ import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/stat/stat.dart';
 import 'package:PiliPlus/common/widgets/video_card/shield_quick_action.dart';
 import 'package:PiliPlus/common/widgets/video_popup_menu.dart';
+import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/http/search.dart';
 import 'package:PiliPlus/models/home/rcmd/result.dart';
 import 'package:PiliPlus/models/model_rec_video_item.dart';
@@ -25,11 +26,15 @@ class VideoCardV extends StatelessWidget {
   final VoidCallback? onRemove;
   final ValueChanged<String>? onRecommendationTapBvid;
 
+  /// 该卡片所在的推荐面；透传给 [VideoPopupMenu] 供 JEV 偏好漏斗记录。
+  final JevSurface? jevSurface;
+
   const VideoCardV({
     super.key,
     required this.videoItem,
     this.onRemove,
     this.onRecommendationTapBvid,
+    this.jevSurface,
   });
 
   Future<void> onPushDetail() async {
@@ -151,6 +156,7 @@ class VideoCardV extends StatelessWidget {
               iconSize: 17,
               videoItem: videoItem,
               onRemove: onRemove,
+              jevSurface: jevSurface,
             ),
           ),
       ],

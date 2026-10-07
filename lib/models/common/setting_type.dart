@@ -12,6 +12,7 @@ enum SettingType {
   channelQuietSetting('频道屏蔽'),
   commentShieldSetting('评论区屏蔽设置'),
   recommendSetting('推荐流设置'),
+  jevSetting('Jev 智能筛选'),
   videoSetting('音视频设置'),
   playSetting('播放器设置'),
   styleSetting('外观设置'),

@@ -1,4 +1,5 @@
 import 'package:PiliPlus/features/shielding/shielding.dart';
+import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/grpc/reply.dart';
 import 'package:PiliPlus/models/model_hot_video_item.dart';
 import 'package:PiliPlus/models/model_video.dart';
@@ -96,6 +97,44 @@ void main() {
         'enrich:[2, 4]',
         'gate:[2, 4]',
         'exposure:[2, 4]',
+      ]);
+    });
+
+    test('终审阶段固定在评论门之后、曝光记录之前', () async {
+      final log = <String>[];
+
+      final pipeline = RecommendationPipeline<int>(
+        supplyBatch: _batch,
+        surface: RecommendationSurface<int>(
+          judge: (item, batch) => true,
+          enrichTags: (kept, batch) {
+            log.add('enrich:$kept');
+            return kept;
+          },
+          gateComments: (kept, batch) {
+            log.add('gate:$kept');
+            return kept;
+          },
+          finalScreen: (kept, batch) {
+            log.add('final:$kept');
+            return kept.where((item) => item != 4).toList();
+          },
+          recordExposure: (kept, batch) {
+            log.add('exposure:$kept');
+            return kept;
+          },
+        ),
+        candidateSource: (batch) => [2, 4, 6],
+      );
+
+      final result = await pipeline.run();
+
+      expect(result, [2, 6]);
+      expect(log, [
+        'enrich:[2, 4, 6]',
+        'gate:[2, 4, 6]',
+        'final:[2, 4, 6]',
+        'exposure:[2, 6]',
       ]);
     });
 
@@ -214,7 +253,9 @@ void main() {
   group('RecommendationSurfaces.homeFeed', () {
     test('命中屏蔽规则被丢弃，allow 规则优先', () {
       final entry = _entry('广告测试', bvid: 'BV1');
-      final surface = RecommendationSurfaces.homeFeed<_TestVideo>();
+      final surface = RecommendationSurfaces.homeFeed<_TestVideo>(
+        jevSurface: JevSurface.homeWeb,
+      );
 
       expect(
         surface.judge(
@@ -246,7 +287,9 @@ void main() {
     });
 
     test('已关注UP豁免只作用于旧派生指标链路', () {
-      final surface = RecommendationSurfaces.homeFeed<_TestVideo>();
+      final surface = RecommendationSurfaces.homeFeed<_TestVideo>(
+        jevSurface: JevSurface.homeWeb,
+      );
       final config = RecommendationFilterConfig(
         rcmdRegExp: RegExp('广告'),
         useLegacyTextFilter: true,
@@ -271,7 +314,9 @@ void main() {
     });
 
     test('推荐屏蔽总开关关闭时整面放行', () {
-      final surface = RecommendationSurfaces.homeFeed<_TestVideo>();
+      final surface = RecommendationSurfaces.homeFeed<_TestVideo>(
+        jevSurface: JevSurface.homeWeb,
+      );
       final config = RecommendationFilterConfig(
         rcmdRegExp: RegExp('广告'),
         useLegacyTextFilter: true,
@@ -293,7 +338,9 @@ void main() {
     });
 
     test('首页面带标签富集、评论门与曝光记录三个阶段', () {
-      final surface = RecommendationSurfaces.homeFeed<_TestVideo>();
+      final surface = RecommendationSurfaces.homeFeed<_TestVideo>(
+        jevSurface: JevSurface.homeWeb,
+      );
 
       expect(surface.enrichTags, isNotNull);
       expect(surface.gateComments, isNotNull);
@@ -303,7 +350,9 @@ void main() {
 
   group('RecommendationSurfaces.hotAndRanking', () {
     test('按推荐作用域判定，全局开关关闭时整面放行', () {
-      final surface = RecommendationSurfaces.hotAndRanking();
+      final surface = RecommendationSurfaces.hotAndRanking(
+        jevSurface: JevSurface.hot,
+      );
 
       expect(
         surface.judge(
@@ -327,7 +376,9 @@ void main() {
     });
 
     test('不受相关视频独立开关影响', () {
-      final surface = RecommendationSurfaces.hotAndRanking();
+      final surface = RecommendationSurfaces.hotAndRanking(
+        jevSurface: JevSurface.hot,
+      );
 
       expect(
         surface.judge(
@@ -344,7 +395,9 @@ void main() {
     });
 
     test('热门面没有命中后行为', () {
-      final surface = RecommendationSurfaces.hotAndRanking();
+      final surface = RecommendationSurfaces.hotAndRanking(
+        jevSurface: JevSurface.hot,
+      );
 
       expect(surface.enrichTags, isNull);
       expect(surface.gateComments, isNull);
@@ -354,7 +407,9 @@ void main() {
 
   group('RecommendationSurfaces.relatedVideos', () {
     test('候选用 videoDetail 作用域，独立开关决定是否生效', () {
-      final surface = RecommendationSurfaces.relatedVideos();
+      final surface = RecommendationSurfaces.relatedVideos(
+        jevSurface: JevSurface.related,
+      );
 
       expect(
         surface.judge(
@@ -391,11 +446,13 @@ void main() {
       final batch = _batch(ruleSet: _ruleSet(rules: [videoDetailRule]));
 
       expect(
-        RecommendationSurfaces.relatedVideos().judge(_hot('广告测试'), batch),
+        RecommendationSurfaces.relatedVideos(jevSurface: JevSurface.related)
+            .judge(_hot('广告测试'), batch),
         isFalse,
       );
       expect(
-        RecommendationSurfaces.hotAndRanking().judge(_hot('广告测试'), batch),
+        RecommendationSurfaces.hotAndRanking(jevSurface: JevSurface.hot)
+            .judge(_hot('广告测试'), batch),
         isTrue,
       );
     });
@@ -459,8 +516,8 @@ void main() {
   group('五个面的空列表', () {
     test('热门/相关视频面空列表返回空', () async {
       for (final surface in [
-        RecommendationSurfaces.hotAndRanking(),
-        RecommendationSurfaces.relatedVideos(),
+        RecommendationSurfaces.hotAndRanking(jevSurface: JevSurface.hot),
+        RecommendationSurfaces.relatedVideos(jevSurface: JevSurface.related),
       ]) {
         final pipeline = RecommendationPipeline<HotVideoItemModel>(
           supplyBatch: _batch,
@@ -473,7 +530,9 @@ void main() {
 
     test('首页面空列表返回空（判定从未被调用）', () async {
       var judgeCalls = 0;
-      final surface = RecommendationSurfaces.homeFeed<_TestVideo>();
+      final surface = RecommendationSurfaces.homeFeed<_TestVideo>(
+        jevSurface: JevSurface.homeWeb,
+      );
       final pipeline =
           RecommendationPipeline<RecommendationFeedEntry<_TestVideo>>(
             supplyBatch: _batch,

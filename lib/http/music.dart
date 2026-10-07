@@ -1,3 +1,4 @@
+import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/http/api.dart';
 import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/http/loading_state.dart';
@@ -53,10 +54,11 @@ abstract final class MusicHttp {
       },
     );
     if (res.data['code'] == 0) {
+      final list = (res.data['data']?['list'] as List?)
+          ?.map((i) => BgmRecommend.fromJson(i))
+          .toList();
       return Success(
-        (res.data['data']?['list'] as List?)
-            ?.map((i) => BgmRecommend.fromJson(i))
-            .toList(),
+        list == null ? null : await JevFinalScreen.music().screen(list),
       );
     } else {
       return Error(res.data['message']);
