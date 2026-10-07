@@ -574,9 +574,9 @@ class _MainAppState extends PopScopeState<MainApp>
       final layout = HomeZenLayout.resolve(zen: ZenMode.isOn, tabCount: 0);
       return Column(
         children: [
-          if (layout.showZenToggle)
-            const ZenModeToggle()
-          else ...[
+          // 普通态(#97):开关常显,头像/徽标保持原位;Zen 下只剩开关与搜索(R6)。
+          const ZenModeToggle(),
+          if (layout.showMessageBadge) ...[
             userAvatar(
               colorScheme: _colorScheme,
               mainController: _mainController,
