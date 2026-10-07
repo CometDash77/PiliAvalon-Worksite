@@ -22,7 +22,12 @@ class VideoCardH extends StatelessWidget {
     this.onTap,
     this.onViewLater,
     this.onRemove,
+    this.zen = false,
   });
+
+  /// Zen 缩略卡(规格 #42 R10-R11):显式参数,默认 false,卡片自身禁止读全局。
+  final bool zen;
+
   final HorizontalVideoModel videoItem;
   final VoidCallback? onTap;
   final ValueChanged<int>? onViewLater;
@@ -46,8 +51,8 @@ class VideoCardH extends StatelessWidget {
         clipBehavior: .none,
         children: [
           InkWell(
-            onLongPress: onLongPress,
-            onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
+            onLongPress: zen ? null : onLongPress,
+            onSecondaryTap: zen || PlatformUtils.isMobile ? null : onLongPress,
             onTap:
                 onTap ??
                 () async {
@@ -115,7 +120,7 @@ class VideoCardH extends StatelessWidget {
                               width: maxWidth,
                               height: maxHeight,
                             ),
-                            if (videoItem.badge case final badge?)
+                            if (videoItem.badge case final badge? when !zen)
                               PBadge(
                                 text: badge,
                                 top: 6.0,
@@ -167,24 +172,25 @@ class VideoCardH extends StatelessWidget {
               ),
             ),
           ),
-          Positioned(
-            bottom: 0,
-            right: 12,
-            width: 29,
-            height: 29,
-            child: VideoPopupMenu(
-              iconSize: 17,
-              videoItem: videoItem,
-              onRemove: onRemove,
+          if (!zen)
+            Positioned(
+              bottom: 0,
+              right: 12,
+              width: 29,
+              height: 29,
+              child: VideoPopupMenu(
+                iconSize: 17,
+                videoItem: videoItem,
+                onRemove: onRemove,
+              ),
             ),
-          ),
         ],
       ),
     );
   }
 
   Widget content(ThemeData theme) {
-    String pubdate = DateFormatUtils.dateFormat(videoItem.pubdate!);
+    String pubdate = DateFormatUtils.dateFormat(videoItem.pubdate);
     if (pubdate != '') pubdate += '  ';
     return Expanded(
       child: Column(
@@ -228,28 +234,23 @@ class VideoCardH extends StatelessWidget {
                 overflow: .ellipsis,
               ),
             ),
-          Text(
-            "$pubdate${videoItem.owner.name}",
-            maxLines: 1,
-            style: TextStyle(
-              fontSize: 12,
-              height: 1,
-              color: theme.colorScheme.outline,
-              overflow: .clip,
+          if (!zen)
+            Text(
+              "$pubdate${videoItem.owner.name}",
+              maxLines: 1,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1,
+                color: theme.colorScheme.outline,
+                overflow: .clip,
+              ),
             ),
-          ),
           const SizedBox(height: 3),
           Row(
             spacing: 8,
             children: [
-              StatWidget(
-                type: .play,
-                value: videoItem.stat.view,
-              ),
-              StatWidget(
-                type: .danmaku,
-                value: videoItem.stat.danmu,
-              ),
+              StatWidget(type: .play, value: videoItem.stat.view),
+              if (!zen) StatWidget(type: .danmaku, value: videoItem.stat.danmu),
             ],
           ),
         ],

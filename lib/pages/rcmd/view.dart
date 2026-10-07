@@ -8,6 +8,7 @@ import 'package:PiliPlus/features/exposure_tracker/exposure_tracker.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/pages/rcmd/controller.dart';
 import 'package:PiliPlus/utils/grid.dart';
+import 'package:PiliPlus/utils/zen_mode.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
@@ -43,7 +44,11 @@ class _RcmdPageState extends State<RcmdPage>
             SliverPadding(
               padding: const .only(top: Style.cardSpace, bottom: 100),
               sliver: Obx(
-                () => _buildBody(colorScheme, controller.loadingState.value),
+                () => _buildBody(
+                  colorScheme,
+                  controller.loadingState.value,
+                  zen: ZenMode.isOn,
+                ),
               ),
             ),
           ],
@@ -62,8 +67,9 @@ class _RcmdPageState extends State<RcmdPage>
 
   Widget _buildBody(
     ColorScheme colorScheme,
-    LoadingState<List<dynamic>?> loadingState,
-  ) {
+    LoadingState<List<dynamic>?> loadingState, {
+    bool zen = false,
+  }) {
     return switch (loadingState) {
       Loading() => _buildSkeleton,
       Success(:final response) =>
@@ -100,7 +106,9 @@ class _RcmdPageState extends State<RcmdPage>
                         : index;
                     return VideoCardV(
                       videoItem: response[actualIndex],
-                      onRecommendationTapBvid: ExposureTracker.instance.clearExposure,
+                      zen: zen,
+                      onRecommendationTapBvid:
+                          ExposureTracker.instance.clearExposure,
                       onRemove: () {
                         if (controller.lastRefreshAt != null &&
                             actualIndex < controller.lastRefreshAt!) {
@@ -115,7 +123,9 @@ class _RcmdPageState extends State<RcmdPage>
                   } else {
                     return VideoCardV(
                       videoItem: response[index],
-                      onRecommendationTapBvid: ExposureTracker.instance.clearExposure,
+                      zen: zen,
+                      onRecommendationTapBvid:
+                          ExposureTracker.instance.clearExposure,
                       onRemove: () => controller.loadingState
                         ..value.data!.removeAt(index)
                         ..refresh(),

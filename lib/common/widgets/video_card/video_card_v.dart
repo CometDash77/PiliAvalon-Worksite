@@ -25,11 +25,15 @@ class VideoCardV extends StatelessWidget {
   final VoidCallback? onRemove;
   final ValueChanged<String>? onRecommendationTapBvid;
 
+  /// Zen 缩略卡(规格 #42 R10-R11):显式参数,默认 false,卡片自身禁止读全局。
+  final bool zen;
+
   const VideoCardV({
     super.key,
     required this.videoItem,
     this.onRemove,
     this.onRecommendationTapBvid,
+    this.zen = false,
   });
 
   Future<void> onPushDetail() async {
@@ -100,8 +104,8 @@ class VideoCardV extends StatelessWidget {
         Card(
           child: InkWell(
             onTap: onPushDetail,
-            onLongPress: onLongPress,
-            onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
+            onLongPress: zen ? null : onLongPress,
+            onSecondaryTap: zen || PlatformUtils.isMobile ? null : onLongPress,
             borderRadius: const .all(.circular(12)),
             child: Column(
               crossAxisAlignment: .start,
@@ -141,7 +145,7 @@ class VideoCardV extends StatelessWidget {
             ),
           ),
         ),
-        if (videoItem.goto == 'av')
+        if (videoItem.goto == 'av' && !zen)
           Positioned(
             right: -5,
             bottom: -2,
@@ -174,56 +178,57 @@ class VideoCardV extends StatelessWidget {
               ),
             ),
             videoStat(theme),
-            Row(
-              spacing: 2,
-              children: [
-                if (videoItem.goto == 'bangumi')
-                  PBadge(
-                    text: videoItem.pgcBadge,
-                    isStack: false,
-                    size: .small,
-                    type: .line_primary,
-                    fontSize: 9,
-                  ),
-                if (videoItem.rcmdReason != null)
-                  PBadge(
-                    text: videoItem.rcmdReason,
-                    isStack: false,
-                    size: .small,
-                    type: .secondary,
-                  ),
-                if (videoItem.goto == 'picture')
-                  const PBadge(
-                    text: '动态',
-                    isStack: false,
-                    size: .small,
-                    type: .line_primary,
-                    fontSize: 9,
-                  ),
-                if (videoItem.isFollowed)
-                  const PBadge(
-                    text: '已关注',
-                    isStack: false,
-                    size: .small,
-                    type: .secondary,
-                  ),
-                Expanded(
-                  flex: 1,
-                  child: Text(
-                    videoItem.owner.name.toString(),
-                    maxLines: 1,
-                    overflow: .clip,
-                    semanticsLabel: 'UP：${videoItem.owner.name}',
-                    style: TextStyle(
-                      height: 1.5,
-                      fontSize: theme.textTheme.labelMedium!.fontSize,
-                      color: theme.colorScheme.outline,
+            if (!zen)
+              Row(
+                spacing: 2,
+                children: [
+                  if (videoItem.goto == 'bangumi')
+                    PBadge(
+                      text: videoItem.pgcBadge,
+                      isStack: false,
+                      size: .small,
+                      type: .line_primary,
+                      fontSize: 9,
+                    ),
+                  if (videoItem.rcmdReason != null)
+                    PBadge(
+                      text: videoItem.rcmdReason,
+                      isStack: false,
+                      size: .small,
+                      type: .secondary,
+                    ),
+                  if (videoItem.goto == 'picture')
+                    const PBadge(
+                      text: '动态',
+                      isStack: false,
+                      size: .small,
+                      type: .line_primary,
+                      fontSize: 9,
+                    ),
+                  if (videoItem.isFollowed)
+                    const PBadge(
+                      text: '已关注',
+                      isStack: false,
+                      size: .small,
+                      type: .secondary,
+                    ),
+                  Expanded(
+                    flex: 1,
+                    child: Text(
+                      videoItem.owner.name.toString(),
+                      maxLines: 1,
+                      overflow: .clip,
+                      semanticsLabel: 'UP：${videoItem.owner.name}',
+                      style: TextStyle(
+                        height: 1.5,
+                        fontSize: theme.textTheme.labelMedium!.fontSize,
+                        color: theme.colorScheme.outline,
+                      ),
                     ),
                   ),
-                ),
-                if (videoItem.goto == 'av') const SizedBox(width: 10),
-              ],
-            ),
+                  if (videoItem.goto == 'av') const SizedBox(width: 10),
+                ],
+              ),
           ],
         ),
       ),
@@ -236,18 +241,12 @@ class VideoCardV extends StatelessWidget {
   Widget videoStat(ThemeData theme) {
     return Row(
       children: [
-        StatWidget(
-          type: .play,
-          value: videoItem.stat.view,
-        ),
-        if (videoItem.goto != 'picture') ...[
+        StatWidget(type: .play, value: videoItem.stat.view),
+        if (!zen && videoItem.goto != 'picture') ...[
           const SizedBox(width: 4),
-          StatWidget(
-            type: .danmaku,
-            value: videoItem.stat.danmu,
-          ),
+          StatWidget(type: .danmaku, value: videoItem.stat.danmu),
         ],
-        if (videoItem is RcmdVideoItemModel) ...[
+        if (!zen && videoItem is RcmdVideoItemModel) ...[
           const Spacer(),
           Text.rich(
             maxLines: 1,

@@ -6,6 +6,7 @@ import 'package:PiliPlus/models/model_hot_video_item.dart';
 import 'package:PiliPlus/pages/rank/zone/controller.dart';
 import 'package:PiliPlus/pages/rank/zone/widget/pgc_rank_item.dart';
 import 'package:PiliPlus/utils/grid.dart';
+import 'package:PiliPlus/utils/zen_mode.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -46,14 +47,20 @@ class _ZonePageState extends State<ZonePage>
         slivers: [
           SliverPadding(
             padding: const EdgeInsets.only(top: 7, bottom: 100),
-            sliver: Obx(() => _buildBody(controller.loadingState.value)),
+            sliver: Obx(
+              () =>
+                  _buildBody(controller.loadingState.value, zen: ZenMode.isOn),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBody(LoadingState<List<dynamic>?> loadingState) {
+  Widget _buildBody(
+    LoadingState<List<dynamic>?> loadingState, {
+    bool zen = false,
+  }) {
     return switch (loadingState) {
       Loading() => gridSkeleton,
       Success(:final response) =>
@@ -65,6 +72,7 @@ class _ZonePageState extends State<ZonePage>
                   if (item is HotVideoItemModel) {
                     return VideoCardH(
                       videoItem: item,
+                      zen: zen,
                       onRemove: () => controller.loadingState
                         ..value.data!.removeAt(index)
                         ..refresh(),
