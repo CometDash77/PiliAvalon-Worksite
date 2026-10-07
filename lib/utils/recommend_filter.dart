@@ -1,13 +1,13 @@
 import 'package:PiliPlus/features/shielding/shielding.dart';
-import 'package:PiliPlus/models/model_video.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 
-/// 旧的推荐过滤门面（兼容层）。
+/// 设置镜像层。
 ///
-/// 判定本体已经搬到无 IO 的 [RecommendationFilter]，这里保留旧的静态名与旧签名
-/// 做转发，让既有测试与尚未迁移的调用点继续可用。设置写入统一走
-/// [updateSettings]；规则集 provider 只是 [ShieldingRuntime] 那一个槽位的转发，
-/// 不再存在第二份规则来源。
+/// 判定本体在无 IO 的纯层 `RecommendationFilter`（首页一条候选经
+/// `RecommendationFilter.visible` 单遍判定），这里只保留三件事：设置静态量的
+/// 内存镜像、设置层唯一写入口 [updateSettings]、与 `ReplyGrpc` 共用的
+/// [shieldRuleSetProvider] 槽位转发。旧判定转发方法已删除——同一份判定只在
+/// 纯层存在一份，产品与测试都直接调用纯层。
 abstract final class RecommendFilter {
   static int minDurationForRcmd = Pref.minDurationForRcmd;
   static int minPlayForRcmd = Pref.minPlayForRcmd;
@@ -111,104 +111,5 @@ abstract final class RecommendFilter {
     if (applyFilterToRelatedVideos != null) {
       RecommendFilter.applyFilterToRelatedVideos = applyFilterToRelatedVideos;
     }
-  }
-
-  static bool get legacyRecommendationEnabled =>
-      RecommendationFilter.scopeEnabled(
-        ShieldingRuntime.instance.ruleSet(),
-      );
-
-  // 下面五个旧方法保留「旧短路点 + 旧静态量的惰性读取顺序」：既有调用方与既有
-  // 测试依赖这个顺序（例如 scope 关闭时一个设置字段都不读、时间过关时不再碰派生
-  // 指标字段），所以局部配置只在真正走到该分支时才构造。判定本体一律来自纯层
-  // [RecommendationFilter]，这里不复制任何判定表达式。
-
-  static bool filter(BaseVideoItemModel videoItem) {
-    final ruleSet = ShieldingRuntime.instance.ruleSet();
-    if (!RecommendationFilter.scopeEnabled(ruleSet)) {
-      return false;
-    }
-    //由于相关视频中没有已关注标签，只能视为非关注视频
-    if (videoItem.isFollowed && exemptFilterForFollowed) {
-      return false;
-    }
-    return filterAll(videoItem);
-  }
-
-  static bool filterLikeRatio(int? like, int? view) {
-    final ruleSet = ShieldingRuntime.instance.ruleSet();
-    if (!RecommendationFilter.scopeEnabled(ruleSet)) {
-      return false;
-    }
-    // view 为 null 时旧代码不读 minPlayForRcmd/minLikeRatioForRecommend
-    if (view == null) {
-      return false;
-    }
-    return RecommendationFilter.filterLikeRatio(
-      ruleSet,
-      RecommendationFilterConfig(
-        minPlayForRcmd: minPlayForRcmd,
-        minLikeRatioForRecommend: minLikeRatioForRecommend,
-      ),
-      like,
-      view,
-    );
-  }
-
-  static bool filterDerivedMetrics(BaseVideoItemModel videoItem) {
-    final ruleSet = ShieldingRuntime.instance.ruleSet();
-    if (!RecommendationFilter.scopeEnabled(ruleSet)) {
-      return false;
-    }
-    if (videoItem.isFollowed && exemptFilterForFollowed) {
-      return false;
-    }
-    return RecommendationFilter.filterDerivedMetrics(
-      ruleSet,
-      RecommendationFilterConfig(
-        exemptFilterForFollowed: exemptFilterForFollowed,
-        filterInteractionRateForRecommend: filterInteractionRateForRecommend,
-        minInteractionRateForRecommend: minInteractionRateForRecommend,
-        filterTripleRateForRecommend: filterTripleRateForRecommend,
-        minTripleRateForRecommend: minTripleRateForRecommend,
-        filterContentValueForRecommend: filterContentValueForRecommend,
-        minContentValueForRecommend: minContentValueForRecommend,
-      ),
-      videoItem,
-    );
-  }
-
-  static bool filterTitle(String title) {
-    final ruleSet = ShieldingRuntime.instance.ruleSet();
-    if (!RecommendationFilter.scopeEnabled(ruleSet)) {
-      return false;
-    }
-    // 旧文本过滤关闭时旧代码不读 enableFilter/rcmdRegExp
-    if (!useLegacyTextFilter) {
-      return false;
-    }
-    return RecommendationFilter.filterTitle(
-      ruleSet,
-      RecommendationFilterConfig(
-        rcmdRegExp: rcmdRegExp,
-        enableFilter: enableFilter,
-        useLegacyTextFilter: useLegacyTextFilter,
-      ),
-      title,
-    );
-  }
-
-  static bool filterAll(BaseVideoItemModel videoItem) {
-    final ruleSet = ShieldingRuntime.instance.ruleSet();
-    if (!RecommendationFilter.scopeEnabled(ruleSet)) {
-      return false;
-    }
-    return RecommendationFilter.isTooShort(
-          RecommendationFilterConfig(minDurationForRcmd: minDurationForRcmd),
-          videoItem,
-        ) ||
-        filterLikeRatio(videoItem.stat.like, videoItem.stat.view) ||
-        filterDerivedMetrics(videoItem) ||
-        filterTitle(videoItem.title);
   }
 }

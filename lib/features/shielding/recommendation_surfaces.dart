@@ -34,16 +34,19 @@ extension RecommendationFeedEntries<T> on List<RecommendationFeedEntry<T>> {
 /// 首页 web / 首页 app 的判定与命中后行为完全同构，因此共用 [homeFeed]；
 /// 热门与排行同链，共用 [hotAndRanking]；相关视频有独立开关，单独一份。
 abstract final class RecommendationSurfaces {
-  /// 首页推荐：旧派生指标 + 规则集可见性 → 标签富集 → 评论门 → JEV 终审 →
-  /// 曝光记录。[jevSurface] 必须显式声明，终审与卡片漏斗都按这面的独立开关走。
+  /// 首页推荐：单遍合并判定（阈值前置链 + 规则集可见性）→ 标签富集 → 评论门 →
+  /// JEV 终审 → 曝光记录。[jevSurface] 必须显式声明，终审与卡片漏斗都按这面的独立开关走。
   static RecommendationSurface<RecommendationFeedEntry<T>>
   homeFeed<T extends BaseVideoItemModel>({
     required JevSurface jevSurface,
     JevEvaluator? jevEvaluator,
   }) => RecommendationSurface(
-    judge: (entry, batch) =>
-        !RecommendationFilter.filter(batch.ruleSet, batch.config, entry.item) &&
-        ShieldingAdapters.isVisible(entry.candidate, batch.ruleSet),
+    judge: (entry, batch) => RecommendationFilter.visible(
+      batch.ruleSet,
+      batch.config,
+      item: entry.item,
+      candidate: entry.candidate,
+    ),
     enrichTags: (entries, batch) => RecommendationTagEnricher().enrichAndFilter(
       entries,
       batch.ruleSet,
