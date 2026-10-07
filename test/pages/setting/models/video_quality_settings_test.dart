@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:PiliPlus/models/common/video/video_quality.dart';
 import 'package:PiliPlus/pages/setting/models/video_settings.dart';
 import 'package:PiliPlus/utils/storage.dart';
@@ -10,25 +8,125 @@ import 'package:get/get.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:material_ui/material_ui.dart';
 
+/// Synchronous in-memory [Box] backing every test in this file.
+///
+/// GStorage.setting is a late final field, so it can only be assigned once;
+/// the stub is installed exactly once in setUpAll and cleared between tests.
+/// Real Hive storage cannot be used inside testWidgets: Hive disk writes rely
+/// on timers that the FakeAsync zone intercepts, so a bare
+/// `await GStorage.setting.put(...)` never completes there.
+class _MemBox implements Box<dynamic> {
+  _MemBox([Map<dynamic, dynamic>? initial])
+    : _map = Map.of(initial ?? const {});
+
+  final Map<dynamic, dynamic> _map;
+
+  @override
+  String get name => 'setting';
+  @override
+  bool get isOpen => true;
+  @override
+  String? get path => null;
+  @override
+  bool get lazy => false;
+  @override
+  Iterable<dynamic> get keys => _map.keys;
+  @override
+  int get length => _map.length;
+  @override
+  bool get isEmpty => _map.isEmpty;
+  @override
+  bool get isNotEmpty => _map.isNotEmpty;
+  @override
+  Iterable<dynamic> get values => _map.values;
+  @override
+  dynamic keyAt(int index) => _map.keys.elementAt(index);
+  @override
+  dynamic getAt(int index) => _map.values.elementAt(index);
+  @override
+  Iterable<dynamic> valuesBetween({dynamic startKey, dynamic endKey}) =>
+      _map.values;
+  @override
+  Stream<BoxEvent> watch({dynamic key}) => const Stream.empty();
+  @override
+  bool containsKey(dynamic key) => _map.containsKey(key);
+  @override
+  dynamic get(dynamic key, {dynamic defaultValue}) => _map[key] ?? defaultValue;
+  @override
+  Map<dynamic, dynamic> toMap() => Map.of(_map);
+  @override
+  Future<void> put(dynamic key, dynamic value) async {
+    _map[key] = value;
+  }
+
+  @override
+  Future<void> putAt(int index, dynamic value) async {
+    _map[_map.keys.elementAt(index)] = value;
+  }
+
+  @override
+  Future<void> putAll(Map<dynamic, dynamic> entries) async {
+    _map.addAll(entries);
+  }
+
+  @override
+  Future<int> add(dynamic value) async {
+    final key = _map.length;
+    _map[key] = value;
+    return key;
+  }
+
+  @override
+  Future<Iterable<int>> addAll(Iterable<dynamic> values) async => [
+    for (final value in values) await add(value),
+  ];
+
+  @override
+  Future<void> delete(dynamic key) async {
+    _map.remove(key);
+  }
+
+  @override
+  Future<void> deleteAt(int index) async {
+    _map.remove(_map.keys.elementAt(index));
+  }
+
+  @override
+  Future<void> deleteAll(Iterable<dynamic> keys) async {
+    for (final key in keys) {
+      _map.remove(key);
+    }
+  }
+
+  @override
+  Future<void> compact() async {}
+
+  @override
+  Future<int> clear() async {
+    final count = _map.length;
+    _map.clear();
+    return count;
+  }
+
+  @override
+  Future<void> close() async {}
+
+  @override
+  Future<void> deleteFromDisk() async {}
+
+  @override
+  Future<void> flush() async {}
+}
+
 void main() {
-  late Directory directory;
   late BuildContext dialogContext;
 
-  setUpAll(() async {
-    directory = await Directory.systemTemp.createTemp(
-      'video_quality_settings_',
-    );
-    Hive.init(directory.path);
-    GStorage.setting = await Hive.openBox('setting');
+  setUpAll(() {
+    GStorage.setting = _MemBox();
   });
 
   setUp(() async {
     await GStorage.setting.clear();
-  });
-
-  tearDownAll(() async {
-    await Hive.close();
-    await directory.delete(recursive: true);
   });
 
   Future<void> pumpDialogHost(WidgetTester tester) async {
@@ -42,6 +140,15 @@ void main() {
         ),
       ),
     );
+  }
+
+  /// Fixed pumps instead of pumpAndSettle: the forked Material dialog is
+  /// fully interactive after a few 150 ms ticks, without waiting on
+  /// potentially endless animation pumps.
+  Future<void> pumpTicks(WidgetTester tester, [int count = 6]) async {
+    for (var i = 0; i < count; i++) {
+      await tester.pump(const Duration(milliseconds: 150));
+    }
   }
 
   group('half-screen quality preference storage', () {
@@ -80,10 +187,13 @@ void main() {
       await pumpDialogHost(tester);
 
       final future = showVideoQaHalfScreenDialog(dialogContext, () {});
-      await tester.pumpAndSettle();
-      await tester.pageBack();
+      await pumpTicks(tester);
+      expect(find.text('跟随全屏画质'), findsOneWidget);
+
+      Navigator.of(dialogContext).pop();
+      await tester.pump();
       await future;
-      await tester.pumpAndSettle();
+      await pumpTicks(tester, 3);
 
       expect(
         GStorage.setting.get(SettingBoxKey.defaultVideoQaHalfScreen),
@@ -101,11 +211,13 @@ void main() {
       await pumpDialogHost(tester);
 
       final future = showVideoQaHalfScreenDialog(dialogContext, () {});
-      await tester.pumpAndSettle();
+      await pumpTicks(tester);
       expect(find.text('跟随全屏画质'), findsOneWidget);
+
       await tester.tap(find.text('跟随全屏画质'));
+      await tester.pump();
       await future;
-      await tester.pumpAndSettle();
+      await pumpTicks(tester, 3);
 
       expect(GStorage.setting.get(SettingBoxKey.defaultVideoQaHalfScreen), -1);
       expect(Pref.defaultVideoQaHalfScreen, isNull);
@@ -117,11 +229,13 @@ void main() {
       await pumpDialogHost(tester);
 
       final future = showVideoQaHalfScreenDialog(dialogContext, () {});
-      await tester.pumpAndSettle();
+      await pumpTicks(tester);
       expect(find.text(VideoQuality.hdr.desc), findsOneWidget);
+
       await tester.tap(find.text(VideoQuality.hdr.desc));
+      await tester.pump();
       await future;
-      await tester.pumpAndSettle();
+      await pumpTicks(tester, 3);
 
       expect(
         GStorage.setting.get(SettingBoxKey.defaultVideoQaHalfScreen),
