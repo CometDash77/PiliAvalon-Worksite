@@ -10,6 +10,7 @@ import 'package:PiliPlus/common/widgets/main_layout.dart';
 import 'package:PiliPlus/common/widgets/route_aware_mixin.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
 import 'package:PiliPlus/pages/home/view.dart';
+import 'package:PiliPlus/pages/home/widgets/zen_mode_toggle.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
@@ -22,6 +23,7 @@ import 'package:PiliPlus/utils/mobile_observer.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
+import 'package:PiliPlus/utils/zen_mode.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
@@ -567,20 +569,31 @@ class _MainAppState extends PopScopeState<MainApp>
   }
 
   Widget userAndSearchVertical() {
-    return Column(
-      children: [
-        userAvatar(colorScheme: _colorScheme, mainController: _mainController),
-        const SizedBox(height: 8),
-        msgBadge(_mainController),
-        IconButton(
-          tooltip: '搜索',
-          icon: const Icon(
-            Icons.search_outlined,
-            semanticLabel: '搜索',
+    // R6: 平板/侧栏同规则 —— Zen 下只剩搜索与开关,无头像无消息徽标。
+    return Obx(() {
+      final layout = HomeZenLayout.resolve(zen: ZenMode.isOn, tabCount: 0);
+      return Column(
+        children: [
+          if (layout.showZenToggle)
+            const ZenModeToggle()
+          else ...[
+            userAvatar(
+              colorScheme: _colorScheme,
+              mainController: _mainController,
+            ),
+            const SizedBox(height: 8),
+            msgBadge(_mainController),
+          ],
+          IconButton(
+            tooltip: '搜索',
+            icon: const Icon(
+              Icons.search_outlined,
+              semanticLabel: '搜索',
+            ),
+            onPressed: () => Get.toNamed('/search'),
           ),
-          onPressed: () => Get.toNamed('/search'),
-        ),
-      ],
-    );
+        ],
+      );
+    });
   }
 }
