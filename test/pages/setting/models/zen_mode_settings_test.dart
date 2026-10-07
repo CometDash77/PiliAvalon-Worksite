@@ -21,6 +21,16 @@ void main() {
     // 组合六个设置列表会读到这些 bootstrap 期才初始化的全局量（缓存路径行的
     // getSubtitle 直读 downloadPath，见 extra_settings.dart:70-75）。
     downloadPath = Directory.systemTemp.createTempSync('zen_s2_download_').path;
+    // Linux 上构造 styleSettings 会执行 _useSSDModel()，直读 bootstrap 期才
+    // 初始化的 appSupportDirPath（style_settings.dart:63 的 Linux-only 分支）；
+    // Windows 本地不走该分支，CI ubuntu 必崩（run 37565641514）。late final
+    // 仅可赋值一次，同 isolate 已被其他测试赋过则吞掉 LateError。
+    try {
+      appSupportDirPath =
+          Directory.systemTemp.createTempSync('zen_s2_appsupport_').path;
+    } catch (_) {
+      // Already assigned by another test file in the same isolate.
+    }
     try {
       final dir = Directory.systemTemp.createTempSync('hive_test_');
       Hive.init(dir.path);
