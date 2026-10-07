@@ -4,11 +4,13 @@ import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart' show tabBarView;
 import 'package:PiliPlus/pages/common/common_page.dart';
 import 'package:PiliPlus/pages/home/controller.dart';
+import 'package:PiliPlus/pages/home/widgets/zen_mode_toggle.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/pages/mine/controller.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/utils/extension/size_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
+import 'package:PiliPlus/utils/zen_mode.dart';
 import 'package:get/get.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:material_ui/material_ui.dart';
@@ -41,69 +43,95 @@ class _HomePageState extends CommonPageState<HomePage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    Widget tabBar;
-    if (_homeController.tabs.length > 1) {
-      tabBar = Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: SizedBox(
-          height: 42,
-          width: double.infinity,
-          child: TabBar(
-            controller: _homeController.tabController,
-            tabs: _homeController.tabs.map((e) => Tab(text: e.label)).toList(),
-            isScrollable: true,
-            dividerColor: Colors.transparent,
-            dividerHeight: 0,
-            splashBorderRadius: Style.mdRadius,
-            tabAlignment: TabAlignment.center,
-            onTap: (_) {
-              feedBack();
-              if (!_homeController.tabController.indexIsChanging) {
-                _homeController.animateToTop();
-              }
-            },
-          ),
-        ),
+    // Obx 监听 ZenMode.enabled:切换极简模式时整页立即重绘/还原(R8/R13)。
+    return Obx(() {
+      final layout = HomeZenLayout.resolve(
+        zen: ZenMode.isOn,
+        tabCount: _homeController.tabs.length,
       );
-      if (_homeController.hideTopBar &&
-          _mainController.barHideType == .instant) {
-        tabBar = Material(
-          color: _colorScheme.surface,
-          child: tabBar,
-        );
-      }
-    } else {
-      tabBar = const SizedBox(height: 6);
-    }
-    return Column(
-      children: [
-        if (!_mainController.useSideBar &&
-            MediaQuery.sizeOf(context).isPortrait)
-          customAppBar(),
-        tabBar,
-        Expanded(
-          child: onBuild(
-            tabBarView(
+      Widget tabBar;
+      if (layout.showTabStrip) {
+        tabBar = Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: SizedBox(
+            height: 42,
+            width: double.infinity,
+            child: TabBar(
               controller: _homeController.tabController,
-              children: _homeController.tabs.map((e) => e.page).toList(),
+              tabs: _homeController.tabs.map((e) => Tab(text: e.label)).toList(),
+              isScrollable: true,
+              dividerColor: Colors.transparent,
+              dividerHeight: 0,
+              splashBorderRadius: Style.mdRadius,
+              tabAlignment: TabAlignment.center,
+              onTap: (_) {
+                feedBack();
+                if (!_homeController.tabController.indexIsChanging) {
+                  _homeController.animateToTop();
+                }
+              },
             ),
           ),
-        ),
-      ],
-    );
+        );
+        if (_homeController.hideTopBar &&
+            _mainController.barHideType == .instant) {
+          tabBar = Material(
+            color: _colorScheme.surface,
+            child: tabBar,
+          );
+        }
+      } else {
+        tabBar = const SizedBox(height: 6);
+      }
+      return Column(
+        children: [
+          if (!_mainController.useSideBar &&
+              MediaQuery.sizeOf(context).isPortrait)
+            customAppBar(layout),
+          tabBar,
+          Expanded(
+            // R4: Zen 下正文留白,不渲染 TabBarView。
+            child: layout.showBody
+                ? onBuild(
+                    tabBarView(
+                      controller: _homeController.tabController,
+                      children: _homeController.tabs.map((e) => e.page).toList(),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
+      );
+    });
   }
 
-  Widget customAppBar() {
+  Widget customAppBar(HomeZenLayout layout) {
     const padding = EdgeInsets.fromLTRB(14, 6, 14, 0);
-    final child = Row(
-      children: [
-        searchBar(),
-        const SizedBox(width: 4),
-        msgBadge(_mainController),
-        const SizedBox(width: 8),
-        userAvatar(colorScheme: _colorScheme, mainController: _mainController),
-      ],
-    );
+    final Widget child;
+    if (layout.showZenToggle) {
+      // R1–R2: 只剩居中搜索框,开关居左,右侧等宽占位。
+      child = Row(
+        children: [
+          const ZenModeToggle(),
+          searchBar(),
+          const SizedBox(width: kZenModeToggleWidth),
+        ],
+      );
+    } else {
+      child = Row(
+        children: [
+          searchBar(),
+          const SizedBox(width: 4),
+          if (layout.showMessageBadge) msgBadge(_mainController),
+          const SizedBox(width: 8),
+          if (layout.showUserAvatar)
+            userAvatar(
+              colorScheme: _colorScheme,
+              mainController: _mainController,
+            ),
+        ],
+      );
+    }
     if (_homeController.hideTopBar) {
       if (_mainController.barOffset case final barOffset?) {
         return Obx(
