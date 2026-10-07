@@ -6,6 +6,8 @@ import 'package:PiliPlus/common/widgets/svg/play_icon.dart';
 import 'package:PiliPlus/models/common/badge_type.dart';
 import 'package:PiliPlus/models/dynamics/result.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
+import 'package:PiliPlus/utils/zen_mode.dart';
+import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 
 Widget videoSeasonWidget(
@@ -58,16 +60,21 @@ Widget videoSeasonWidget(
                 ),
               ),
               if (video.badge?.text case final badge?)
-                PBadge(
-                  text: badge,
-                  top: 8.0,
-                  right: 10.0,
-                  bottom: null,
-                  left: null,
-                  type: switch (badge) {
-                    '充电专属' => PBadgeType.error,
-                    _ => PBadgeType.primary,
-                  },
+                // R16: badge overlay hidden while Zen is on.
+                Obx(
+                  () => ZenMode.isOn
+                      ? const SizedBox.shrink()
+                      : PBadge(
+                          text: badge,
+                          top: 8.0,
+                          right: 10.0,
+                          bottom: null,
+                          left: null,
+                          type: switch (badge) {
+                            '充电专属' => PBadgeType.error,
+                            _ => PBadgeType.primary,
+                          },
+                        ),
                 ),
               Positioned(
                 left: 0,
@@ -109,7 +116,12 @@ Widget videoSeasonWidget(
                         if (video.stat case final stat?) ...[
                           Text('${NumUtils.numFormat(stat.play)}播放'),
                           const SizedBox(width: 6),
-                          Text('${NumUtils.numFormat(stat.danmu)}弹幕'),
+                          // R16: danmaku count hidden while Zen is on.
+                          Obx(
+                            () => ZenMode.isOn
+                                ? const SizedBox.shrink()
+                                : Text('${NumUtils.numFormat(stat.danmu)}弹幕'),
+                          ),
                         ],
                         const Spacer(),
                         const PlayIcon(size: 50),

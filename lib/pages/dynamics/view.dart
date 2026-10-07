@@ -10,6 +10,7 @@ import 'package:PiliPlus/pages/dynamics_create/view.dart';
 import 'package:PiliPlus/pages/dynamics_tab/view.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
+import 'package:PiliPlus/utils/zen_mode.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart' hide DraggableScrollableSheet;
 
@@ -123,11 +124,13 @@ class _DynamicsPageState extends CommonPageState<DynamicsPage>
     Widget? leading;
     Widget actions;
 
-    Widget child = tabBarView(
-      controller: _dynamicsController.tabController,
-      children: DynamicsTabType.values
-          .map((e) => DynamicsTabPage(dynamicsType: e))
-          .toList(),
+    Widget child = Obx(
+      () => tabBarView(
+        controller: _dynamicsController.tabController,
+        children: DynamicsController.visibleTabs(zen: ZenMode.isOn)
+            .map((DynamicsTabType e) => DynamicsTabPage(dynamicsType: e))
+            .toList(),
+      ),
     );
 
     switch (upPanelPosition) {
@@ -175,22 +178,13 @@ class _DynamicsPageState extends CommonPageState<DynamicsPage>
           children: [
             ?leading,
             Expanded(
-              child: TabBar(
-                dividerHeight: 0,
-                isScrollable: true,
-                tabAlignment: .start,
-                dividerColor: Colors.transparent,
-                labelColor: colorScheme.primary,
-                indicatorColor: colorScheme.primary,
-                controller: _dynamicsController.tabController,
-                unselectedLabelColor: colorScheme.onSurface,
+              child: DynamicsTabStrip(
+                controllerOf: () => _dynamicsController.tabController,
+                colorScheme: colorScheme,
                 labelStyle:
                     TabBarTheme.of(context).labelStyle
                         ?.copyWith(fontSize: 13) ??
                     const TextStyle(fontSize: 13),
-                tabs: DynamicsTabType.values
-                    .map((e) => Tab(text: e.label))
-                    .toList(),
                 onTap: (index) {
                   if (!_dynamicsController.tabController.indexIsChanging) {
                     _dynamicsController.animateToTop();
@@ -205,6 +199,47 @@ class _DynamicsPageState extends CommonPageState<DynamicsPage>
       drawer: drawer,
       endDrawer: endDrawer,
       body: onBuild(child),
+    );
+  }
+}
+
+/// Dynamics tab strip (R15): collapses while Zen is on, restores the full
+/// visible tab list when Zen goes off (R18). The controller is resolved on
+/// every rebuild so a Zen-mode TabController swap re-binds the bar.
+class DynamicsTabStrip extends StatelessWidget {
+  const DynamicsTabStrip({
+    super.key,
+    required this.controllerOf,
+    required this.colorScheme,
+    required this.labelStyle,
+    this.onTap,
+  });
+
+  final TabController Function() controllerOf;
+  final ColorScheme colorScheme;
+  final TextStyle? labelStyle;
+  final ValueChanged<int>? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(
+      () => ZenMode.isOn
+          ? const SizedBox.shrink()
+          : TabBar(
+              dividerHeight: 0,
+              isScrollable: true,
+              tabAlignment: .start,
+              dividerColor: Colors.transparent,
+              labelColor: colorScheme.primary,
+              indicatorColor: colorScheme.primary,
+              controller: controllerOf(),
+              unselectedLabelColor: colorScheme.onSurface,
+              labelStyle: labelStyle,
+              tabs: DynamicsController.visibleTabs(zen: ZenMode.isOn)
+                  .map((DynamicsTabType e) => Tab(text: e.label))
+                  .toList(),
+              onTap: onTap,
+            ),
     );
   }
 }

@@ -11,14 +11,17 @@ import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/extension/scroll_controller_ext.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:PiliPlus/utils/zen_mode.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:easy_debounce/easy_throttle.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart' show TabController;
 
 class DynamicsController
     extends CommonDataController<FollowUpModel, FollowUpModel>
-    with GetSingleTickerProviderStateMixin, AccountMixin {
-  late final TabController tabController;
+    with GetTickerProviderStateMixin, AccountMixin {
+  late TabController tabController;
+  bool _tabControllerBuilt = false;
 
   final Set<int> tempBannedList = <int>{};
 
@@ -35,10 +38,34 @@ class DynamicsController
   @override
   final AccountService accountService = Get.find<AccountService>();
 
+  /// Visible dynamics tabs for a Zen state (spec #42 R14): only the video
+  /// (投稿) tab survives, Zen off restores the full five-tab list (R18).
+  static List<DynamicsTabType> visibleTabs({required bool zen}) => zen
+      ? const <DynamicsTabType>[DynamicsTabType.video]
+      : DynamicsTabType.values;
+
+  /// Preferred start tab clamped into the visible range (R17).
+  static int initialIndexFor(int preferred, {required bool zen}) =>
+      preferred.clamp(0, visibleTabs(zen: zen).length - 1);
+
+  /// UP-panel jump target remapped into the visible list (R17): the UP tab
+  /// only exists outside Zen, so a Zen jump falls back to the first tab.
+  static int jumpTargetFor(int mid, {required bool zen}) {
+    if (mid == -1) {
+      return 0;
+    }
+    final upIndex = visibleTabs(zen: zen).indexOf(DynamicsTabType.up);
+    return upIndex == -1 ? 0 : upIndex;
+  }
+
+  /// GetX tag for the visible tab at [index] (R17 tag-lookup remap).
+  static String tagForIndex(int index, {required bool zen}) =>
+      visibleTabs(zen: zen)[index].name;
+
   DynamicsTabController? get controller {
     try {
       return Get.find<DynamicsTabController>(
-        tag: DynamicsTabType.values[tabController.index].name,
+        tag: tagForIndex(tabController.index, zen: ZenMode.isOn),
       );
     } catch (_) {
       return null;
@@ -48,16 +75,30 @@ class DynamicsController
   @override
   void onInit() {
     super.onInit();
-    tabController = TabController(
-      vsync: this,
-      length: DynamicsTabType.values.length,
-      initialIndex: Pref.defaultDynamicTypeIndex,
-    );
+    _rebuildTabController();
+    ever(ZenMode.enabled, (_) => _rebuildTabController());
     queryData();
   }
 
+  void _rebuildTabController() {
+    final TabController? previous = _tabControllerBuilt ? tabController : null;
+    tabController = TabController(
+      vsync: this,
+      length: visibleTabs(zen: ZenMode.isOn).length,
+      initialIndex: initialIndexFor(
+        Pref.defaultDynamicTypeIndex,
+        zen: ZenMode.isOn,
+      ),
+    );
+    _tabControllerBuilt = true;
+    if (previous != null) {
+      // Dispose after the frame so in-flight listeners detach first.
+      SchedulerBinding.instance.addPostFrameCallback((_) => previous.dispose());
+    }
+  }
+
   void _jumpToTab(int mid) {
-    tabController.index = mid == -1 ? 0 : 4;
+    tabController.index = jumpTargetFor(mid, zen: ZenMode.isOn);
   }
 
   void onSelectUp(int mid) {
