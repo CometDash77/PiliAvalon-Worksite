@@ -166,9 +166,12 @@ test/pages/setting/*
 test/pages/setting/models/*
 !test/pages/setting/models/shielding_settings_test.dart
 !test/pages/setting/models/recommend_settings_test.dart
+!test/pages/setting/models/zen_mode_settings_test.dart
 !test/pages/setting/recommend_range_shielding_test.dart
 !test/features/jev/
 !test/features/jev/**
+!test/features/zen_mode/
+!test/features/zen_mode/**
 !test/pages/jev_settings/
 !test/pages/jev_settings/**
 

@@ -394,6 +394,9 @@ abstract final class Pref {
   static bool get showRelatedVideo =>
       _setting.get(SettingBoxKey.showRelatedVideo, defaultValue: true);
 
+  static bool get zenMode =>
+      _setting.get(SettingBoxKey.zenMode, defaultValue: false);
+
   static bool get showVideoReply =>
       _setting.get(SettingBoxKey.showVideoReply, defaultValue: true);
 
