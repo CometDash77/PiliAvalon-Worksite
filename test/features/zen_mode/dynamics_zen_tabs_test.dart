@@ -245,6 +245,16 @@ void main() {
       await setZen(tester, true);
 
       expect(find.byType(DynamicPanel), findsNothing);
+      expect(
+        find.byWidgetPredicate((widget) {
+          if (widget is! Container) return false;
+          final decoration = widget.decoration;
+          return decoration is BoxDecoration &&
+              decoration.gradient is LinearGradient;
+        }),
+        findsNothing,
+        reason: 'R16 removes the cover gradient overlay',
+      );
       expect(find.text('测试UP主'), findsNothing, reason: 'no author');
       expect(find.text('动态正文内容'), findsNothing, reason: 'no body');
       expect(

@@ -119,17 +119,19 @@ Widget videoSeasonWidget(
                   height: 70,
                   alignment: Alignment.bottomLeft,
                   padding: const EdgeInsets.fromLTRB(10, 0, 8, 8),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black54,
-                      ],
-                    ),
-                    borderRadius: .vertical(bottom: Style.imgRadius),
-                  ),
+                  decoration: zen
+                      ? null
+                      : const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black54,
+                            ],
+                          ),
+                          borderRadius: .vertical(bottom: Style.imgRadius),
+                        ),
                   child: DefaultTextStyle.merge(
                     style: TextStyle(
                       fontSize: theme.textTheme.labelMedium!.fontSize,
