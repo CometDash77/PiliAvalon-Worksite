@@ -32,6 +32,15 @@ import 'package:hive_ce/hive.dart';
 import 'package:material_ui/material_ui.dart';
 
 void main() {
+  // A wedged pump must burn seconds, not the whole CI job: the default
+  // per-test budget is 10 minutes, which is enough for a single hang to take
+  // the 30-minute `verify` job down with it.
+  (TestWidgetsFlutterBinding.ensureInitialized()
+          as AutomatedTestWidgetsFlutterBinding)
+      .defaultTestTimeout = const Timeout(
+    Duration(seconds: 120),
+  );
+
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     try {
@@ -88,7 +97,11 @@ void main() {
       // state-reused 全部 page that occupies the same slot in the TabBarView.
       expect(find.text('视频丙'), findsOneWidget, reason: 'video feed shown');
       expect(find.text('视频甲'), findsNothing, reason: 'all feed gone');
-      expect(find.byType(DynamicPanel), findsNothing, reason: 'cards simplified');
+      expect(
+        find.byType(DynamicPanel),
+        findsNothing,
+        reason: 'cards simplified',
+      );
     });
 
     testWidgets('zen OFF again restores the five tabs and the prior feed', (
@@ -239,7 +252,11 @@ void main() {
       expect(find.byType(DynamicPanel), findsNothing);
       expect(find.text('测试UP主'), findsNothing, reason: 'no author');
       expect(find.text('动态正文内容'), findsNothing, reason: 'no body');
-      expect(find.textContaining('01:23'), findsWidgets, reason: 'duration kept');
+      expect(
+        find.textContaining('01:23'),
+        findsWidgets,
+        reason: 'duration kept',
+      );
       expect(find.text('123播放'), findsWidgets, reason: 'play count kept');
       expect(find.text('视频丙'), findsWidgets, reason: 'title kept');
       expect(find.text('45弹幕'), findsNothing, reason: 'R16 hides danmaku');
@@ -271,8 +288,10 @@ void main() {
         tester,
       ) async {
         await tester.runAsync(
-          () =>
-              GStorage.setting.put(SettingBoxKey.upPanelPosition, position.index),
+          () => GStorage.setting.put(
+            SettingBoxKey.upPanelPosition,
+            position.index,
+          ),
         );
         await pumpDynamicsPage(tester);
 
@@ -475,12 +494,23 @@ class StubDynamicsController extends DynamicsController {
 class StubDynamicsTabController extends DynamicsTabController {
   StubDynamicsTabController({required super.dynamicsType, required this.items});
 
+  /// Read-only fixture. Every response must own its *copy*: `queryData`
+  /// stores the refresh list on `loadingState` and later appends the next
+  /// page into that same instance, so handing the fixture over twice makes it
+  /// `addAll` itself and throw ConcurrentModificationError.
   final List<DynamicItemModel> items;
 
   @override
   Future<LoadingState<DynamicsDataModel>> customGetData() async => Success(
-    DynamicsDataModel.fromJson(const {'has_more': false})..items = items,
+    DynamicsDataModel.fromJson(const {'has_more': false})
+      ..items = List<DynamicItemModel>.of(items),
   );
+
+  /// The fixture is a single page (`has_more: false`), so mark the list done
+  /// after the refresh — the base class no-op would otherwise keep paging and
+  /// append duplicate fixtures to the rendered feed.
+  @override
+  void checkIsEnd(int length) => isEnd = true;
 }
 
 class StubMainController extends MainController {
