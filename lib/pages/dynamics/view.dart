@@ -10,6 +10,7 @@ import 'package:PiliPlus/pages/dynamics_create/view.dart';
 import 'package:PiliPlus/pages/dynamics_tab/view.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
+import 'package:PiliPlus/utils/zen_mode.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart' hide DraggableScrollableSheet;
 
@@ -117,94 +118,123 @@ class _DynamicsPageState extends CommonPageState<DynamicsPage>
     super.build(context);
     final colorScheme = ColorScheme.of(context);
 
-    Widget? drawer;
-    Widget? endDrawer;
+    // One reactive build for zen + the visible tab list + the controller, so
+    // the strip, the pages and the controller swap in the same frame.
+    return Obx(() {
+      final bool zen = ZenMode.isOn;
+      final List<DynamicsTabType> tabs = DynamicsController.visibleTabs(
+        zen: zen,
+      );
+      final TabController tabController = _dynamicsController.tabController;
 
-    Widget? leading;
-    Widget actions;
+      Widget child = tabBarView(
+        controller: tabController,
+        children: [
+          // Explicit type keys: without them the TabBarView would reuse the
+          // 全部 page's State for the single 投稿 slot and keep showing the
+          // wrong feed (R14/R17).
+          for (final type in tabs)
+            DynamicsTabPage(key: ValueKey(type), dynamicsType: type),
+        ],
+      );
 
-    Widget child = tabBarView(
-      controller: _dynamicsController.tabController,
-      children: DynamicsTabType.values
-          .map((e) => DynamicsTabPage(dynamicsType: e))
-          .toList(),
-    );
+      Widget? drawer;
+      Widget? endDrawer;
 
-    switch (upPanelPosition) {
-      case .top:
-        child = Column(
-          children: [
-            upPanelPart(colorScheme),
-            Expanded(child: child),
-          ],
-        );
-        actions = _createDynamicBtn(colorScheme);
-      case .leftFixed:
-        child = Row(
-          children: [
-            upPanelPart(colorScheme),
-            Expanded(child: child),
-          ],
-        );
-        actions = _createDynamicBtn(colorScheme);
-      case .rightFixed:
-        child = Row(
-          children: [
-            Expanded(child: child),
-            upPanelPart(colorScheme),
-          ],
-        );
-        actions = _createDynamicBtn(colorScheme);
-      case .leftDrawer:
-        drawer = upPanelPart(colorScheme);
-        actions = _createDynamicBtn(colorScheme);
-        leading = const DrawerButton();
-      case .rightDrawer:
-        endDrawer = upPanelPart(colorScheme);
-        leading = _createDynamicBtn(colorScheme, isRight: false);
-        actions = const EndDrawerButton();
-    }
+      Widget? leading;
+      late Widget actions;
 
-    return Scaffold(
-      primary: false,
-      resizeToAvoidBottomInset: false,
-      backgroundColor: Colors.transparent,
-      appBar: PreferredSize(
-        preferredSize: const .fromHeight(50),
-        child: Row(
-          children: [
-            ?leading,
-            Expanded(
-              child: TabBar(
-                dividerHeight: 0,
-                isScrollable: true,
-                tabAlignment: .start,
-                dividerColor: Colors.transparent,
-                labelColor: colorScheme.primary,
-                indicatorColor: colorScheme.primary,
-                controller: _dynamicsController.tabController,
-                unselectedLabelColor: colorScheme.onSurface,
-                labelStyle:
-                    TabBarTheme.of(context).labelStyle
-                        ?.copyWith(fontSize: 13) ??
-                    const TextStyle(fontSize: 13),
-                tabs: DynamicsTabType.values
-                    .map((e) => Tab(text: e.label))
-                    .toList(),
-                onTap: (index) {
-                  if (!_dynamicsController.tabController.indexIsChanging) {
-                    _dynamicsController.animateToTop();
-                  }
-                },
+      if (zen) {
+        // R14: the UP panel, its drawer and the drawer buttons are noise
+        // while Zen is on. The publish-dynamics button keeps its original
+        // behaviour — and, for the right drawer, its original side.
+        if (upPanelPosition == .rightDrawer) {
+          leading = _createDynamicBtn(colorScheme, isRight: false);
+          actions = const SizedBox.shrink();
+        } else {
+          actions = _createDynamicBtn(colorScheme);
+        }
+      } else {
+        switch (upPanelPosition) {
+          case .top:
+            child = Column(
+              children: [
+                upPanelPart(colorScheme),
+                Expanded(child: child),
+              ],
+            );
+            actions = _createDynamicBtn(colorScheme);
+          case .leftFixed:
+            child = Row(
+              children: [
+                upPanelPart(colorScheme),
+                Expanded(child: child),
+              ],
+            );
+            actions = _createDynamicBtn(colorScheme);
+          case .rightFixed:
+            child = Row(
+              children: [
+                Expanded(child: child),
+                upPanelPart(colorScheme),
+              ],
+            );
+            actions = _createDynamicBtn(colorScheme);
+          case .leftDrawer:
+            drawer = upPanelPart(colorScheme);
+            actions = _createDynamicBtn(colorScheme);
+            leading = const DrawerButton();
+          case .rightDrawer:
+            endDrawer = upPanelPart(colorScheme);
+            leading = _createDynamicBtn(colorScheme, isRight: false);
+            actions = const EndDrawerButton();
+        }
+      }
+
+      return Scaffold(
+        primary: false,
+        resizeToAvoidBottomInset: false,
+        backgroundColor: Colors.transparent,
+        appBar: PreferredSize(
+          preferredSize: const .fromHeight(50),
+          child: Row(
+            children: [
+              ?leading,
+              Expanded(
+                // R15: no strip while zen is on — a lone tab is noise.
+                child: zen
+                    ? const SizedBox.shrink()
+                    : TabBar(
+                        dividerHeight: 0,
+                        isScrollable: true,
+                        tabAlignment: .start,
+                        dividerColor: Colors.transparent,
+                        labelColor: colorScheme.primary,
+                        indicatorColor: colorScheme.primary,
+                        controller: tabController,
+                        unselectedLabelColor: colorScheme.onSurface,
+                        labelStyle:
+                            TabBarTheme.of(context).labelStyle
+                                ?.copyWith(fontSize: 13) ??
+                            const TextStyle(fontSize: 13),
+                        tabs: [
+                          for (final type in tabs) Tab(text: type.label),
+                        ],
+                        onTap: (index) {
+                          if (!tabController.indexIsChanging) {
+                            _dynamicsController.animateToTop();
+                          }
+                        },
+                      ),
               ),
-            ),
-            actions,
-          ],
+              actions,
+            ],
+          ),
         ),
-      ),
-      drawer: drawer,
-      endDrawer: endDrawer,
-      body: onBuild(child),
-    );
+        drawer: drawer,
+        endDrawer: endDrawer,
+        body: onBuild(child),
+      );
+    });
   }
 }
