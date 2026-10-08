@@ -52,14 +52,33 @@ jobs:
       - name: Verify dependency lock is clean
         run: git diff --exit-code pubspec.yaml pubspec.lock
 
-      - name: Run Flutter regression suite
-        run: flutter test --no-pub
+      - name: Render Zen visual smoke goldens
+        run: flutter test --no-pub test/features/zen_mode/zen_visual_smoke_test.dart --update-goldens
 
       - name: Test Android launcher resolution
         run: python3 -m unittest discover -s tool -p android_runtime_smoke_launch_test.py
 
       - name: Analyze
         run: flutter analyze --no-pub --no-fatal-infos
+
+      - name: Record golden inventory
+        shell: bash
+        run: |
+          set -euxo pipefail
+          dir=test/features/zen_mode/goldens
+          find "$dir" -name '*.png' -print | sort
+          (cd "$dir" && sha256sum *.png) | tee "$GITHUB_WORKSPACE/goldens.sha256"
+          find "$dir" -name '*.png' -exec stat -c '%n %s' {} \; | tee "$GITHUB_WORKSPACE/goldens.sizes"
+
+      - name: Upload Zen visual smoke PNGs
+        uses: actions/upload-artifact@v7
+        with:
+          name: zen-visual-smoke
+          path: |
+            test/features/zen_mode/goldens/
+            goldens.sha256
+            goldens.sizes
+          if-no-files-found: error
 
   android-x86-64:
     name: Build Android x86_64 artifact
