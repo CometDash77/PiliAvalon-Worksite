@@ -63,6 +63,15 @@ void main() {
     } catch (_) {
       // Same isolation guard as above.
     }
+    // Seeded once, here: `setUp` runs on the widget test's fake clock, where
+    // the flush timer behind a Hive write never advances, so an awaited
+    // `put`/`delete` there deadlocks the whole file after the first test.
+    // Nothing under test writes these two keys, so a single seed holds.
+    await GStorage.setting.delete(SettingBoxKey.defaultDynamicType);
+    await GStorage.setting.put(
+      SettingBoxKey.upPanelPosition,
+      UpPanelPosition.leftFixed.index,
+    );
   });
 
   setUp(resetPrefs);
@@ -333,13 +342,10 @@ void main() {
 // Harness
 // ---------------------------------------------------------------------------
 
-Future<void> resetPrefs() async {
+/// In-memory only. The two prefs it used to reset are seeded in `setUpAll`;
+/// see the note there on why Hive writes cannot be awaited on this clock.
+void resetPrefs() {
   ZenMode.enabled.value = false;
-  await GStorage.setting.delete(SettingBoxKey.defaultDynamicType);
-  await GStorage.setting.put(
-    SettingBoxKey.upPanelPosition,
-    UpPanelPosition.leftFixed.index,
-  );
 }
 
 /// Bounded pump loop instead of `pumpAndSettle`: this page tree hosts
@@ -374,8 +380,13 @@ Future<void> pumpDynamicsPage(WidgetTester tester) async {
     deleteControllers();
   });
 
+  // `material_ui` is a fork of Flutter's material library with its own
+  // `MaterialLocalizations` type, and every widget in this tree comes from
+  // it. GetX's `GetMaterialApp` wires up Flutter's *other*
+  // `MaterialLocalizations`, so the fork's `TabBar` finds neither and every
+  // frame throws. The fork's own `MaterialApp` registers the right one.
   await tester.pumpWidget(
-    GetMaterialApp(
+    MaterialApp(
       theme: ThemeData(useMaterial3: true),
       builder: FlutterSmartDialog.init(),
       home: const DynamicsPage(),

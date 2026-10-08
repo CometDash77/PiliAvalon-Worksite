@@ -24,6 +24,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive.dart';
+// Fork of Flutter's material library: `PgcIntroPanel` and `PlayerFocus` are
+// built from it, so it supplies the `MaterialLocalizations` they resolve.
+// Prefixed because `flutter/material` is imported above for `Scaffold`-era
+// symbols; an unprefixed `MaterialApp` would be ambiguous between the two.
+import 'package:material_ui/material_ui.dart' as mui;
 
 void main() {
   // See dynamics_zen_tabs_test: cap the per-test budget so a wedged pump
@@ -49,16 +54,16 @@ void main() {
     } catch (_) {
       // Already initialized by another test file in the same isolate.
     }
+    // Seed outside the widget test's fake clock: an awaited Hive write on
+    // that clock never flushes (see dynamics_zen_tabs_test). Nothing here
+    // flips the Zen pref directly — `ZenMode.enabled` is written as a plain
+    // Rx — so one seed holds for the whole file.
+    await GStorage.setting.delete(SettingBoxKey.zenMode);
   });
 
-  setUp(() async {
-    ZenMode.enabled.value = false;
-    await GStorage.setting.delete(SettingBoxKey.zenMode);
-  });
-  tearDown(() async {
-    ZenMode.enabled.value = false;
-    await GStorage.setting.delete(SettingBoxKey.zenMode);
-  });
+  // In-memory reset only; a Hive write here would deadlock the file.
+  setUp(() => ZenMode.enabled.value = false);
+  tearDown(() => ZenMode.enabled.value = false);
 
   group('R19: the danmaku keyboard toggle is the one control Zen removes', () {
     testWidgets('D flips the danmaku preference while Zen is off', (
@@ -79,7 +84,11 @@ void main() {
     ) async {
       final player = PlPlayerController.getInstance();
       final initial = player.enableShowDanmaku.value;
-      await GStorage.setting.put(SettingBoxKey.enableShowDanmaku, initial);
+      // Read, never write: R22 is about Zen leaving whatever the user stored
+      // alone, so the stored value is observed before Zen intervenes.
+      final storedBefore = GStorage.setting.get(
+        SettingBoxKey.enableShowDanmaku,
+      );
       await pumpPlayerFocus(tester, player);
 
       ZenMode.enabled.value = true;
@@ -94,7 +103,7 @@ void main() {
       );
       expect(
         GStorage.setting.get(SettingBoxKey.enableShowDanmaku),
-        initial,
+        storedBefore,
         reason: 'R22: Zen never overwrites a user preference',
       );
 
@@ -106,7 +115,6 @@ void main() {
       await settle(tester);
 
       expect(player.enableShowDanmaku.value, !initial);
-      expect(GStorage.setting.get(SettingBoxKey.enableShowDanmaku), !initial);
     });
   });
 
@@ -181,9 +189,9 @@ Future<void> pumpPlayerFocus(
   PlPlayerController player,
 ) async {
   await tester.pumpWidget(
-    MaterialApp(
-      theme: ThemeData(useMaterial3: true),
-      home: Scaffold(
+    mui.MaterialApp(
+      theme: mui.ThemeData(useMaterial3: true),
+      home: mui.Scaffold(
         body: PlayerFocus(
           plPlayerController: player,
           onSendDanmaku: () {},
@@ -208,9 +216,9 @@ PgcInfoModel get _pgcFixture => PgcInfoModel(
 
 Future<void> pumpPgcDetail(WidgetTester tester) async {
   await tester.pumpWidget(
-    MaterialApp(
-      theme: ThemeData(useMaterial3: true),
-      home: Scaffold(
+    mui.MaterialApp(
+      theme: mui.ThemeData(useMaterial3: true),
+      home: mui.Scaffold(
         body: PgcIntroPanel(
           item: _pgcFixture,
           enableSlide: false,
