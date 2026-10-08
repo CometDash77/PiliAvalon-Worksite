@@ -145,14 +145,24 @@ void main() {
         DynamicsTabType.values.indexOf(DynamicsTabType.article),
         reason: 'the tap actually moved the tab controller',
       );
-      expect(find.text('专栏乙'), findsOneWidget, reason: 'article feed shown');
+      // The desc renders as a bare RichText (BaseText.build), which plain
+      // find.text never matches — it only looks at Text.data.
+      expect(
+        find.text('专栏乙', findRichText: true),
+        findsOneWidget,
+        reason: 'article feed shown',
+      );
 
       await setZen(tester, true);
       expect(find.byType(TabBar), findsNothing);
 
       await setZen(tester, false);
       expect(find.byType(TabBar), findsOneWidget);
-      expect(find.text('专栏乙'), findsOneWidget, reason: 'selection restored');
+      expect(
+        find.text('专栏乙', findRichText: true),
+        findsOneWidget,
+        reason: 'selection restored',
+      );
       expect(find.text('视频甲'), findsNothing, reason: 'not back on 全部');
 
       expect(
@@ -212,7 +222,17 @@ void main() {
         expect(find.text('视频丙'), findsOneWidget);
         await setZen(tester, false);
         expect(find.byType(TabBar), findsOneWidget, reason: 'toggle $i OFF');
-        expect(find.text('视频甲'), findsOneWidget);
+        // Which feed is actually on screen distinguishes "restored to the
+        // wrong tab" from "restored to the right tab but the list is empty".
+        expect(
+          find.text('视频甲'),
+          findsOneWidget,
+          reason:
+              'toggle $i OFF; cards='
+              '${['视频甲', '视频丙', '专栏乙'].map(
+                (t) => '$t:${find.text(t, findRichText: true).evaluate().length}',
+              ).join(' ')}',
+        );
       }
       expect(tester.takeException(), isNull);
     });
@@ -309,7 +329,12 @@ void main() {
         expect(
           find.byType(UpPanel, skipOffstage: false),
           findsOneWidget,
-          reason: '${position.name} shows the UP panel while OFF',
+          reason:
+              '${position.name} shows the UP panel while OFF '
+              '(up=${find.byType(UpPanel, skipOffstage: false).evaluate().length}, '
+              'loading=${Get.find<DynamicsController>().loadingState.value.runtimeType}, '
+              'drawerBtn=${find.byType(DrawerButton).evaluate().length}, '
+              'endDrawerBtn=${find.byType(EndDrawerButton).evaluate().length})',
         );
 
         await setZen(tester, true);
