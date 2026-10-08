@@ -21,7 +21,7 @@ void main() {
     }
   });
 
-  group('homeZenLayout truth table (spec R1-R4, R8)', () {
+  group('homeZenLayout truth table (spec R1-R4, R8; #97 normal-state toggle)', () {
     setUp(() async {
       // Plain test() body: real async zone, Hive write completes.
       await ZenMode.set(false);
@@ -38,18 +38,19 @@ void main() {
       }
     });
 
-    test('zen off: full bar/strip/body restore', () {
+    test('zen off: toggle stays visible as second entry (#97), chrome restores', () {
       final one = HomeZenLayout.resolve(zen: false, tabCount: 1);
       // 单 tab 时首页本来就用 6px 占位替代 tab 条。
       expect(one.showTabStrip, isFalse);
-      expect(one.showZenToggle, isFalse);
+      // 普通态开关常显:设置之外的第二入口,OFF 时由此进入(#97 决议)。
+      expect(one.showZenToggle, isTrue);
       expect(one.showMessageBadge, isTrue);
       expect(one.showUserAvatar, isTrue);
       expect(one.showBody, isTrue);
 
       final multi = HomeZenLayout.resolve(zen: false, tabCount: 3);
       expect(multi.showTabStrip, isTrue);
-      expect(multi.showZenToggle, isFalse);
+      expect(multi.showZenToggle, isTrue);
       expect(multi.showMessageBadge, isTrue);
       expect(multi.showUserAvatar, isTrue);
       expect(multi.showBody, isTrue);
@@ -57,7 +58,7 @@ void main() {
   });
 
   group('zen home top bar widgets', () {
-    testWidgets('badge/avatar hide and toggle appears once Zen turns on', (
+    testWidgets('toggle always visible; normal-state tap enters and exits zen (#97)', (
       tester,
     ) async {
       // testWidgets body runs in a FakeAsync zone: real Hive I/O only
@@ -85,16 +86,37 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.self_improvement), findsNothing);
+      // 普通态:开关常显(#97),角标/头像保持原位。
+      expect(find.byIcon(Icons.self_improvement), findsOneWidget);
       expect(find.text('MSG_BADGE'), findsOneWidget);
       expect(find.text('USER_AVATAR'), findsOneWidget);
 
-      await tester.runAsync(() => ZenMode.set(true));
+      // 普通态点开关 → 立即进入 Zen:角标/头像让位,开关仍在(出口)。
+      await tester.tap(find.byIcon(Icons.self_improvement));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
       await tester.pumpAndSettle();
 
       expect(find.byIcon(Icons.self_improvement), findsOneWidget);
       expect(find.text('MSG_BADGE'), findsNothing);
       expect(find.text('USER_AVATAR'), findsNothing);
+
+      // 再点 → 立即退出并还原完整顶栏部件(R8)。
+      await tester.tap(find.byIcon(Icons.self_improvement));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.self_improvement), findsOneWidget);
+      expect(find.text('MSG_BADGE'), findsOneWidget);
+      expect(find.text('USER_AVATAR'), findsOneWidget);
+
+      // 收尾:在真实 zone 完整等待写链落盘,排空 tap 驱动 set 留在 FakeAsync
+      // 里的 whenComplete 监听,否则下一个用例的首个 Hive put 会被跨用例卡死
+      // (与本组其他用例结尾的 runAsync set 模式保持一致)。
+      await tester.runAsync(() => ZenMode.set(false));
     });
 
     testWidgets('tapping the toggle flips and persists the mode (R8)', (

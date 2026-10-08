@@ -108,18 +108,11 @@ class _HomePageState extends CommonPageState<HomePage>
   Widget customAppBar(HomeZenLayout layout) {
     const padding = EdgeInsets.fromLTRB(14, 6, 14, 0);
     final Widget child;
-    if (layout.showZenToggle) {
-      // R1–R2: 只剩居中搜索框,开关居左,右侧等宽占位。
+    if (layout.showMessageBadge || layout.showUserAvatar) {
+      // 普通态(#97):开关常显作第二入口,搜索栏让位缩短,角标/头像保持原位。
       child = Row(
         children: [
           const ZenModeToggle(),
-          searchBar(),
-          const SizedBox(width: kZenModeToggleWidth),
-        ],
-      );
-    } else {
-      child = Row(
-        children: [
           searchBar(),
           const SizedBox(width: 4),
           if (layout.showMessageBadge) msgBadge(_mainController),
@@ -129,6 +122,15 @@ class _HomePageState extends CommonPageState<HomePage>
               colorScheme: _colorScheme,
               mainController: _mainController,
             ),
+        ],
+      );
+    } else {
+      // R1–R2: 只剩居中搜索框,开关居左,右侧等宽占位。
+      child = Row(
+        children: [
+          const ZenModeToggle(),
+          searchBar(),
+          const SizedBox(width: kZenModeToggleWidth),
         ],
       );
     }
