@@ -214,6 +214,10 @@ void main() {
     testWidgets('repeated zen toggles rebuild cleanly every time', (
       tester,
     ) async {
+      // The clamping cases above leave `defaultDynamicType` at 99, which
+      // starts this page on the (fixture-empty) UP tab. Pin it so the toggles
+      // are measured against the all feed instead of inherited state.
+      await seedPref(tester, SettingBoxKey.defaultDynamicType, 0);
       await pumpDynamicsPage(tester);
 
       for (var i = 0; i < 4; i++) {
@@ -326,15 +330,17 @@ void main() {
         await seedPref(tester, SettingBoxKey.upPanelPosition, position.index);
         await pumpDynamicsPage(tester);
 
+        final bool isDrawer =
+            position == UpPanelPosition.leftDrawer ||
+            position == UpPanelPosition.rightDrawer;
+        if (isDrawer) {
+          await showUpPanelDrawer(tester);
+        }
+
         expect(
           find.byType(UpPanel, skipOffstage: false),
           findsOneWidget,
-          reason:
-              '${position.name} shows the UP panel while OFF '
-              '(up=${find.byType(UpPanel, skipOffstage: false).evaluate().length}, '
-              'loading=${Get.find<DynamicsController>().loadingState.value.runtimeType}, '
-              'drawerBtn=${find.byType(DrawerButton).evaluate().length}, '
-              'endDrawerBtn=${find.byType(EndDrawerButton).evaluate().length})',
+          reason: '${position.name} shows the UP panel while OFF',
         );
 
         await setZen(tester, true);
@@ -354,6 +360,9 @@ void main() {
 
         await setZen(tester, false);
 
+        if (isDrawer) {
+          await showUpPanelDrawer(tester);
+        }
         expect(
           find.byType(UpPanel, skipOffstage: false),
           findsOneWidget,
@@ -404,6 +413,21 @@ Future<void> settle(WidgetTester tester, {int frames = 20}) async {
   for (var i = 0; i < frames; i++) {
     await tester.pump(const Duration(milliseconds: 100));
   }
+}
+
+/// A `Scaffold` drawer never builds its child while closed:
+/// `DrawerControllerState._buildDrawer` returns a bare `SizedBox.shrink()`
+/// for a dismissed drawer, so the UP panel is not in the element tree at all
+/// until the drawer is open. Open it when it isn't showing already.
+Future<void> showUpPanelDrawer(WidgetTester tester) async {
+  if (find.byType(UpPanel, skipOffstage: false).evaluate().isNotEmpty) {
+    return;
+  }
+  final Finder button = find.byType(DrawerButton).evaluate().isNotEmpty
+      ? find.byType(DrawerButton)
+      : find.byType(EndDrawerButton);
+  await tester.tap(button);
+  await settle(tester);
 }
 
 Future<void> setZen(WidgetTester tester, bool value) async {
