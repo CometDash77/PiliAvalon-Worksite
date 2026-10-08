@@ -18,6 +18,7 @@ import 'package:PiliPlus/pages/video/introduction/ugc/widgets/action_item.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
+import 'package:PiliPlus/utils/zen_mode.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
@@ -59,7 +60,7 @@ class _PgcIntroPageState extends State<PgcIntroPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Obx(() {
     final colorScheme = ColorScheme.of(context);
     final item = introController.pgcItem;
     final isLandscape = widget.isLandscape;
@@ -76,8 +77,9 @@ class _PgcIntroPageState extends State<PgcIntroPage> {
             ],
           ),
           const SizedBox(height: 6),
-          // 点赞收藏转发 布局样式2
-          if (introController.isPgc) actionGrid(item.stat!, introController),
+          // 点赞收藏转发 布局样式2 (R20 hides it in Zen)
+          if (introController.isPgc && !ZenMode.isOn)
+            actionGrid(item.stat!, introController),
           // 番剧分集
           if (item.episodes?.isNotEmpty == true)
             PgcPanel(
@@ -106,7 +108,7 @@ class _PgcIntroPageState extends State<PgcIntroPage> {
       ),
       sliver: sliver,
     );
-  }
+  });
 
   Widget? _buildBrief(PgcInfoModel item) {
     final img = item.brief?.img;
@@ -198,6 +200,8 @@ class _PgcIntroPageState extends State<PgcIntroPage> {
     if (introController.isPgc) {
       Widget subBtn() => Obx(
         () {
+          // R20: the follow button is a Zen-hidden surface.
+          if (ZenMode.isOn) return const SizedBox.shrink();
           final isFollowed = introController.isFollowed.value;
           final followStatus = introController.followStatus.value;
           return FilledButton.tonal(
@@ -266,9 +270,10 @@ class _PgcIntroPageState extends State<PgcIntroPage> {
             children: [
               if (item.areas?.isNotEmpty == true)
                 TextSpan(text: '${item.areas!.first.name!}  '),
-              TextSpan(
-                text: item.publish!.pubTimeShow!,
-              ),
+              if (!ZenMode.isOn)
+                TextSpan(
+                  text: item.publish!.pubTimeShow!,
+                ),
             ],
           ),
           style: TextStyle(fontSize: 12, color: colorScheme.outline),
@@ -279,7 +284,8 @@ class _PgcIntroPageState extends State<PgcIntroPage> {
         runSpacing: 2,
         children: [
           StatWidget(type: .play, value: item.stat!.view),
-          StatWidget(type: .danmaku, value: item.stat!.danmaku),
+          if (!ZenMode.isOn)
+            StatWidget(type: .danmaku, value: item.stat!.danmaku),
           if (isLandscape) ...desc(),
         ],
       );

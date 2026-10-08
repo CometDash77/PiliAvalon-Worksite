@@ -23,6 +23,7 @@ class PlayerFocus extends StatelessWidget {
     this.canPlay,
     this.onSkipSegment,
     this.onRefresh,
+    this.canToggleDanmaku,
   });
 
   final Widget child;
@@ -32,6 +33,11 @@ class PlayerFocus extends StatelessWidget {
   final ValueGetter<bool>? canPlay;
   final ValueGetter<bool>? onSkipSegment;
   final VoidCallback? onRefresh;
+
+  /// R19 keeps every player control except the danmaku toggle, so Zen-mode
+  /// hosts pass `() => !ZenMode.isOn` here. `null` means the shortcut stays
+  /// unconditional (live rooms are out of spec #42's scope, R22).
+  final ValueGetter<bool>? canToggleDanmaku;
 
   static bool _shouldHandle(LogicalKeyboardKey logicalKey) {
     return logicalKey == LogicalKeyboardKey.tab ||
@@ -183,6 +189,12 @@ class PlayerFocus extends StatelessWidget {
           return true;
 
         case LogicalKeyboardKey.keyD:
+          // R19: the danmaku toggle is the one control Zen removes. Consume
+          // the key without flipping anything so the preference is untouched
+          // and no toast/ripple hints at a hidden button.
+          if (canToggleDanmaku?.call() == false) {
+            return true;
+          }
           final newVal = !plPlayerController.enableShowDanmakuAdaptive.value;
           plPlayerController.enableShowDanmakuAdaptive.value = newVal;
           if (!plPlayerController.tempPlayerConf) {

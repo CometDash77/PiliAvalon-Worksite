@@ -68,6 +68,7 @@ import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/theme_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:PiliPlus/utils/video_utils.dart';
+import 'package:PiliPlus/utils/zen_mode.dart';
 import 'package:collection/collection.dart';
 import 'package:dio/dio.dart' show Options;
 import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart'
@@ -110,6 +111,11 @@ class VideoDetailController extends GetxController
 
   /// tabs相关配置
   late TabController tabCtr;
+
+  /// Clears on-screen danmaku the moment Zen turns on (spec #42 R20), so
+  /// turning Zen back off does not replay danmaku drawn before the gate
+  /// closed. Never touches `enableShowDanmaku` or Hive — Zen is display-only.
+  Worker? _zenDanmakuWorker;
 
   // 请求返回的视频信息
   late PlayUrlModel data;
@@ -179,27 +185,37 @@ class VideoDetailController extends GetxController
     globalShow: showReply,
     persistentRuleHide: persistentRuleHideReply,
     temporaryHide: tempHideReply.value,
+    zenMode: ZenMode.isOn,
   );
 
   bool get effectiveShowDanmaku => effectiveShowContent(
     globalShow: plPlayerController.enableShowDanmaku.value,
     persistentRuleHide: persistentRuleHideDanmaku,
     temporaryHide: tempHideDanmaku.value,
+    zenMode: ZenMode.isOn,
   );
+
+  /// Zen hides the related-video panel (spec #42 R20) without touching the
+  /// user's own `showRelatedVideo` preference.
+  bool get effectiveShowRelatedVideo => showRelatedVideo && !ZenMode.isOn;
 
   /// Toggle per-page temporary hide for comments.
   ///
-  /// No-op when the global comment gate is off.
+  /// No-op when the global comment gate is off, or while Zen is on — Zen must
+  /// not let a stale menu callback rewrite the user's temporary state (R22).
   void toggleTempHideReply() {
+    if (ZenMode.isOn) return;
     if (!showReply) return;
     tempHideReply.toggle();
   }
 
   /// Toggle per-page temporary hide for danmaku.
   ///
-  /// No-op when the global danmaku gate is off. Clears visible danmaku
-  /// immediately when hiding so the screen does not show stale danmaku.
+  /// No-op when the global danmaku gate is off, or while Zen is on (R22).
+  /// Clears visible danmaku immediately when hiding so the screen does not
+  /// show stale danmaku.
   void toggleTempHideDanmaku() {
+    if (ZenMode.isOn) return;
     if (!plPlayerController.enableShowDanmaku.value) return;
     tempHideDanmaku.toggle();
     if (tempHideDanmaku.value) {
@@ -529,6 +545,11 @@ class VideoDetailController extends GetxController
   @override
   void onInit() {
     super.onInit();
+    _zenDanmakuWorker = ever(ZenMode.enabled, (zen) {
+      if (zen) {
+        plPlayerController.danmakuController?.clear();
+      }
+    });
     args = Get.arguments;
     videoType = args['videoType'];
     if (videoType == VideoType.pgc) {
@@ -782,6 +803,10 @@ class VideoDetailController extends GetxController
 
   /// 发送弹幕
   Future<void> showShootDanmakuSheet() async {
+    // R20: the danmaku send box/entry is a Zen-hidden surface. Bail before
+    // pausing playback or navigating so Enter (跳过片头's fallback path) and
+    // the control-bar button cannot open it either.
+    if (ZenMode.isOn) return;
     if (plPlayerController.dmState.contains(cid.value)) {
       SmartDialog.showToast('UP主已关闭弹幕');
       return;
@@ -1419,6 +1444,8 @@ class VideoDetailController extends GetxController
 
   @override
   void onClose() {
+    _zenDanmakuWorker?.dispose();
+    _zenDanmakuWorker = null;
     cid.close();
     if (isFileSource) {
       cacheLocalProgress();
