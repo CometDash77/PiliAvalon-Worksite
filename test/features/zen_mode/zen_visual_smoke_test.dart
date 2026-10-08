@@ -22,6 +22,7 @@ import 'package:PiliPlus/pages/video/introduction/ugc/view.dart';
 import 'package:PiliPlus/pages/video/related/controller.dart';
 import 'package:PiliPlus/pages/video/related/view.dart';
 import 'package:PiliPlus/services/account_service.dart';
+import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/zen_mode.dart';
@@ -68,6 +69,14 @@ void main() {
       GStorage.userInfo = await Hive.openBox<UserInfoData>('userInfo');
     } catch (_) {
       // Same isolation guard as above.
+    }
+    try {
+      // `Accounts.account` is a `late final` box; the UGC intro panel reads
+      // it through `MineController.anonymity` (_buildInfo -> ugc/view.dart)
+      // and throws LateInitializationError on its first frame without it.
+      await Accounts.init();
+    } catch (_) {
+      // Same isolation guard: a `late final` can only be assigned once.
     }
     await GStorage.setting.delete(SettingBoxKey.defaultDynamicType);
     await GStorage.setting.put(
