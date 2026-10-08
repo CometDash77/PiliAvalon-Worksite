@@ -5,6 +5,8 @@
 // tab bookkeeping, the five UP-panel layouts and the dynamics cards are all
 // production widgets. Network and media stay at the fixture boundary only.
 
+import 'dart:async';
+
 import 'dart:io';
 
 import 'package:PiliPlus/common/widgets/svg/play_icon.dart';
@@ -136,6 +138,13 @@ void main() {
 
       await tester.tap(find.text('专栏'));
       await settle(tester);
+      // Split the two ways this can fail: the tap not moving the controller
+      // vs. the article page being empty once it does.
+      expect(
+        Get.find<DynamicsController>().tabController.index,
+        DynamicsTabType.values.indexOf(DynamicsTabType.article),
+        reason: 'the tap actually moved the tab controller',
+      );
       expect(find.text('专栏乙'), findsOneWidget, reason: 'article feed shown');
 
       await setZen(tester, true);
@@ -175,9 +184,7 @@ void main() {
       testWidgets('stored default index $label ($stored) is clamped', (
         tester,
       ) async {
-        await tester.runAsync(
-          () => GStorage.setting.put(SettingBoxKey.defaultDynamicType, stored),
-        );
+        await seedPref(tester, SettingBoxKey.defaultDynamicType, stored);
 
         await pumpDynamicsPage(tester);
 
@@ -296,12 +303,7 @@ void main() {
       testWidgets('${position.name}: zen hides the panel and its buttons', (
         tester,
       ) async {
-        await tester.runAsync(
-          () => GStorage.setting.put(
-            SettingBoxKey.upPanelPosition,
-            position.index,
-          ),
-        );
+        await seedPref(tester, SettingBoxKey.upPanelPosition, position.index);
         await pumpDynamicsPage(tester);
 
         expect(
@@ -346,6 +348,27 @@ void main() {
 /// see the note there on why Hive writes cannot be awaited on this clock.
 void resetPrefs() {
   ZenMode.enabled.value = false;
+}
+
+/// Seed a pref for one case without wedging the binding.
+///
+/// Awaiting the write is fatal on this clock (it never settles), and
+/// `tester.runAsync` is worse: the first call never completed, which left the
+/// binding permanently busy so every later `runAsync` failed with "Reentrant
+/// call to runAsync() denied" and every later pump stalled — one bad seed
+/// took fourteen tests with it. Fire the write and drain the fake clock
+/// instead, then assert it landed so a failure names itself rather than
+/// burning the CI budget on a timeout.
+Future<void> seedPref(WidgetTester tester, String key, Object value) async {
+  unawaited(GStorage.setting.put(key, value));
+  for (var i = 0; i < 20 && GStorage.setting.get(key) != value; i++) {
+    await tester.pump(const Duration(milliseconds: 10));
+  }
+  expect(
+    GStorage.setting.get(key),
+    value,
+    reason: 'seeding `$key` did not reach the box',
+  );
 }
 
 /// Bounded pump loop instead of `pumpAndSettle`: this page tree hosts
