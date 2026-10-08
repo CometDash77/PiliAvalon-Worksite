@@ -677,24 +677,26 @@ class HeaderControlState extends State<HeaderControl>
                 descPosType: .subtitle,
                 descStyle: subTitleStyle,
               ),
-              ListTile(
-                dense: true,
-                onTap: () {
-                  Get.back();
-                  showDanmakuPool();
-                },
-                leading: const Icon(CustomIcons.dm_on, size: 20),
-                title: const Text('弹幕列表', style: titleStyle),
-              ),
-              ListTile(
-                dense: true,
-                onTap: () {
-                  Get.back();
-                  showSetDanmaku();
-                },
-                leading: const Icon(CustomIcons.dm_settings, size: 20),
-                title: const Text('弹幕设置', style: titleStyle),
-              ),
+              if (!ZenMode.isOn) ...[
+                ListTile(
+                  dense: true,
+                  onTap: () {
+                    Get.back();
+                    showDanmakuPool();
+                  },
+                  leading: const Icon(CustomIcons.dm_on, size: 20),
+                  title: const Text('弹幕列表', style: titleStyle),
+                ),
+                ListTile(
+                  dense: true,
+                  onTap: () {
+                    Get.back();
+                    showSetDanmaku();
+                  },
+                  leading: const Icon(CustomIcons.dm_settings, size: 20),
+                  title: const Text('弹幕设置', style: titleStyle),
+                ),
+              ],
               ListTile(
                 dense: true,
                 onTap: () {
@@ -1906,19 +1908,23 @@ class HeaderControlState extends State<HeaderControl>
                 ),
               );
             }),
-            SizedBox(
-              width: btnWidth,
-              height: btnHeight,
-              child: IconButton(
-                tooltip: '弹幕设置',
-                style: btnStyle,
-                onPressed: showSetDanmaku,
-                icon: const Icon(
-                  size: 20,
-                  CustomIcons.dm_settings,
-                  color: Colors.white,
-                ),
-              ),
+            Obx(
+              () => ZenMode.isOn
+                  ? const SizedBox.shrink()
+                  : SizedBox(
+                      width: btnWidth,
+                      height: btnHeight,
+                      child: IconButton(
+                        tooltip: '弹幕设置',
+                        style: btnStyle,
+                        onPressed: showSetDanmaku,
+                        icon: const Icon(
+                          size: 20,
+                          CustomIcons.dm_settings,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
             ),
             if (Platform.isAndroid ||
                 (PlatformUtils.isDesktop && !isFullScreen))

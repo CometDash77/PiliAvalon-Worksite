@@ -1348,6 +1348,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
         },
         onSkipSegment: videoDetailController.onSkipSegment,
         canToggleDanmaku: () => !ZenMode.isOn,
+        canSendDanmaku: () => !ZenMode.isOn,
         child: child,
       );
     }

@@ -24,6 +24,7 @@ class PlayerFocus extends StatelessWidget {
     this.onSkipSegment,
     this.onRefresh,
     this.canToggleDanmaku,
+    this.canSendDanmaku,
   });
 
   final Widget child;
@@ -38,6 +39,9 @@ class PlayerFocus extends StatelessWidget {
   /// hosts pass `() => !ZenMode.isOn` here. `null` means the shortcut stays
   /// unconditional (live rooms are out of spec #42's scope, R22).
   final ValueGetter<bool>? canToggleDanmaku;
+
+  /// Hosts can consume Enter without opening the danmaku composer.
+  final ValueGetter<bool>? canSendDanmaku;
 
   static bool _shouldHandle(LogicalKeyboardKey logicalKey) {
     return logicalKey == LogicalKeyboardKey.tab ||
@@ -243,6 +247,9 @@ class PlayerFocus extends StatelessWidget {
 
         case LogicalKeyboardKey.enter:
           if (onSkipSegment?.call() ?? false) {
+            return true;
+          }
+          if (canSendDanmaku?.call() == false) {
             return true;
           }
           onSendDanmaku();

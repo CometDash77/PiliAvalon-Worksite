@@ -165,7 +165,7 @@ class _PgcIntroPageState extends State<PgcIntroPage> {
             bottom: 6,
             left: null,
           ),
-        if (!introController.isPgc)
+        if (!introController.isPgc && !ZenMode.isOn)
           Positioned(
             right: 6,
             bottom: 6,

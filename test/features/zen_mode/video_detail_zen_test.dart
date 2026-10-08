@@ -102,6 +102,30 @@ void main() {
 
       expect(player.enableShowDanmaku.value, !initial);
     });
+
+    testWidgets('Zen consumes Enter and restores danmaku send off', (
+      tester,
+    ) async {
+      final player = PlPlayerController.getInstance();
+      var sends = 0;
+      await pumpPlayerFocus(
+        tester,
+        player,
+        onSendDanmaku: () => sends++,
+      );
+
+      ZenMode.enabled.value = true;
+      await settle(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await settle(tester);
+      expect(sends, 0, reason: 'R20 hides the keyboard send entry in Zen');
+
+      ZenMode.enabled.value = false;
+      await settle(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await settle(tester);
+      expect(sends, 1, reason: 'R22 restores the normal send path');
+    });
   });
 
   group('R19/R20/R21: the PGC detail sheet', () {
@@ -172,16 +196,18 @@ int statCount(WidgetTester tester, StatType type) => find
 
 Future<void> pumpPlayerFocus(
   WidgetTester tester,
-  PlPlayerController player,
-) async {
+  PlPlayerController player, {
+  VoidCallback? onSendDanmaku,
+}) async {
   await tester.pumpWidget(
     GetMaterialApp(
       theme: ThemeData(useMaterial3: true),
       home: Scaffold(
         body: PlayerFocus(
           plPlayerController: player,
-          onSendDanmaku: () {},
+          onSendDanmaku: onSendDanmaku ?? () {},
           canToggleDanmaku: () => !ZenMode.isOn,
+          canSendDanmaku: () => !ZenMode.isOn,
           child: const SizedBox(width: 200, height: 200),
         ),
       ),
