@@ -70,6 +70,7 @@ import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/theme_utils.dart';
+import 'package:PiliPlus/utils/zen_mode.dart';
 import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, clampDouble;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -881,7 +882,8 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     }
     final introHeight = maxHeight - height - padding.top;
     final showIntro =
-        videoDetailController.isUgc && videoDetailController.showRelatedVideo;
+        videoDetailController.isUgc &&
+        videoDetailController.effectiveShowRelatedVideo;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1106,8 +1108,12 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   });
 
   List<PopupMenuItem<void>> quietControlPopupItems(BuildContext context) {
+    // R20: the 隐藏评论/显示评论 and 隐藏弹幕/显示弹幕 overflow entries are
+    // hidden while Zen is on. Their callbacks already no-op there too, so a
+    // stale popup route cannot rewrite the user's temporary state (R22).
+    final zen = ZenMode.isOn;
     final items = <PopupMenuItem<void>>[
-      if (videoDetailController.showReply)
+      if (!zen && videoDetailController.showReply)
         PopupMenuItem(
           onTap: videoDetailController.toggleTempHideReply,
           child: Obx(
@@ -1116,7 +1122,8 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
             ),
           ),
         ),
-      if (videoDetailController.plPlayerController.enableShowDanmaku.value)
+      if (!zen &&
+          videoDetailController.plPlayerController.enableShowDanmaku.value)
         PopupMenuItem(
           onTap: videoDetailController.toggleTempHideDanmaku,
           child: Obx(
@@ -1340,6 +1347,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
           return false;
         },
         onSkipSegment: videoDetailController.onSkipSegment,
+        canToggleDanmaku: () => !ZenMode.isOn,
         child: child,
       );
     }
@@ -1353,7 +1361,11 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     String? introText,
     bool showIntro = true,
     VoidCallback? onTap,
-  }) {
+  }) => Obx(() {
+    // R19/R20: only 简介 (+ 相关视频/离线视频 intro tab) and 播放列表
+    // survive Zen. The whole widget is reactive because this helper is
+    // called from several layouts, not all of them already inside an Obx.
+    final zen = ZenMode.isOn;
     final tabs = [
       if (showIntro)
         videoDetailController.isFileSource ? '离线视频' : introText ?? '简介',
@@ -1457,54 +1469,60 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                   ),
                 ),
               ),
-            SizedBox(
-              height: 32,
-              child: TextButton(
-                style: const ButtonStyle(
-                  padding: WidgetStatePropertyAll(.zero),
-                ),
-                onPressed: videoDetailController.showShootDanmakuSheet,
-                child: Text(
-                  '发弹幕',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: colorScheme.onSurfaceVariant,
+            // R19 retains the player's own controls except the danmaku
+            // toggle; R20 also drops the send entry from the strip.
+            if (!zen) ...[
+              SizedBox(
+                height: 32,
+                child: TextButton(
+                  style: const ButtonStyle(
+                    padding: WidgetStatePropertyAll(.zero),
+                  ),
+                  onPressed: videoDetailController.showShootDanmakuSheet,
+                  child: Text(
+                    '发弹幕',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ),
-            ),
-            SizedBox.square(
-              dimension: 38,
-              child: Obx(() {
-                final ctr = videoDetailController.plPlayerController;
-                final enableShowDanmaku = ctr.enableShowDanmaku.value;
-                return IconButton(
-                  onPressed: () {
-                    final newVal = !enableShowDanmaku;
-                    ctr.enableShowDanmaku.value = newVal;
-                    if (!ctr.tempPlayerConf) {
-                      GStorage.setting.put(
-                        SettingBoxKey.enableShowDanmaku,
-                        newVal,
-                      );
-                    }
-                  },
-                  icon: Icon(
-                    size: 22,
-                    enableShowDanmaku ? CustomIcons.dm_on : CustomIcons.dm_off,
-                    color: enableShowDanmaku
-                        ? colorScheme.secondary
-                        : colorScheme.outline,
-                  ),
-                );
-              }),
-            ),
+              SizedBox.square(
+                dimension: 38,
+                child: Obx(() {
+                  final ctr = videoDetailController.plPlayerController;
+                  final enableShowDanmaku = ctr.enableShowDanmaku.value;
+                  return IconButton(
+                    onPressed: () {
+                      final newVal = !enableShowDanmaku;
+                      ctr.enableShowDanmaku.value = newVal;
+                      if (!ctr.tempPlayerConf) {
+                        GStorage.setting.put(
+                          SettingBoxKey.enableShowDanmaku,
+                          newVal,
+                        );
+                      }
+                    },
+                    icon: Icon(
+                      size: 22,
+                      enableShowDanmaku
+                          ? CustomIcons.dm_on
+                          : CustomIcons.dm_off,
+                      color: enableShowDanmaku
+                          ? colorScheme.secondary
+                          : colorScheme.outline,
+                    ),
+                  );
+                }),
+              ),
+            ],
             const SizedBox(width: 14),
           ],
         ),
       ),
     );
-  }
+  });
 
   Widget videoPlayer({required double width, required double height}) {
     final isFullScreen = this.isFullScreen;
@@ -1702,7 +1720,8 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
             isPortrait: isPortrait,
             isHorizontal: isHorizontal ?? width! / height! >= kScreenRatio,
           ),
-          if (needRelated && videoDetailController.showRelatedVideo) ...[
+          if (needRelated &&
+              videoDetailController.effectiveShowRelatedVideo) ...[
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.only(top: Style.safeSpace),
