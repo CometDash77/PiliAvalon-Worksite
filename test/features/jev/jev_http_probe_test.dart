@@ -11,6 +11,7 @@ class _StubAdapter implements HttpClientAdapter {
   final int statusCode;
   final Object? body;
   final DioException? error;
+  final List<RequestOptions> requests = [];
 
   @override
   Future<ResponseBody> fetch(
@@ -18,6 +19,7 @@ class _StubAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    requests.add(options);
     final error = this.error;
     if (error != null) throw error;
     return ResponseBody.fromString(
@@ -107,5 +109,31 @@ void main() {
 
     expect(result.outcome, JevProbeOutcome.timeout);
     expect(result.detail, isNull);
+  });
+
+  test('probe requests pin the maintainer-decided OpenRouter model id (issue #101)', () async {
+    final adapter = _StubAdapter(statusCode: 200, body: {'answers': {}});
+    await _probe(adapter: adapter).call(provider: JevProvider.openRouter, apiKey: 'sk-or-v1-abc');
+
+    final request = adapter.requests.single;
+    final data = request.data as Map<String, Object?>;
+    expect(data['model'], 'typesafe/jev-latest');
+    expect(request.uri.host, 'openrouter.ai');
+  });
+
+  test('very long upstream messages are truncated to keep the verdict readable (issue #101)', () async {
+    final result = await _probe(
+      adapter: _StubAdapter(
+        statusCode: 400,
+        body: {
+          'error': {'message': 'x' * 500, 'code': 400},
+        },
+      ),
+    ).call(provider: JevProvider.openRouter, apiKey: 'sk-or-v1-abc');
+
+    expect(result.outcome, JevProbeOutcome.rejectedRequest);
+    expect(result.detail, isNotNull);
+    expect(result.detail!.runes.length, lessThanOrEqualTo(210));
+    expect(result.detail!.endsWith('…'), isTrue);
   });
 }
