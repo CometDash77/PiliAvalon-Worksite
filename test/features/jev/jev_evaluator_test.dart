@@ -85,13 +85,14 @@ Map<String, Object?> _answers(
 class _Harness {
   _Harness({
     this.confirmed = true,
+    String providerKey = 'typesafe',
     _FakeCredentials? credentials,
     JevPreferenceProfile? profile,
   }) : credentials = credentials ?? _FakeCredentials() {
     settingsBox = _MemoryBox();
     settingsBox.values[JevSettingsStore.enabledKey] = true;
     settingsBox.values[JevSettingsStore.surfaceKey(JevSurface.homeWeb)] = true;
-    settingsBox.values[JevSettingsStore.providerKey] = 'typesafe';
+    settingsBox.values[JevSettingsStore.providerKey] = providerKey;
     if (confirmed) {
       settingsBox.values[JevSettingsStore.providerConfirmedKey] = true;
     }
@@ -208,6 +209,17 @@ void main() {
         {'theme': '某主题', 'count': 1},
       ],
     });
+  });
+
+  test('OpenRouter batches pin the maintainer-decided model id (issue #101)', () async {
+    final capture = _CapturingTransport(
+      reply: (index) => _answers({'candidate_1': 0.1}),
+    );
+    await _Harness(
+      providerKey: 'openrouter',
+    ).evaluator(capture).screen([candidate('a')], surface: JevSurface.homeWeb);
+
+    expect(capture.bodies.single['model'], 'typesafe/jev-latest');
   });
 
   test('只有达到阈值才隐藏', () async {

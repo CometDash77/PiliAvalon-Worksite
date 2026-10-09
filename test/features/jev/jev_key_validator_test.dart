@@ -112,4 +112,35 @@ void main() {
     expect(result.provider, isNull);
     expect(result.blockedBy, contains(JevSelectionIssue.missingProvider));
   });
+
+  test('probe detail rides along and stays null when absent (issue #101)', () async {
+    var reply = const JevProbeResult(
+      JevProbeOutcome.rejectedRequest,
+      detail: 'HTTP 400：No endpoint found.',
+    );
+    final validator = JevKeyValidator(
+      probe:
+          ({
+            required JevProvider provider,
+            required String apiKey,
+          }) async => reply,
+    );
+    final state = const JevSelectionState(
+      keyText: 'plain-key',
+    ).withProvider(JevProvider.typeSafe);
+
+    final withDetail = await validator.validate(
+      selection: state,
+      apiKey: 'plain-key',
+    );
+    expect(withDetail.outcome, JevProbeOutcome.rejectedRequest);
+    expect(withDetail.detail, 'HTTP 400：No endpoint found.');
+
+    reply = const JevProbeResult(JevProbeOutcome.rejectedRequest);
+    final withoutDetail = await validator.validate(
+      selection: state,
+      apiKey: 'plain-key',
+    );
+    expect(withoutDetail.detail, isNull);
+  });
 }
