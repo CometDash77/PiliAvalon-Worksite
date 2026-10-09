@@ -130,7 +130,6 @@ class JevHttpEvaluator implements JevBatchEvaluator {
             headers: {'Authorization': 'Bearer ${key.trim()}'},
             contentType: Headers.jsonContentType,
             responseType: ResponseType.json,
-            receiveDataWhenStatusError: false,
           ),
         )
         .timeout(timeout);

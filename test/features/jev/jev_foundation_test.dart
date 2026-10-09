@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
@@ -375,7 +377,65 @@ void main() {
       );
       expect(jevValidationFailureMessage(error), contains('拒绝了验证请求'));
     });
+
+    test('a real 4xx response carries the upstream message through the dio error channel', () async {
+      final dio = Dio()..httpClientAdapter = _StatusAdapter(
+        statusCode: 400,
+        body: {
+          'error': {'message': 'No endpoint found.', 'code': 400},
+        },
+      );
+      final evaluator = JevHttpEvaluator(dio: dio);
+      DioException? failure;
+      try {
+        await evaluator.evaluate(
+          provider: JevProvider.openRouter,
+          key: 'synthetic-test-key',
+          candidates: const [
+            JevCandidate(
+              title: 'video title',
+              description: 'short description',
+              category: 'education',
+              tags: ['language'],
+            ),
+          ],
+          negativeThemes: const [{'label': 'topic', 'approximate_count': 1}],
+          timeout: const Duration(seconds: 1),
+        );
+      } on DioException catch (error) {
+        failure = error;
+      }
+      expect(failure, isNotNull);
+      final message = jevValidationFailureMessage(failure!);
+      expect(message, contains('拒绝了验证请求'));
+      expect(message, contains('HTTP 400：No endpoint found.'));
+    });
   });
+}
+
+class _StatusAdapter implements HttpClientAdapter {
+  _StatusAdapter({required this.statusCode, this.body});
+
+  final int statusCode;
+  final Object? body;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    return ResponseBody.fromString(
+      body == null ? '' : jsonEncode(body),
+      statusCode,
+      headers: const {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
 }
 
 class _MemorySecrets implements JevSecretStorage {
