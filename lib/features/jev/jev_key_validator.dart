@@ -9,6 +9,7 @@ class JevValidationResult {
     required this.provider,
     required this.outcome,
     this.blockedBy = const <JevSelectionIssue>[],
+    this.detail,
   });
 
   /// The provider of the attempt, or the selected provider when nothing was
@@ -20,6 +21,10 @@ class JevValidationResult {
 
   /// Non-empty when the request was never sent.
   final List<JevSelectionIssue> blockedBy;
+
+  /// Short upstream summary (status + message) from the probe, when the
+  /// provider actually answered; null keeps the generic copy (issue #101).
+  final String? detail;
 
   bool get attempted => outcome != null;
 
@@ -49,6 +54,10 @@ class JevKeyValidator {
       );
     }
     final result = await _probe(provider: provider, apiKey: apiKey);
-    return JevValidationResult(provider: provider, outcome: result.outcome);
+    return JevValidationResult(
+      provider: provider,
+      outcome: result.outcome,
+      detail: result.detail,
+    );
   }
 }

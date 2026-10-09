@@ -306,4 +306,70 @@ void main() {
     expect(find.text('档为空'), findsOneWidget);
     expect(box.values.containsKey(JevPreferenceStore.profileKey), isFalse);
   });
+
+  testWidgets('a rejected request shows the upstream status and message', (
+    tester,
+  ) async {
+    final box = _MemoryBox();
+    final messages = <String>[];
+
+    await pumpPage(
+      tester,
+      store: JevSettingsStore(box: box),
+      credentials: _FakeCredentialStore(),
+      validator: JevKeyValidator(
+        probe: ({
+          required JevProvider provider,
+          required String apiKey,
+        }) async => const JevProbeResult(
+          JevProbeOutcome.rejectedRequest,
+          detail: 'HTTP 400：No endpoint found.',
+        ),
+      ),
+      messages: messages,
+    );
+
+    await tester.tap(find.text('OpenRouter'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'sk-or-v1-abc');
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, '验证'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('拒绝了请求格式'), findsOneWidget);
+    expect(
+      find.textContaining('（上游：HTTP 400：No endpoint found.）'),
+      findsOneWidget,
+    );
+    expect(messages.last, contains('上游：HTTP 400：No endpoint found.'));
+  });
+
+  testWidgets('a rejected request without detail keeps the stable copy', (
+    tester,
+  ) async {
+    final box = _MemoryBox();
+
+    await pumpPage(
+      tester,
+      store: JevSettingsStore(box: box),
+      credentials: _FakeCredentialStore(),
+      validator: JevKeyValidator(
+        probe: ({
+          required JevProvider provider,
+          required String apiKey,
+        }) async => const JevProbeResult(JevProbeOutcome.rejectedRequest),
+      ),
+      messages: <String>[],
+    );
+
+    await tester.tap(find.text('OpenRouter'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'sk-or-v1-abc');
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, '验证'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('拒绝了请求格式'), findsOneWidget);
+    expect(find.textContaining('上游'), findsNothing);
+  });
 }

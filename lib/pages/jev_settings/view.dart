@@ -223,7 +223,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
 
   String _validationMessage(JevValidationResult result) {
     final provider = result.provider?.label ?? '所选提供方';
-    return switch (result.outcome) {
+    final base = switch (result.outcome) {
       JevProbeOutcome.ok => '验证通过：$provider',
       JevProbeOutcome.invalidKey => '$provider 拒绝了该密钥（401），请检查密钥与提供方选择',
       JevProbeOutcome.rateLimited => '$provider 限流或过载，稍后再试；候选保持可见',
@@ -234,6 +234,11 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       JevProbeOutcome.malformedResponse => '$provider 响应无法解析，稍后再试',
       null => '尚未发起验证',
     };
+    // Issue #101: when the provider explained itself (status + message), show
+    // it; without a detail the stable copy above stays the whole message.
+    final detail = result.detail;
+    if (detail == null || detail.isEmpty || result.validated) return base;
+    return '$base（上游：$detail）';
   }
 
   @override
