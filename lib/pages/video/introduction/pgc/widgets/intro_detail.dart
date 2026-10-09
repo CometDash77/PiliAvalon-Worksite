@@ -11,6 +11,7 @@ import 'package:PiliPlus/pages/pgc_review/view.dart';
 import 'package:PiliPlus/pages/search/widgets/search_text.dart';
 import 'package:PiliPlus/utils/extension/scroll_controller_ext.dart';
 import 'package:PiliPlus/utils/utils.dart';
+import 'package:PiliPlus/utils/zen_mode.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -116,98 +117,104 @@ class _IntroDetailState extends State<PgcIntroPanel>
     final TextStyle textStyle = TextStyle(
       color: theme.colorScheme.onSurfaceVariant,
     );
-    return ListView(
-      controller: _controller,
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.only(
-        left: 14,
-        right: 14,
-        top: 14,
-        bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
-      ),
-      children: [
-        SelectionText(
-          widget.item.title!,
-          style: const TextStyle(fontSize: 16),
+    // Zen flips while this sheet is open must re-gate its own content, so the
+    // list rebuilds from an Obx (R19/R20).
+    return Obx(
+      () => ListView(
+        controller: _controller,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.only(
+          left: 14,
+          right: 14,
+          top: 14,
+          bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
         ),
-        const SizedBox(height: 4),
-        Row(
-          spacing: 6,
-          children: [
-            StatWidget(
-              type: StatType.play,
-              value: widget.item.stat!.view,
-            ),
-            StatWidget(
-              type: StatType.danmaku,
-              value: widget.item.stat!.danmaku,
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Row(
-          spacing: 6,
-          children: [
-            if (widget.item.areas?.isNotEmpty ?? false)
+        children: [
+          SelectionText(
+            widget.item.title!,
+            style: const TextStyle(fontSize: 16),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            spacing: 6,
+            children: [
+              StatWidget(
+                type: StatType.play,
+                value: widget.item.stat!.view,
+              ),
+              if (!ZenMode.isOn)
+                StatWidget(
+                  type: StatType.danmaku,
+                  value: widget.item.stat!.danmaku,
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            spacing: 6,
+            children: [
+              if (widget.item.areas?.isNotEmpty ?? false)
+                Text(
+                  widget.item.areas!.first.name!,
+                  style: smallTitle,
+                ),
+              if (!ZenMode.isOn)
+                Text(
+                  widget.item.publish!.pubTimeShow!,
+                  style: smallTitle,
+                ),
               Text(
-                widget.item.areas!.first.name!,
+                widget.item.newEp!.desc!,
                 style: smallTitle,
               ),
+            ],
+          ),
+          if (widget.item.evaluate?.isNotEmpty == true) ...[
+            const SizedBox(height: 20),
             Text(
-              widget.item.publish!.pubTimeShow!,
-              style: smallTitle,
+              '简介：',
+              style: theme.textTheme.titleMedium,
             ),
-            Text(
-              widget.item.newEp!.desc!,
-              style: smallTitle,
+            const SizedBox(height: 4),
+            SelectionText(
+              widget.item.evaluate!,
+              style: textStyle,
             ),
           ],
-        ),
-        if (widget.item.evaluate?.isNotEmpty == true) ...[
-          const SizedBox(height: 20),
-          Text(
-            '简介：',
-            style: theme.textTheme.titleMedium,
-          ),
-          const SizedBox(height: 4),
-          SelectionText(
-            widget.item.evaluate!,
-            style: textStyle,
-          ),
-        ],
-        if (widget.item.actors?.isNotEmpty == true) ...[
-          const SizedBox(height: 20),
-          Text(
-            '演职人员：',
-            style: theme.textTheme.titleMedium,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            widget.item.actors!,
-            style: textStyle,
-          ),
-        ],
-        if (widget.videoTags?.isNotEmpty == true) ...[
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: widget.videoTags!
-                .map(
-                  (item) => SearchText(
-                    fontSize: 13,
-                    text: item.tagName!,
-                    onTap: (tagName) => Get.toNamed(
-                      '/searchResult',
-                      parameters: {'keyword': tagName},
+          if (widget.item.actors?.isNotEmpty == true) ...[
+            const SizedBox(height: 20),
+            Text(
+              '演职人员：',
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              widget.item.actors!,
+              style: textStyle,
+            ),
+          ],
+          if (!ZenMode.isOn && widget.videoTags?.isNotEmpty == true) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: widget.videoTags!
+                  .map(
+                    (item) => SearchText(
+                      fontSize: 13,
+                      text: item.tagName!,
+                      onTap: (tagName) => Get.toNamed(
+                        '/searchResult',
+                        parameters: {'keyword': tagName},
+                      ),
+                      onLongPress: Utils.copyText,
                     ),
-                    onLongPress: Utils.copyText,
-                  ),
-                )
-                .toList(),
-          ),
+                  )
+                  .toList(),
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }

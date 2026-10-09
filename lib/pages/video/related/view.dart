@@ -3,6 +3,7 @@ import 'package:PiliPlus/common/widgets/video_card/video_card_h.dart';
 import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/model_hot_video_item.dart';
+import 'package:PiliPlus/pages/video/controller.dart';
 import 'package:PiliPlus/pages/video/related/controller.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/utils/grid.dart';
@@ -26,6 +27,13 @@ class _RelatedVideoPanelState extends State<RelatedVideoPanel> with GridMixin {
       RelatedController.new,
       tag: widget.heroTag,
     );
+    // Zen 恢复或复用旧 controller 时，先对齐当前视频再展示
+    try {
+      final videoDetailCtr = Get.find<VideoDetailController>(
+        tag: widget.heroTag,
+      );
+      _relatedController.syncIfNeeded(videoDetailCtr.bvid);
+    } catch (_) {}
   }
 
   @override

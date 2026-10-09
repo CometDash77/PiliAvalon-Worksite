@@ -9,6 +9,7 @@ void main() {
           globalShow: true,
           persistentRuleHide: false,
           temporaryHide: false,
+          zenMode: false,
         ),
         isTrue,
       );
@@ -20,6 +21,7 @@ void main() {
           globalShow: true,
           persistentRuleHide: true,
           temporaryHide: false,
+          zenMode: false,
         ),
         isFalse,
       );
@@ -31,6 +33,7 @@ void main() {
           globalShow: true,
           persistentRuleHide: false,
           temporaryHide: true,
+          zenMode: false,
         ),
         isFalse,
       );
@@ -42,6 +45,7 @@ void main() {
           globalShow: true,
           persistentRuleHide: true,
           temporaryHide: true,
+          zenMode: false,
         ),
         isFalse,
       );
@@ -53,14 +57,7 @@ void main() {
           globalShow: false,
           persistentRuleHide: false,
           temporaryHide: false,
-        ),
-        isFalse,
-      );
-      expect(
-        effectiveShowContent(
-          globalShow: false,
-          persistentRuleHide: true,
-          temporaryHide: false,
+          zenMode: false,
         ),
         isFalse,
       );
@@ -69,6 +66,7 @@ void main() {
           globalShow: false,
           persistentRuleHide: false,
           temporaryHide: true,
+          zenMode: false,
         ),
         isFalse,
       );
@@ -77,8 +75,44 @@ void main() {
           globalShow: false,
           persistentRuleHide: true,
           temporaryHide: true,
+          zenMode: false,
         ),
         isFalse,
+      );
+    });
+
+    test('16-row truth table: only the fully-open row is visible', () {
+      for (var mask = 0; mask < 16; mask++) {
+        final globalShow = mask & 1 != 0;
+        final persistentRuleHide = mask & 2 != 0;
+        final temporaryHide = mask & 4 != 0;
+        final zenMode = mask & 8 != 0;
+        expect(
+          effectiveShowContent(
+            globalShow: globalShow,
+            persistentRuleHide: persistentRuleHide,
+            temporaryHide: temporaryHide,
+            zenMode: zenMode,
+          ),
+          globalShow && !persistentRuleHide && !temporaryHide && !zenMode,
+          reason:
+              'mask=$mask globalShow=$globalShow '
+              'persistentRuleHide=$persistentRuleHide '
+              'temporaryHide=$temporaryHide zenMode=$zenMode',
+        );
+      }
+    });
+
+    test('zen hides even when the user gates are wide open', () {
+      expect(
+        effectiveShowContent(
+          globalShow: true,
+          persistentRuleHide: false,
+          temporaryHide: false,
+          zenMode: true,
+        ),
+        isFalse,
+        reason: 'R19: zen is an AND term layered on top, never an override',
       );
     });
   });
@@ -90,6 +124,7 @@ void main() {
           globalShow: true,
           persistentRuleHide: true,
           temporaryHide: false,
+          zenMode: false,
         ),
         isFalse,
       );
@@ -103,6 +138,7 @@ void main() {
             globalShow: true,
             persistentRuleHide: false,
             temporaryHide: false,
+            zenMode: false,
           ),
           isTrue,
         );
@@ -115,6 +151,7 @@ void main() {
           globalShow: true,
           persistentRuleHide: false,
           temporaryHide: false,
+          zenMode: false,
         ),
         isTrue,
       );
@@ -128,6 +165,7 @@ void main() {
             globalShow: false,
             persistentRuleHide: true,
             temporaryHide: false,
+            zenMode: false,
           ),
           isFalse,
         );
@@ -136,6 +174,7 @@ void main() {
             globalShow: false,
             persistentRuleHide: false,
             temporaryHide: false,
+            zenMode: false,
           ),
           isFalse,
         );
@@ -150,6 +189,7 @@ void main() {
           globalShow: true,
           persistentRuleHide: true,
           temporaryHide: false,
+          zenMode: false,
         ),
         isFalse,
       );
@@ -163,6 +203,7 @@ void main() {
             globalShow: true,
             persistentRuleHide: false,
             temporaryHide: false,
+            zenMode: false,
           ),
           isTrue,
         );
@@ -175,6 +216,7 @@ void main() {
           globalShow: true,
           persistentRuleHide: false,
           temporaryHide: false,
+          zenMode: false,
         ),
         isTrue,
       );
@@ -187,6 +229,7 @@ void main() {
           globalShow: false,
           persistentRuleHide: true,
           temporaryHide: false,
+          zenMode: false,
         ),
         isFalse,
       );
@@ -195,6 +238,7 @@ void main() {
           globalShow: false,
           persistentRuleHide: false,
           temporaryHide: false,
+          zenMode: false,
         ),
         isFalse,
       );
