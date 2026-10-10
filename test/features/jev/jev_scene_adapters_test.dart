@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:PiliPlus/features/jev/jev_contract.dart';
 import 'package:PiliPlus/features/jev/jev_evaluator.dart';
 import 'package:PiliPlus/features/jev/jev_final_screen.dart';
@@ -8,6 +10,7 @@ import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models_new/live/live_feed_index/card_data_list_item.dart';
 import 'package:PiliPlus/models_new/live/live_feed_index/card_list.dart';
 import 'package:PiliPlus/pages/common/common_list_controller.dart';
+import 'package:PiliPlus/pages/video/reply_reply/controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fixnum/fixnum.dart';
 
@@ -37,18 +40,41 @@ class _Evaluator extends JevEvaluator {
       );
   final calls = <(JevSurface, List<JevCandidate>)>[];
   bool fail = false;
+  Completer<void>? waitFor;
 
   @override
   Future<JevScreening> screen(
     List<JevCandidate> candidates, {
     required JevSurface surface,
   }) async {
+    if (waitFor != null) await waitFor!.future;
     calls.add((surface, candidates));
     if (fail) throw StateError('offline');
     return JevScreening(
       status: JevScreenStatus.evaluated,
       hidden: candidates.map((candidate) => candidate.title == 'hide').toList(),
     );
+  }
+}
+
+class _VideoReplies extends VideoReplyReplyController {
+  _VideoReplies(JevEvaluator evaluator)
+    : super(
+        hasRoot: false,
+        id: 42,
+        oid: 1,
+        rpid: 1,
+        dialog: null,
+        replyType: 1,
+        isVideoDetail: true,
+        jevEvaluator: evaluator,
+      );
+  int? jumpedTo;
+  @override
+  List<ReplyInfo> applyShielding(List<ReplyInfo> replies) => replies;
+  @override
+  void jumpToItem(int index) {
+    jumpedTo = index;
   }
 }
 
@@ -70,6 +96,29 @@ class _PageController extends CommonListController<List<int>, int> {
 }
 
 void main() {
+  test(
+    'video target lookup waits for screening and uses the visible index',
+    () async {
+      final evaluator = _Evaluator()..waitFor = Completer<void>();
+      final controller = _VideoReplies(evaluator);
+      final replies = [
+        ReplyInfo(
+          id: Int64(1),
+          content: Content(message: 'hide'),
+        ),
+        ReplyInfo(
+          id: Int64(42),
+          content: Content(message: 'keep'),
+        ),
+      ];
+      final pending = controller.handleListResponse(replies);
+      expect(controller.jumpedTo, isNull);
+      evaluator.waitFor!.complete();
+      await pending;
+      expect(replies.map((r) => r.id.toInt()), [42]);
+      expect(controller.jumpedTo, 0);
+    },
+  );
   test('live maps both source card shapes with only title and area', () async {
     final evaluator = _Evaluator();
     final raw = CardLiveItem(

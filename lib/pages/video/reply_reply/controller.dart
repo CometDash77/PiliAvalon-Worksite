@@ -1,4 +1,5 @@
 import 'package:PiliPlus/features/jev/jev_final_screen.dart';
+import 'package:PiliPlus/features/jev/jev_evaluator.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo, DetailListReply, Mode;
 import 'package:PiliPlus/grpc/reply.dart';
@@ -26,10 +27,12 @@ class VideoReplyReplyController extends ReplyController
     required this.replyType,
     this.isVideoDetail = false,
     this.parentBody,
+    this.jevEvaluator,
   });
   final int? dialog;
   final bool isVideoDetail;
   final String? parentBody;
+  final JevEvaluator? jevEvaluator;
   ReplyInfo? _visibleFirstFloor;
   String? _rootBody;
   int? id;
@@ -95,11 +98,18 @@ class VideoReplyReplyController extends ReplyController
 
   @override
   Future<void> handleListResponse(List<ReplyInfo> dataList) async {
+    final targetId = id;
+    id = null;
+    // Non-video pages keep their existing synchronous lookup behavior.
+    if (!isVideoDetail && targetId != null) {
+      setIndexById(Int64(targetId), dataList);
+    }
     super.handleListResponse(dataList);
     if (isVideoDetail) {
       final visible = await JevFinalScreen.comments(
         dataList,
         parentBody: parentBody ?? _rootBody,
+        evaluator: jevEvaluator,
       );
       if (isClosed) return;
       if (!identical(visible, dataList)) {
@@ -107,10 +117,10 @@ class VideoReplyReplyController extends ReplyController
           ..clear()
           ..addAll(visible);
       }
-    }
-    if (id != null) {
-      setIndexById(Int64(id!), dataList);
-      id = null;
+      if (targetId != null) {
+        // The next-frame scroll must target the final visible list, after Jev.
+        setIndexById(Int64(targetId), dataList);
+      }
     }
   }
 
@@ -180,7 +190,8 @@ class VideoReplyReplyController extends ReplyController
           final root = applyFirstFloorShielding(response.root);
           final visible = root == null
               ? <ReplyInfo>[]
-              : await JevFinalScreen.comment().screen([root]);
+              : await JevFinalScreen.comment(evaluator: jevEvaluator)
+                    .screen([root]);
           if (!isClosed) {
             _visibleFirstFloor = visible.isEmpty ? null : visible.single;
           }

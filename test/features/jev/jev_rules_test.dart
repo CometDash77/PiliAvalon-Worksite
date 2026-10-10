@@ -39,6 +39,78 @@ JevRule rule({JevRuleTarget target = JevRuleTarget.video, bool yes = true}) =>
 
 void main() {
   test(
+    'Choice wire criteria and partial rule failures preserve OR decisions',
+    () async {
+      final box = MemoryBox();
+      final settings = JevSettingsStore(box: box);
+      await settings.save(
+        const JevSettings(
+          enabled: true,
+          provider: JevProvider.typeSafe,
+          providerConfirmed: true,
+          surfaces: {JevSurface.live},
+        ),
+      );
+      final store = JevRuleStore(box: box);
+      await store.save(
+        const JevRuleConfig(
+          disabledBuiltins: {JevRuleTarget.live},
+          rules: [
+            JevRule(
+              id: 'live',
+              target: JevRuleTarget.live,
+              question: '内容类型？',
+              type: JevRuleType.choice,
+              options: [
+                JevRuleOption(id: 'ad', label: '广告', description: '推广商品'),
+                JevRuleOption(id: 'other', label: '其他'),
+              ],
+              hiddenOptions: {'ad'},
+            ),
+            JevRule(
+              id: 'failed',
+              target: JevRuleTarget.live,
+              question: '是否剧透？',
+            ),
+          ],
+        ),
+      );
+      var malformed = false;
+      final evaluator = JevEvaluator(
+        settings: settings,
+        rules: store,
+        credentials: Credentials(),
+        transport: ({required provider, required apiKey, required body}) async {
+          final question =
+              (body['questions'] as Map)['candidate_1_rule_1'] as Map;
+          expect(question['type'], 'choice');
+          expect(question['criteria'], {'ad': '广告：推广商品', 'other': '其他'});
+          expect(body.toString(), isNot(contains('test-secret')));
+          return {
+            'answers': {
+              'candidate_1_rule_1': {
+                'type': 'choice',
+                'choice': 'ad',
+                'confidence': malformed ? 2 : .99,
+                'probabilities': {'ad': .99, 'other': .01},
+              },
+              'candidate_1_rule_1_context': {'type': 'noul', 'noul': .99},
+              // The other rule has no answer: it cannot override a valid hide.
+            },
+          };
+        },
+      );
+      const input = [JevCandidate(title: '广告：优惠商品')];
+      expect((await evaluator.screen(input, surface: JevSurface.live)).hidden, [
+        true,
+      ]);
+      malformed = true;
+      expect((await evaluator.screen(input, surface: JevSurface.live)).hidden, [
+        false,
+      ]);
+    },
+  );
+  test(
     'restart preserves independent targets, No trigger and builtin switches',
     () async {
       final box = MemoryBox();
@@ -85,9 +157,9 @@ void main() {
         question: '内容属于什么？',
         type: JevRuleType.choice,
         options: [
-          const JevRuleOption(id: 'tutorial', label: '教程'),
-          const JevRuleOption(id: 'ad', label: '广告'),
-          const JevRuleOption(id: 'fun', label: '娱乐'),
+          JevRuleOption(id: 'tutorial', label: '教程'),
+          JevRuleOption(id: 'ad', label: '广告'),
+          JevRuleOption(id: 'fun', label: '娱乐'),
         ],
         hiddenOptions: {'ad', 'fun'},
       );
@@ -145,8 +217,8 @@ void main() {
         enabled: true,
         provider: JevProvider.openRouter,
         providerConfirmed: true,
-        surfaces: const {JevSurface.homeWeb, JevSurface.comment},
-        modelOverrides: const {JevProvider.openRouter: '~typesafe/jev-latest'},
+        surfaces: {JevSurface.homeWeb, JevSurface.comment},
+        modelOverrides: {JevProvider.openRouter: '~typesafe/jev-latest'},
       ),
     );
     final store = JevRuleStore(box: box);

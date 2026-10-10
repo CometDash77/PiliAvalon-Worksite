@@ -13,6 +13,7 @@ import 'package:PiliPlus/pages/common/fab_mixin.dart';
 import 'package:PiliPlus/pages/video/reply/controller.dart';
 import 'package:PiliPlus/pages/video/reply/vote/reply_vote_item.dart';
 import 'package:PiliPlus/pages/video/reply/widgets/reply_item_grpc.dart';
+import 'package:PiliPlus/pages/video/reply/widgets/filtered_comments_continuation.dart';
 import 'package:PiliPlus/pages/video/reply_reply/view.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:easy_debounce/easy_throttle.dart';
@@ -210,10 +211,18 @@ class _VideoReplyPanelState extends State<VideoReplyPanel>
           );
         }
 
-        final child = HttpError(
-          errMsg: '还没有评论',
-          onReload: _videoReplyController.onReload,
-        );
+        final Widget child = !_videoReplyController.isEnd
+            ? SliverToBoxAdapter(
+                child: FilteredCommentsContinuation(
+                  onLoadMore: _videoReplyController.onLoadMore,
+                ),
+              )
+            : HttpError(
+                errMsg: _videoReplyController.count.value > 0
+                    ? '当前没有可见评论'
+                    : '还没有评论',
+                onReload: _videoReplyController.onReload,
+              );
         if (_videoReplyController.voteCard case final voteCard?) {
           return SliverMainAxisGroup(
             slivers: [
