@@ -1,5 +1,8 @@
 import 'package:PiliPlus/features/jev/jev.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'decisions_schema.dart';
 
 class _MemoryBox implements JevSettingsBox {
   final Map<String, Object?> values = <String, Object?>{};
@@ -60,6 +63,9 @@ class _CapturingTransport {
       ({required provider, required apiKey, required body}) async {
         final index = calls++;
         bodies.add(body);
+        if (!acceptsDecisionsRequest(body)) {
+          throw StateError('HTTP 400: invalid Decisions request schema');
+        }
         final answer = reply?.call(index);
         if (answer == null) {
           throw StateError('transport failure');
@@ -108,8 +114,11 @@ class _Harness {
   late final _MemoryBox preferenceBox;
   final _FakeCredentials credentials;
 
-  JevEvaluator evaluator(_CapturingTransport capture) => JevEvaluator(
-    transport: capture.transport,
+  JevEvaluator evaluator(
+    _CapturingTransport capture, {
+    JevTransport? transport,
+  }) => JevEvaluator(
+    transport: transport ?? capture.transport,
     credentials: credentials,
     settings: JevSettingsStore(box: settingsBox),
     preferences: JevPreferenceStore(box: preferenceBox),
@@ -123,6 +132,80 @@ void main() {
   });
 
   JevCandidate candidate(String title) => JevCandidate(title: title);
+
+  for (final provider in JevProvider.values) {
+    test(
+      '${provider.id} HTTP batches associate reordered and missing answers by name',
+      () async {
+        final adapter = DecisionsSchemaAdapter(
+          (index) => {
+            'answers': index == 0
+                ? {
+                    'candidate_3': {'type': 'noul', 'noul': 0.99},
+                    'unrequested': {'type': 'noul', 'noul': 0.99},
+                    'candidate_1': {'type': 'noul', 'noul': 0.1},
+                    'candidate_2': {'type': 'noul', 'noul': 0.96},
+                  }
+                : index == 1
+                ? {
+                    'candidate_2': {'type': 'noul', 'noul': 0.99},
+                    'candidate_3': {'type': 'noul', 'noul': 'unreadable'},
+                  }
+                : {},
+          },
+        );
+        final dio = Dio()..httpClientAdapter = adapter;
+        final result = await _Harness(providerKey: provider.id)
+            .evaluator(
+              _CapturingTransport(),
+              transport: JevHttpTransport(dio: dio).call,
+            )
+            .screen(
+              List.generate(7, (i) => candidate('title-${i + 1}')),
+              surface: JevSurface.homeWeb,
+            );
+
+        expect(result.hidden, [false, true, true, false, true, false, false]);
+        expect(result.requests, 3);
+        expect(adapter.requests, hasLength(3));
+        for (var index = 0; index < adapter.requests.length; index++) {
+          final request = adapter.requests[index];
+          expect(
+            request.uri.toString(),
+            provider == JevProvider.openRouter
+                ? 'https://openrouter.ai/api/alpha/decisions'
+                : 'https://api.typesafe.ai/v1/systemone',
+          );
+          final body = request.data as Map;
+          expect(
+            body['model'],
+            provider == JevProvider.openRouter
+                ? 'typesafe/jev-latest'
+                : 'jev-latest',
+          );
+          expect(acceptsDecisionsRequest(body), isTrue);
+          final questions = body['questions'] as Map;
+          final contexts = (body['state'] as Map)['candidates'] as Map;
+          expect(contexts.keys, questions.keys);
+          for (final key in questions.keys) {
+            expect(
+              (questions[key] as Map)['instructions'],
+              contains('state.candidates.$key'),
+            );
+          }
+          expect(
+            (contexts['candidate_1'] as Map)['title'],
+            'title-${index * 3 + 1}',
+          );
+          expect(
+            request.headers.keys.map((key) => key.toLowerCase()),
+            isNot(contains('cookie')),
+          );
+          expect(body.toString(), isNot(contains('sk-test-key')));
+        }
+      },
+    );
+  }
 
   test('面开关关着时什么都不发', () async {
     final capture = _CapturingTransport();
@@ -199,28 +282,48 @@ void main() {
 
     final first = capture.bodies[0];
     expect(first['model'], 'jev-latest');
-    final questions = first['questions'] as List;
-    expect((questions[0] as Map)['id'], 'candidate_1');
-    expect((questions[2] as Map)['id'], 'candidate_3');
-    expect((questions[0] as Map)['question'], JevQuestion.text);
-    expect((capture.bodies[2]['questions'] as List), hasLength(1));
+    final questions = first['questions'] as Map;
+    expect(questions.keys, ['candidate_1', 'candidate_2', 'candidate_3']);
+    expect((questions['candidate_1'] as Map)['type'], 'noul');
+    expect(
+      (questions['candidate_1'] as Map)['instructions'],
+      contains('state.candidates.candidate_1'),
+    );
+    expect(
+      (questions['candidate_1'] as Map)['instructions'],
+      contains(JevQuestion.text),
+    );
+    expect((capture.bodies[2]['questions'] as Map), hasLength(1));
     expect(first['state'], {
       'themes': [
         {'theme': '某主题', 'count': 1},
       ],
+      'candidates': {
+        'candidate_1': {'title': '1'},
+        'candidate_2': {'title': '2'},
+        'candidate_3': {'title': '3'},
+      },
+    });
+    expect((capture.bodies[2]['state'] as Map)['candidates'], {
+      'candidate_1': {'title': '7'},
     });
   });
 
-  test('OpenRouter batches pin the maintainer-decided model id (issue #101)', () async {
-    final capture = _CapturingTransport(
-      reply: (index) => _answers({'candidate_1': 0.1}),
-    );
-    await _Harness(
-      providerKey: 'openrouter',
-    ).evaluator(capture).screen([candidate('a')], surface: JevSurface.homeWeb);
+  test(
+    'OpenRouter batches pin the maintainer-decided model id (issue #101)',
+    () async {
+      final capture = _CapturingTransport(
+        reply: (index) => _answers({'candidate_1': 0.1}),
+      );
+      await _Harness(
+            providerKey: 'openrouter',
+          )
+          .evaluator(capture)
+          .screen([candidate('a')], surface: JevSurface.homeWeb);
 
-    expect(capture.bodies.single['model'], 'typesafe/jev-latest');
-  });
+      expect(capture.bodies.single['model'], 'typesafe/jev-latest');
+    },
+  );
 
   test('只有达到阈值才隐藏', () async {
     final capture = _CapturingTransport(
@@ -325,7 +428,7 @@ void main() {
 
     final body = capture.bodies.single;
     final context =
-        ((body['questions'] as List).single as Map)['candidate'] as Map;
+        ((body['state'] as Map)['candidates'] as Map)['candidate_1'] as Map;
     expect(context.keys.toSet(), {'title', 'snippet', 'tags'});
     final encoded = body.toString();
     expect(encoded.contains('http'), isFalse);

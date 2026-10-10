@@ -5,8 +5,17 @@ import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'decisions_schema.dart';
+
 class _StubAdapter implements HttpClientAdapter {
-  _StubAdapter({this.statusCode = 200, this.body, this.error});
+  _StubAdapter({
+    this.statusCode = 200,
+    this.body,
+    this.error,
+    this.checkSchema = false,
+  });
+
+  final bool checkSchema;
 
   final int statusCode;
   final Object? body;
@@ -20,6 +29,19 @@ class _StubAdapter implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     requests.add(options);
+    if (checkSchema && !acceptsDecisionsRequest(options.data)) {
+      return ResponseBody.fromString(
+        jsonEncode({
+          'error': {
+            'message': 'Invalid input: expected record, received array',
+          },
+        }),
+        400,
+        headers: const {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
+      );
+    }
     final error = this.error;
     if (error != null) throw error;
     return ResponseBody.fromString(
@@ -41,19 +63,89 @@ JevHttpProbe _probe({_StubAdapter? adapter}) {
 }
 
 void main() {
-  test('a 401 keeps the key verdict and carries the upstream message', () async {
-    final result = await _probe(
-      adapter: _StubAdapter(
-        statusCode: 401,
+  for (final provider in JevProvider.values) {
+    test('${provider.id} probe passes a rejecting Decisions schema', () async {
+      final adapter = _StubAdapter(
+        checkSchema: true,
         body: {
-          'error': {'message': 'User not found.', 'code': 401},
+          'answers': {
+            'probe_1': {'type': 'noul', 'noul': 0.1},
+          },
         },
-      ),
-    ).call(provider: JevProvider.openRouter, apiKey: 'sk-or-v1-abc');
+      );
+      final result = await _probe(adapter: adapter)
+          .call(provider: provider, apiKey: 'fake-key');
+      expect(result.outcome, JevProbeOutcome.ok);
+      expect(adapter.requests, hasLength(1));
+      final request = adapter.requests.single;
+      expect(
+        request.uri.toString(),
+        provider == JevProvider.openRouter
+            ? 'https://openrouter.ai/api/alpha/decisions'
+            : 'https://api.typesafe.ai/v1/systemone',
+      );
+      final data = request.data as Map;
+      expect(
+        data['model'],
+        provider == JevProvider.openRouter
+            ? 'typesafe/jev-latest'
+            : 'jev-latest',
+      );
+      expect(data['state'], isEmpty);
+      expect((data['questions'] as Map).keys, ['probe_1']);
+      expect(data.toString(), isNot(contains('fake-key')));
+    });
+  }
 
-    expect(result.outcome, JevProbeOutcome.invalidKey);
-    expect(result.detail, 'HTTP 401：User not found.');
+  test('schema rejects arrays and legacy question fields', () {
+    final question = {
+      'type': 'noul',
+      'instructions': 'Evaluate',
+      'criteria': {'true': 'Yes', 'false': 'No'},
+    };
+    expect(
+      acceptsDecisionsRequest({
+        'state': {},
+        'model': 'm',
+        'questions': [question],
+      }),
+      isFalse,
+    );
+    expect(
+      acceptsDecisionsRequest({
+        'state': {},
+        'model': 'm',
+        'questions': {
+          'q': {'id': 'q', 'question': 'Evaluate'},
+        },
+      }),
+      isFalse,
+    );
+    expect(
+      acceptsDecisionsRequest({
+        'state': {},
+        'model': 'm',
+        'questions': {'q': question},
+      }),
+      isTrue,
+    );
   });
+  test(
+    'a 401 keeps the key verdict and carries the upstream message',
+    () async {
+      final result = await _probe(
+        adapter: _StubAdapter(
+          statusCode: 401,
+          body: {
+            'error': {'message': 'User not found.', 'code': 401},
+          },
+        ),
+      ).call(provider: JevProvider.openRouter, apiKey: 'sk-or-v1-abc');
+
+      expect(result.outcome, JevProbeOutcome.invalidKey);
+      expect(result.detail, 'HTTP 401：User not found.');
+    },
+  );
 
   test('a 400 is a rejected request and explains the shape problem', () async {
     final result = await _probe(
@@ -69,14 +161,17 @@ void main() {
     expect(result.detail, 'HTTP 400：No endpoint found.');
   });
 
-  test('a rate limit without a message still reports the bare status', () async {
-    final result = await _probe(
-      adapter: _StubAdapter(statusCode: 429, body: null),
-    ).call(provider: JevProvider.openRouter, apiKey: 'sk-or-v1-abc');
+  test(
+    'a rate limit without a message still reports the bare status',
+    () async {
+      final result = await _probe(
+        adapter: _StubAdapter(statusCode: 429, body: null),
+      ).call(provider: JevProvider.openRouter, apiKey: 'sk-or-v1-abc');
 
-    expect(result.outcome, JevProbeOutcome.rateLimited);
-    expect(result.detail, 'HTTP 429');
-  });
+      expect(result.outcome, JevProbeOutcome.rateLimited);
+      expect(result.detail, 'HTTP 429');
+    },
+  );
 
   test('an unparseable 2xx body carries a status-only summary on malformedResponse', () async {
     final result = await _probe(
@@ -113,7 +208,8 @@ void main() {
 
   test('probe requests pin the maintainer-decided OpenRouter model id (issue #101)', () async {
     final adapter = _StubAdapter(statusCode: 200, body: {'answers': {}});
-    await _probe(adapter: adapter).call(provider: JevProvider.openRouter, apiKey: 'sk-or-v1-abc');
+    await _probe(adapter: adapter)
+        .call(provider: JevProvider.openRouter, apiKey: 'sk-or-v1-abc');
 
     final request = adapter.requests.single;
     final data = request.data as Map<String, Object?>;
