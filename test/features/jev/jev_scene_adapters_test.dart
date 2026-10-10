@@ -59,7 +59,8 @@ ReplyInfo _reply(String body, {List<ReplyInfo>? children}) => ReplyInfo(
 
 class _PageController extends CommonListController<List<int>, int> {
   @override
-  Future<LoadingState<List<int>>> customGetData() async => const Success([1, 2]);
+  Future<LoadingState<List<int>>> customGetData() async =>
+      Success(List.of(const [1, 2]));
 
   @override
   Future<void> handleListResponse(List<int> items) async {
