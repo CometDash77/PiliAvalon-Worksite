@@ -56,7 +56,8 @@ enum JevSurface {
   ranking(id: 'ranking', label: '排行榜'),
   live(id: 'live', label: '直播推荐'),
   pgc(id: 'pgc', label: '番剧/影视推荐'),
-  music(id: 'music', label: '音乐推荐列表');
+  music(id: 'music', label: '音乐推荐列表'),
+  comment(id: 'video_comments', label: '视频详情评论');
 
   const JevSurface({required this.id, required this.label});
 

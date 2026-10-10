@@ -4,6 +4,7 @@ import 'package:PiliPlus/features/jev/jev_contract.dart';
 import 'package:PiliPlus/features/jev/jev_credential_store.dart';
 import 'package:PiliPlus/features/jev/jev_preference_store.dart';
 import 'package:PiliPlus/features/jev/jev_settings.dart';
+import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show immutable;
 
@@ -153,15 +154,18 @@ class JevEvaluator {
     JevCredentialStore? credentials,
     JevSettingsStore? settings,
     JevPreferenceStore? preferences,
+    JevRuleStore? rules,
   }) : _transport = transport ?? JevHttpTransport().call,
        _credentials = credentials ?? SecureJevCredentialStore(),
        _settings = settings ?? JevSettingsStore(),
-       _preferences = preferences ?? JevPreferenceStore();
+       _preferences = preferences ?? JevPreferenceStore(box: settings?.box),
+       _rules = rules ?? JevRuleStore(box: settings?.box);
 
   final JevTransport _transport;
   final JevCredentialStore _credentials;
   final JevSettingsStore _settings;
   final JevPreferenceStore _preferences;
+  final JevRuleStore _rules;
 
   /// Screens [candidates] for [surface]. The returned list is parallel to the
   /// input; callers drop the hidden entries before render and before
@@ -208,8 +212,17 @@ class JevEvaluator {
       );
     }
 
-    // Fresh load also settles expiry: only unexpired themes travel.
-    final state = (await _preferences.load()).statePayload();
+    final config = await _rules.load();
+    final target = JevRuleTarget.forSurface(surface);
+    final activeRules = config.activeFor(target);
+    final builtin = config.builtinEnabled(target);
+    if (!builtin && activeRules.isEmpty) {
+      return JevScreening(status: JevScreenStatus.disabled, hidden: hidden);
+    }
+    // Custom-only judgments never send the unrelated negative-feedback profile.
+    final state = builtin
+        ? (await _preferences.load()).statePayload()
+        : <String, Object?>{};
 
     var requests = 0;
     var answeredBatches = 0;
@@ -229,32 +242,72 @@ class JevEvaluator {
             model: settings.modelFor(provider),
             state: <String, Object?>{
               ...state,
+              if (activeRules.isNotEmpty) 'surface': surface.id,
               JevRequest.candidatesField: <String, Object?>{
                 for (var i = 0; i < batch.length; i++)
-                  JevRequest.candidateKey(i): batch[i].toContext(),
+                  JevRequest.candidateKey(i): _boundedContext(batch[i]),
               },
             },
             questions: <String, Map<String, Object?>>{
-              for (var i = 0; i < batch.length; i++)
-                JevRequest.candidateKey(i): JevRequest.question(
-                  candidateKey: JevRequest.candidateKey(i),
-                ),
+              for (var i = 0; i < batch.length; i++) ...{
+                if (builtin)
+                  JevRequest.candidateKey(i): JevRequest.question(
+                    candidateKey: JevRequest.candidateKey(i),
+                  ),
+                for (var r = 0; r < activeRules.length; r++) ...{
+                  _ruleKey(i, r): activeRules[r].compile(
+                    JevRequest.candidateKey(i),
+                  ),
+                  '${_ruleKey(i, r)}_context': _contextQuestion(
+                    activeRules[r],
+                    JevRequest.candidateKey(i),
+                  ),
+                },
+              },
             },
           ),
         );
+        if (data is! Map || data['answers'] is! Map) continue;
+        final rawAnswers = data['answers'] as Map;
+        if (rawAnswers.isEmpty) continue;
         final answers = JevAnswer.parseAll(data);
-        if (answers == null) continue;
         answeredBatches++;
         for (var i = 0; i < batch.length; i++) {
-          final answer = answers[JevRequest.candidateKey(i)];
-          if (answer == null) continue; // missing answer keeps the candidate
+          if (batch[i].title.trim().isEmpty) continue;
+          final answer = builtin && answers != null
+              ? answers[JevRequest.candidateKey(i)]
+              : null;
           final lowConfidence =
-              answer.confidence != null &&
-              answer.confidence! < JevLimits.minReportedConfidence;
-          if (answer.noul != null &&
+              answer?.confidence != null &&
+              (!answer!.confidence!.isFinite ||
+                  answer.confidence! < JevLimits.minReportedConfidence ||
+                  answer.confidence! > 1);
+          final rawBuiltin = rawAnswers[JevRequest.candidateKey(i)];
+          if (answer?.noul != null &&
+              answer!.noul!.isFinite &&
+              answer.noul! <= 1 &&
+              (rawBuiltin is Map &&
+                  (rawBuiltin['type'] == null ||
+                      rawBuiltin['type'] == 'noul')) &&
               !lowConfidence &&
               answer.noul! >= JevLimits.hideNoulThreshold) {
             hidden[start + i] = true;
+          }
+          for (var r = 0; r < activeRules.length; r++) {
+            // Asking for No must never equate missing evidence with a confident No.
+            final sufficient = rawAnswers['${_ruleKey(i, r)}_context'];
+            final p = sufficient is Map ? sufficient['noul'] : null;
+            if (sufficient is! Map ||
+                sufficient['type'] != 'noul' ||
+                p is! num ||
+                !p.isFinite ||
+                p < .95 ||
+                p > 1) {
+              continue;
+            }
+            if (activeRules[r].hides(rawAnswers[_ruleKey(i, r)])) {
+              hidden[start + i] = true;
+            }
           }
         }
       } catch (_) {
@@ -270,4 +323,31 @@ class JevEvaluator {
       requests: requests,
     );
   }
+
+  static String _ruleKey(int candidate, int rule) =>
+      '${JevRequest.candidateKey(candidate)}_rule_${rule + 1}';
+
+  static Map<String, Object?> _contextQuestion(
+    JevRule rule,
+    String candidateKey,
+  ) => {
+    'type': 'noul',
+    'instructions':
+        '只看 `state.candidates.$candidateKey`，是否有足够信息回答用户的问题“${rule.question.trim()}”？不要猜测未提供的事实。',
+    'criteria': {
+      'true': '现有正文或元数据足以判断该问题，无需猜测缺失资料。',
+      'false': '缺少回答所需的信息或存在不确定性。',
+    },
+  };
+
+  static Map<String, Object?> _boundedContext(JevCandidate candidate) => {
+    'title': _limit(candidate.title, 1000),
+    if (candidate.snippet?.trim().isNotEmpty == true)
+      'snippet': _limit(candidate.snippet!, 800),
+    if (candidate.tags.isNotEmpty)
+      'tags': candidate.tags.take(12).map((tag) => _limit(tag, 80)).toList(),
+  };
+
+  static String _limit(String text, int limit) =>
+      String.fromCharCodes(text.runes.take(limit));
 }

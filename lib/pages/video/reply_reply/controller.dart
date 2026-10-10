@@ -1,3 +1,4 @@
+import 'package:PiliPlus/features/jev/jev_final_screen.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo, DetailListReply, Mode;
 import 'package:PiliPlus/grpc/reply.dart';
@@ -23,8 +24,14 @@ class VideoReplyReplyController extends ReplyController
     required this.rpid,
     required this.dialog,
     required this.replyType,
+    this.isVideoDetail = false,
+    this.parentBody,
   });
   final int? dialog;
+  final bool isVideoDetail;
+  final String? parentBody;
+  ReplyInfo? _visibleFirstFloor;
+  String? _rootBody;
   int? id;
   // 视频aid 请求时使用的oid
   int oid;
@@ -77,7 +84,9 @@ class VideoReplyReplyController extends ReplyController
     if (data is DetailListReply) {
       count.value = data.root.count.toInt();
       if (isRefresh && !hasRoot) {
-        firstFloor.value ??= applyFirstFloorShielding(data.root);
+        firstFloor.value = isVideoDetail
+            ? _visibleFirstFloor
+            : applyFirstFloorShielding(data.root);
       }
     }
 
@@ -85,13 +94,29 @@ class VideoReplyReplyController extends ReplyController
   }
 
   @override
-  void handleListResponse(List<ReplyInfo> dataList) {
+  Future<void> handleListResponse(List<ReplyInfo> dataList) async {
+    super.handleListResponse(dataList);
+    if (isVideoDetail) {
+      final visible = await JevFinalScreen.comments(
+        dataList,
+        parentBody: parentBody ?? _rootBody,
+      );
+      if (isClosed) return;
+      if (!identical(visible, dataList)) {
+        dataList
+          ..clear()
+          ..addAll(visible);
+      }
+    }
     if (id != null) {
       setIndexById(Int64(id!), dataList);
       id = null;
     }
-    super.handleListResponse(dataList);
   }
+
+  // Detail cursors describe the unfiltered source, including all-hidden pages.
+  @override
+  void checkIsEnd(int length) {}
 
   ReplyInfo? applyFirstFloorShielding(ReplyInfo reply) {
     final visible = applyShielding([reply]);
@@ -131,22 +156,39 @@ class VideoReplyReplyController extends ReplyController
   }
 
   @override
-  Future<LoadingState> customGetData() => dialog != null
-      ? ReplyGrpc.dialogList(
-          type: replyType,
-          oid: oid,
-          root: rpid,
-          dialog: dialog!,
-          offset: paginationReply?.nextOffset,
-        )
-      : ReplyGrpc.detailList(
-          type: replyType,
-          oid: oid,
-          root: rpid,
-          rpid: id ?? 0,
-          mode: mode,
-          offset: paginationReply?.nextOffset,
-        );
+  Future<LoadingState> customGetData() async {
+    final response = await (dialog != null
+        ? ReplyGrpc.dialogList(
+            type: replyType,
+            oid: oid,
+            root: rpid,
+            dialog: dialog!,
+            offset: paginationReply?.nextOffset,
+          )
+        : ReplyGrpc.detailList(
+            type: replyType,
+            oid: oid,
+            root: rpid,
+            rpid: id ?? 0,
+            mode: mode,
+            offset: paginationReply?.nextOffset,
+          ));
+    if (response case Success(:final response)) {
+      if (isVideoDetail && response is DetailListReply) {
+        _rootBody = response.root.content.message;
+        if (!hasRoot) {
+          final root = applyFirstFloorShielding(response.root);
+          final visible = root == null
+              ? <ReplyInfo>[]
+              : await JevFinalScreen.comment().screen([root]);
+          if (!isClosed) {
+            _visibleFirstFloor = visible.isEmpty ? null : visible.single;
+          }
+        }
+      }
+    }
+    return response;
+  }
 
   @override
   Future<void> onReload() {
@@ -157,12 +199,7 @@ class VideoReplyReplyController extends ReplyController
   }
 
   @override
-  void onReply(
-    ReplyInfo? replyItem, {
-    int? oid,
-    int? replyType,
-    int? index,
-  }) {
+  void onReply(ReplyInfo? replyItem, {int? oid, int? replyType, int? index}) {
     assert(replyItem != null && index != null);
 
     final (bool inputDisable, String? hint) = replyHint;
