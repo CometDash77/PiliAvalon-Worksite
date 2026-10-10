@@ -10,3 +10,4 @@ export 'jev_key_format.dart';
 export 'jev_key_validator.dart';
 export 'jev_provider_selection.dart';
 export 'jev_settings.dart';
+export 'jev_model_catalog.dart';

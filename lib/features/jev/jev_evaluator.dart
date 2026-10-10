@@ -226,7 +226,7 @@ class JevEvaluator {
           provider: provider,
           apiKey: apiKey,
           body: JevRequest.body(
-            model: provider.model,
+            model: settings.modelFor(provider),
             state: <String, Object?>{
               ...state,
               JevRequest.candidatesField: <String, Object?>{

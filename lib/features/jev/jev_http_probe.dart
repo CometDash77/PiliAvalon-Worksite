@@ -15,6 +15,9 @@ enum JevProbeOutcome {
   /// The provider rejected the request shape (400/422) - not a key verdict.
   rejectedRequest,
 
+  /// The requested model was explicitly reported missing.
+  modelNotFound,
+
   /// The provider failed on its side.
   serverError,
 
@@ -41,6 +44,7 @@ class JevProbeResult {
 typedef JevProbe = Future<JevProbeResult> Function({
   required JevProvider provider,
   required String apiKey,
+  String? model,
 });
 
 /// Single-shot credential probe behind the settings page (gap G-20).
@@ -57,18 +61,20 @@ class JevHttpProbe {
   Future<JevProbeResult> call({
     required JevProvider provider,
     required String apiKey,
+    String? model,
   }) async {
     try {
       final response = await _dio.post<Object?>(
         provider.endpoint,
         data: JevRequest.body(
-          model: provider.model,
+          model: model ?? provider.model,
           state: const <String, Object?>{},
           questions: <String, Map<String, Object?>>{
             'probe_1': JevRequest.question(),
           },
         ),
         options: Options(
+          followRedirects: false,
           headers: <String, String>{
             'authorization': 'Bearer $apiKey',
             'content-type': 'application/json',
@@ -80,11 +86,20 @@ class JevHttpProbe {
       final status = response.statusCode ?? 0;
       if (status < 200 || status >= 300) {
         return JevProbeResult(
-          _outcomeForStatus(status),
+          _outcomeForResponse(status, response.data),
           detail: _describeResponse(status, response.data),
         );
       }
-      if (response.data is! Map) {
+      final data = response.data;
+      final answers = data is Map ? data['answers'] : null;
+      final answer = answers is Map ? answers['probe_1'] : null;
+      final noul = answer is Map ? answer['noul'] : null;
+      if (answer is! Map ||
+          answer['type'] != 'noul' ||
+          noul is! num ||
+          !noul.isFinite ||
+          noul < 0 ||
+          noul > 1) {
         return JevProbeResult(
           JevProbeOutcome.malformedResponse,
           detail: _describeResponse(status, response.data),
@@ -100,6 +115,25 @@ class JevHttpProbe {
         ),
       );
     }
+  }
+
+  static JevProbeOutcome _outcomeForResponse(int status, Object? data) {
+    final text =
+        (data is Map
+                ? _messageIn(data)
+                : data is String
+                ? data
+                : null)
+            ?.toLowerCase() ??
+        '';
+    if ((status == 400 || status == 404 || status == 422) &&
+        text.contains('model') &&
+        (text.contains('does not exist') ||
+            text.contains('not found') ||
+            text.contains('unknown model'))) {
+      return JevProbeOutcome.modelNotFound;
+    }
+    return _outcomeForStatus(status);
   }
 
   static JevProbeOutcome _outcomeForStatus(int status) {
@@ -152,8 +186,9 @@ class JevHttpProbe {
       DioExceptionType.connectionTimeout ||
       DioExceptionType.sendTimeout ||
       DioExceptionType.receiveTimeout => JevProbeOutcome.timeout,
-      DioExceptionType.badResponse => _outcomeForStatus(
+      DioExceptionType.badResponse => _outcomeForResponse(
         error.response?.statusCode ?? 0,
+        error.response?.data,
       ),
       _ => JevProbeOutcome.networkError,
     };
