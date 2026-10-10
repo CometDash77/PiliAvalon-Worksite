@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:PiliPlus/features/jev/jev_comment_screening.dart';
 import 'package:PiliPlus/features/shielding/comment_shielding_config.dart';
 import 'package:PiliPlus/features/shielding/shielding_adapters.dart';
 import 'package:PiliPlus/features/shielding/shielding_matcher.dart';
@@ -10,14 +11,13 @@ import 'package:PiliPlus/grpc/reply.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:fixnum/fixnum.dart';
 
-typedef HomeFeedCommentLoader =
-    Future<LoadingState<MainListReply>> Function({
-      required int oid,
-      required int type,
-      required Mode mode,
-      required String? offset,
-      required Int64? cursorNext,
-    });
+typedef HomeFeedCommentLoader = Future<LoadingState<MainListReply>> Function({
+  required int oid,
+  required int type,
+  required Mode mode,
+  required String? offset,
+  required Int64? cursorNext,
+});
 
 /// 首页评论门：没有可见评论的候选不上首页。
 ///
@@ -72,13 +72,24 @@ abstract final class HomeFeedCommentGate {
     HomeFeedCommentLoader loader = _defaultLoader,
     int maxConcurrent = defaultMaxConcurrent,
     Duration timeout = defaultTimeout,
+    JevCommentScreening? commentScreening,
   }) async {
     if (!config.hideHomeFeedItemsWithoutVisibleComments || items.isEmpty) {
       return items;
     }
 
+    final screening = commentScreening ?? JevCommentScreening();
+    String semanticPolicy;
+    bool semanticEnabled;
+    try {
+      semanticPolicy = await screening.policyKey();
+      semanticEnabled = await screening.isEnabled();
+    } catch (_) {
+      // Unreadable semantic settings cannot remove a recommendation.
+      return items;
+    }
     final decisionCache = _cacheFor(
-      _strategyKey(config: config, ruleSet: ruleSet),
+      '${_strategyKey(config: config, ruleSet: ruleSet)}:$semanticPolicy',
     );
 
     // 判定按原下标回填，worker 谁先完成都不影响输出顺序。
@@ -98,6 +109,8 @@ abstract final class HomeFeedCommentGate {
           ruleSet: ruleSet,
           loader: loader,
           timeout: timeout,
+          screening: screening,
+          cacheResults: !semanticEnabled,
         );
         // 没有判定（失败 / 超时）→ 保留条目（fail-open）。
         kept[index] = decision ?? true;
@@ -121,8 +134,12 @@ abstract final class HomeFeedCommentGate {
     required ShieldRuleSet ruleSet,
     required HomeFeedCommentLoader loader,
     required Duration timeout,
+    required JevCommentScreening screening,
+    required bool cacheResults,
   }) {
-    final cached = cache.lookup(aid);
+    // Paid semantic outcomes are deliberately not persisted: a changed key,
+    // provider recovery, or uncertainty must be retried on the next pass.
+    final cached = cacheResults ? cache.lookup(aid) : null;
     if (cached != null) return Future.value(cached);
 
     final pending = cache.inFlight[aid];
@@ -139,11 +156,12 @@ abstract final class HomeFeedCommentGate {
       ruleSet: ruleSet,
       loader: loader,
       timeout: timeout,
+      screening: screening,
     ).then(
       (decision) {
         // 释放与完成之间没有 await：合并进来的调用方被唤醒时缓存已经写完。
         cache.inFlight.remove(aid);
-        if (decision != null) cache.put(aid, decision);
+        if (decision != null && cacheResults) cache.put(aid, decision);
         completer.complete(decision);
       },
       onError: (Object error, StackTrace stackTrace) {
@@ -166,7 +184,9 @@ abstract final class HomeFeedCommentGate {
     required ShieldRuleSet ruleSet,
     required HomeFeedCommentLoader loader,
     required Duration timeout,
+    required JevCommentScreening screening,
   }) async {
+    final elapsed = Stopwatch()..start();
     try {
       final state = await loader(
         oid: aid,
@@ -177,11 +197,29 @@ abstract final class HomeFeedCommentGate {
       ).timeout(timeout);
 
       if (state case Success(:final response)) {
-        if (_hasVisibleCheckedComment(
-          response.replies,
-          config: config,
-          ruleSet: ruleSet,
-        )) {
+        // No fetched comments remains fail-open, as in the original gate.
+        if (response.replies.isEmpty && !response.hasUpTop()) return true;
+        final candidates =
+            [
+                  if (response.hasUpTop()) response.upTop,
+                  ...response.replies,
+                ]
+                .where(
+                  (reply) => _isVisible(
+                    reply,
+                    config: config,
+                    ruleSet: ruleSet,
+                  ),
+                )
+                .toList();
+        // Loading and semantic work share one bounded aid budget, rather than
+        // adding a fresh full provider deadline after a slow comment request.
+        final semantic = await screening.filter(
+          candidates,
+          timeout: screening.passTimeout - elapsed.elapsed,
+        );
+        if (!semantic.cacheable) return null;
+        if (semantic.replies.isNotEmpty) {
           return true;
         }
         return !_checkedCommentsExhausted(response);
@@ -242,18 +280,6 @@ abstract final class HomeFeedCommentGate {
       ReplyGrpc.replyRegExp.pattern,
     ],
   });
-
-  static bool _hasVisibleCheckedComment(
-    List<ReplyInfo> replies, {
-    required CommentShieldingConfig config,
-    required ShieldRuleSet ruleSet,
-  }) {
-    if (replies.isEmpty) return true;
-    for (final reply in replies) {
-      if (_isVisible(reply, config: config, ruleSet: ruleSet)) return true;
-    }
-    return false;
-  }
 
   static bool _checkedCommentsExhausted(MainListReply response) {
     if (response.hasPaginationReply() &&

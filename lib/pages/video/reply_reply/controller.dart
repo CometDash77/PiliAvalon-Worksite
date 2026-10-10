@@ -23,6 +23,7 @@ class VideoReplyReplyController extends ReplyController
     required this.rpid,
     required this.dialog,
     required this.replyType,
+    this.initialRoot,
   });
   final int? dialog;
   int? id;
@@ -33,7 +34,10 @@ class VideoReplyReplyController extends ReplyController
   int replyType;
 
   bool hasRoot = false;
+  final ReplyInfo? initialRoot;
   final firstFloor = Rxn<ReplyInfo>();
+  ReplyInfo? _screenedFirstFloor;
+  bool _hasPendingFirstFloor = false;
 
   final index = RxnInt();
 
@@ -76,12 +80,47 @@ class VideoReplyReplyController extends ReplyController
     // reply2Reply // isDialogue.not
     if (data is DetailListReply) {
       count.value = data.root.count.toInt();
-      if (isRefresh && !hasRoot) {
-        firstFloor.value ??= applyFirstFloorShielding(data.root);
-      }
     }
 
     return false;
+  }
+
+  @override
+  Future<void> beforeListResponse(bool isRefresh, response) async {
+    if (isRefresh && (response is DetailListReply || initialRoot != null)) {
+      // Children are screened by the list pipeline. Screen only the root here.
+      final source = initialRoot ?? (response as DetailListReply).root;
+      _screenedFirstFloor = ReplyInfo.fromBuffer(source.writeToBuffer())
+        ..replies.clear();
+      _hasPendingFirstFloor = true;
+    }
+  }
+
+  @override
+  Future<void> prepareListResponse(List<ReplyInfo> dataList) async {
+    if (!_hasPendingFirstFloor) {
+      return super.prepareListResponse(dataList);
+    }
+    final root = _screenedFirstFloor!;
+    handleListResponse(dataList);
+    final visible = await screenComments([
+      ...applyShielding([root]),
+      ...dataList,
+    ]);
+    _screenedFirstFloor = visible.any((r) => identical(r, root)) ? root : null;
+    dataList
+      ..clear()
+      ..addAll(visible.where((r) => !identical(r, root)));
+  }
+
+  @override
+  void afterListResponse(bool isRefresh, response) {
+    if (_hasPendingFirstFloor && isRefresh) {
+      _screenedFirstFloor?.replies.addAll(getDataList(response) ?? []);
+      firstFloor.value = _screenedFirstFloor;
+      _screenedFirstFloor = null;
+      _hasPendingFirstFloor = false;
+    }
   }
 
   @override
@@ -197,14 +236,23 @@ class VideoReplyReplyController extends ReplyController
             },
           ),
         )
-        .then((replyInfo) {
+        .then((replyInfo) async {
           if (replyInfo is ReplyInfo) {
             savedReplies.remove(key);
 
             count.value += 1;
-            loadingState
-              ..value.dataOrNull?.insert(index! + 1, replyInfo)
-              ..refresh();
+            final visible = await screenComments(applyShielding([replyInfo]));
+            if (visible.isEmpty) {
+              if (enableCommAntifraud) {
+                onCheckReply(replyInfo, isManual: false);
+              }
+              return;
+            }
+            final replies = loadingState.value.dataOrNull;
+            if (replies != null) {
+              replies.insert((index! + 1).clamp(0, replies.length), replyInfo);
+            }
+            loadingState.refresh();
             if (enableCommAntifraud) {
               onCheckReply(replyInfo, isManual: false);
             }
