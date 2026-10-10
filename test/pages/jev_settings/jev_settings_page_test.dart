@@ -309,7 +309,7 @@ void main() {
     final surfaces = tester
         .widgetList<SwitchListTile>(find.byType(SwitchListTile))
         .toList();
-    expect(surfaces.length, JevSurface.values.length + 1);
+    expect(surfaces.length, JevSurface.values.length + 2);
     for (final tile in surfaces.skip(1)) {
       expect(tile.onChanged, isNull);
     }
@@ -577,4 +577,65 @@ void main() {
     expect(find.textContaining('拒绝了请求格式'), findsOneWidget);
     expect(find.textContaining('上游：'), findsNothing);
   });
+  testWidgets(
+    'comment criterion saves, survives reopening and restores preset',
+    (tester) async {
+      final store = JevSettingsStore(box: _MemoryBox());
+      await store.save(const JevSettings(enabled: true));
+      final credentials = _FakeCredentialStore();
+      final validator = JevKeyValidator(
+        probe: ({required provider, required apiKey, String? model}) async =>
+            const JevProbeResult(JevProbeOutcome.ok),
+      );
+      await pumpPage(
+        tester,
+        store: store,
+        credentials: credentials,
+        validator: validator,
+        messages: [],
+      );
+      final switchFinder = find.byKey(const ValueKey('jev-comment-enabled'));
+      await tester.ensureVisible(switchFinder);
+      expect(tester.widget<SwitchListTile>(switchFinder).value, isFalse);
+      await tester.tap(switchFinder);
+      await tester.pumpAndSettle();
+      expect((await store.load()).commentEnabled, isTrue);
+      await tester.enterText(
+        find.byKey(const ValueKey('jev-comment-criteria')),
+        '隐藏剧透，保留批评',
+      );
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('jev-comment-save')),
+      );
+      await tester.tap(find.byKey(const ValueKey('jev-comment-save')));
+      await tester.pumpAndSettle();
+      expect((await store.load()).commentCriteria, '隐藏剧透，保留批评');
+      await tester.pumpWidget(const SizedBox());
+      await pumpPage(
+        tester,
+        store: store,
+        credentials: credentials,
+        validator: validator,
+        messages: [],
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('jev-comment-criteria')),
+            )
+            .controller!
+            .text,
+        '隐藏剧透，保留批评',
+      );
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('jev-comment-restore')),
+      );
+      await tester.tap(find.byKey(const ValueKey('jev-comment-restore')));
+      await tester.pumpAndSettle();
+      expect(
+        (await store.load()).commentCriteria,
+        JevSettings.defaultCommentCriteria,
+      );
+    },
+  );
 }
