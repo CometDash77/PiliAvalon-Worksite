@@ -29,9 +29,11 @@ class JevSettings {
   /// (issue #38: a format hint neither selects nor switches a provider).
   final bool providerConfirmed;
 
-  /// A surface screens candidates only when the master switch is on too.
+  /// A surface screens candidates only when the master switch is on too, and
+  /// only when the app actually implements that surface (issue #120): a
+  /// surface with no call site stays off whatever the stored set says.
   bool isSurfaceEnabled(JevSurface surface) =>
-      enabled && surfaces.contains(surface);
+      enabled && surface.screeningWired && surfaces.contains(surface);
 
   JevSettings copyWith({
     bool? enabled,
