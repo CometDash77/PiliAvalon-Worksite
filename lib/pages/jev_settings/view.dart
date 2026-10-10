@@ -290,8 +290,12 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         dense: true,
         secondary: const Icon(Icons.filter_alt_outlined),
         title: Text(surface.label),
-        value: _settings.surfaces.contains(surface),
-        onChanged: _settings.enabled
+        subtitle: surface.screeningWired
+            ? null
+            : const Text('尚未接线：本版本打开也不会生效'),
+        value:
+            surface.screeningWired && _settings.surfaces.contains(surface),
+        onChanged: _settings.enabled && surface.screeningWired
             ? (value) =>
                   _saveSettings(_settings.withSurface(surface, value: value))
             : null,

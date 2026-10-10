@@ -424,6 +424,8 @@ void main() {
         harness.preferenceBox.values[JevPreferenceStore.profileKey],
       );
       expect(profile.statePayload()['themes'], isNotEmpty);
+      // The tapped reason is what the profile keeps, not the card title.
+      expect(profile.themes.single.theme, '不想看此UP主');
     });
 
     test('底层异常被吞掉返回 false', () async {

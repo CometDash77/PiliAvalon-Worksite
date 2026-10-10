@@ -54,20 +54,33 @@ enum JevProvider {
 ///
 /// Every surface carries its own switch; a surface is only screened when the
 /// master switch is on as well.
+///
+/// [screeningWired] separates the surfaces that actually run the final screen
+/// today from the ones that only exist in the settings list (issue #120). An
+/// unwired surface must never look switchable: the settings page renders it as
+/// a stated gap and [JevSettings.isSurfaceEnabled] keeps it off.
 enum JevSurface {
   homeWeb(id: 'home_web', label: '首页推荐（Web）'),
   homeApp(id: 'home_app', label: '首页推荐（App）'),
   related(id: 'related', label: '相关推荐'),
   hot(id: 'hot', label: '热门'),
   ranking(id: 'ranking', label: '排行榜'),
-  live(id: 'live', label: '直播推荐'),
+  live(id: 'live', label: '直播推荐', screeningWired: false),
   pgc(id: 'pgc', label: '番剧/影视推荐'),
   music(id: 'music', label: '音乐推荐列表');
 
-  const JevSurface({required this.id, required this.label});
+  const JevSurface({
+    required this.id,
+    required this.label,
+    this.screeningWired = true,
+  });
 
   final String id;
   final String label;
+
+  /// Whether this surface has a final-screen call site in the app. Wiring the
+  /// live page is issue #115, not this contract.
+  final bool screeningWired;
 
   static JevSurface? tryFromId(String? id) {
     for (final surface in values) {
