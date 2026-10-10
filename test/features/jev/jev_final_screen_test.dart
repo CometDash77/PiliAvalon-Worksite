@@ -7,6 +7,8 @@ import 'package:PiliPlus/models_new/pgc/pgc_index_result/list.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_rank/pgc_rank_item_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'decisions_schema.dart';
+
 // 评测器测试假件的轻量复刻（见 jev_evaluator_test.dart）。
 class _MemoryBox implements JevSettingsBox {
   final Map<String, Object?> values = <String, Object?>{};
@@ -71,6 +73,9 @@ class _CapturingTransport {
       ({required provider, required apiKey, required body}) async {
         final index = calls++;
         bodies.add(body);
+        if (!acceptsDecisionsRequest(body)) {
+          throw StateError('HTTP 400: invalid Decisions request schema');
+        }
         final answer = reply?.call(index);
         if (answer == null) {
           throw StateError('transport failure');
@@ -196,9 +201,8 @@ void main() {
 
       expect(result.map((e) => e.title), ['a', 'c']);
       expect(capture.calls, 1);
-      final questions =
-          (capture.bodies.single['questions'] as List).cast<Map>();
-      expect(questions.map((question) => question['id']), [
+      final questions = capture.bodies.single['questions'] as Map;
+      expect(questions.keys, [
         'candidate_1',
         'candidate_2',
         'candidate_3',
@@ -244,8 +248,8 @@ void main() {
       await screen.screen([_hot('某标题')]);
 
       final context =
-          ((capture.bodies.single['questions'] as List).single
-                  as Map)['candidate']
+          ((capture.bodies.single['state'] as Map)['candidates']
+                  as Map)['candidate_1']
               as Map;
       expect(context, {
         'title': '某标题',
@@ -263,8 +267,8 @@ void main() {
         PgcRankItemModel.fromJson({'title': '某番剧'}),
       ]);
       var context =
-          ((capture.bodies.single['questions'] as List).single
-                  as Map)['candidate']
+          ((capture.bodies.single['state'] as Map)['candidates']
+                  as Map)['candidate_1']
               as Map;
       expect(context, {'title': '某番剧'});
 
@@ -278,8 +282,8 @@ void main() {
         PgcIndexItem.fromJson({'title': '某索引'}),
       ]);
       context =
-          ((capture.bodies.single['questions'] as List).single
-                  as Map)['candidate']
+          ((capture.bodies.single['state'] as Map)['candidates']
+                  as Map)['candidate_1']
               as Map;
       expect(context, {'title': '某索引'});
     });
@@ -300,8 +304,8 @@ void main() {
       ]);
 
       final context =
-          ((capture.bodies.single['questions'] as List).single
-                  as Map)['candidate']
+          ((capture.bodies.single['state'] as Map)['candidates']
+                  as Map)['candidate_1']
               as Map;
       expect(context, {
         'title': '某曲',
@@ -336,8 +340,8 @@ void main() {
 
       expect(result, hasLength(1));
       final context =
-          ((capture.bodies.single['questions'] as List).single
-                  as Map)['candidate']
+          ((capture.bodies.single['state'] as Map)['candidates']
+                  as Map)['candidate_1']
               as Map;
       expect(context, {
         'title': '某视频',

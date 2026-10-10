@@ -64,7 +64,9 @@ class JevHttpProbe {
         data: JevRequest.body(
           model: provider.model,
           state: const <String, Object?>{},
-          questions: <Map<String, Object?>>[JevRequest.question('probe_1')],
+          questions: <String, Map<String, Object?>>{
+            'probe_1': JevRequest.question(),
+          },
         ),
         options: Options(
           headers: <String, String>{
@@ -92,7 +94,10 @@ class JevHttpProbe {
     } on DioException catch (error) {
       return JevProbeResult(
         _outcomeForError(error),
-        detail: _describeResponse(error.response?.statusCode, error.response?.data),
+        detail: _describeResponse(
+          error.response?.statusCode,
+          error.response?.data,
+        ),
       );
     }
   }

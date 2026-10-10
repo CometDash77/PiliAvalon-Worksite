@@ -25,7 +25,7 @@ class JevCandidate {
 
   final List<String> tags;
 
-  /// The per-candidate context object carried inside its keyed question.
+  /// The per-candidate context object carried inside state.candidates.
   Map<String, Object?> toContext() => <String, Object?>{
     JevRequest.candidateTitleField: title,
     if (snippet != null && snippet!.trim().isNotEmpty)
@@ -227,14 +227,19 @@ class JevEvaluator {
           apiKey: apiKey,
           body: JevRequest.body(
             model: provider.model,
-            state: state,
-            questions: <Map<String, Object?>>[
+            state: <String, Object?>{
+              ...state,
+              JevRequest.candidatesField: <String, Object?>{
+                for (var i = 0; i < batch.length; i++)
+                  JevRequest.candidateKey(i): batch[i].toContext(),
+              },
+            },
+            questions: <String, Map<String, Object?>>{
               for (var i = 0; i < batch.length; i++)
-                JevRequest.question(
-                  JevRequest.candidateKey(i),
-                  candidate: batch[i].toContext(),
+                JevRequest.candidateKey(i): JevRequest.question(
+                  candidateKey: JevRequest.candidateKey(i),
                 ),
-            ],
+            },
           ),
         );
         final answers = JevAnswer.parseAll(data);
