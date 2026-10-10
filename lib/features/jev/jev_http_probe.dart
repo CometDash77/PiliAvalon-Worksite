@@ -77,14 +77,23 @@ class JevHttpProbe {
       );
       final status = response.statusCode ?? 0;
       if (status < 200 || status >= 300) {
-        return JevProbeResult(_outcomeForStatus(status));
+        return JevProbeResult(
+          _outcomeForStatus(status),
+          detail: _describeResponse(status, response.data),
+        );
       }
       if (response.data is! Map) {
-        return const JevProbeResult(JevProbeOutcome.malformedResponse);
+        return JevProbeResult(
+          JevProbeOutcome.malformedResponse,
+          detail: _describeResponse(status, response.data),
+        );
       }
       return const JevProbeResult(JevProbeOutcome.ok);
     } on DioException catch (error) {
-      return JevProbeResult(_outcomeForError(error));
+      return JevProbeResult(
+        _outcomeForError(error),
+        detail: _describeResponse(error.response?.statusCode, error.response?.data),
+      );
     }
   }
 
@@ -93,6 +102,44 @@ class JevHttpProbe {
     if (status == 429 || status == 529) return JevProbeOutcome.rateLimited;
     if (status == 400 || status == 422) return JevProbeOutcome.rejectedRequest;
     return JevProbeOutcome.serverError;
+  }
+
+  /// Short upstream summary (status + message) carried on the probe result so
+  /// the settings page can explain *why* a request was rejected (issue #101).
+  /// Returns null for outcomes without an HTTP response, keeping the existing
+  /// user-facing copy as the fallback.
+  static String? _describeResponse(int? status, Object? data) {
+    final message = switch (data) {
+      final Map body => _messageIn(body),
+      final String text => text.trim(),
+      _ => null,
+    };
+    final summary = (message == null || message.isEmpty)
+        ? null
+        : _shorten(message);
+    if (summary == null) return status == null ? null : 'HTTP $status';
+    return status == null ? summary : 'HTTP $status：$summary';
+  }
+
+  static String? _messageIn(Map body) {
+    final error = body['error'];
+    if (error is Map) {
+      final message = error['message'];
+      if (message is String && message.trim().isNotEmpty) {
+        return message.trim();
+      }
+    }
+    for (final key in const ['message', 'detail', 'error']) {
+      final value = body[key];
+      if (value is String && value.trim().isNotEmpty) return value.trim();
+    }
+    return null;
+  }
+
+  static String _shorten(String text) {
+    final runes = text.runes.toList();
+    if (runes.length <= 200) return text;
+    return '${String.fromCharCodes(runes.take(200))}…';
   }
 
   static JevProbeOutcome _outcomeForError(DioException error) {

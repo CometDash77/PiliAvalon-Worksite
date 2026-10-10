@@ -13,7 +13,7 @@ enum JevProvider {
     id: 'openrouter',
     label: 'OpenRouter',
     endpoint: 'https://openrouter.ai/api/alpha/decisions',
-    model: 'typesafe/jev-1.13',
+    model: 'typesafe/jev-latest',
   );
 
   const JevProvider({
@@ -34,7 +34,9 @@ enum JevProvider {
 
   /// Pinned model identifier.
   ///
-  /// `typesafe/jev-1.13` is the OpenRouter-side model id while the TypeSafe
+  /// `typesafe/jev-latest` is the OpenRouter-side model id (issue #101: the
+  /// previously pinned `typesafe/jev-1.13` does not exist upstream and turned
+  /// every OpenRouter validation into a rejected request) while the TypeSafe
   /// direct call uses the documented `jev-latest` alias (issue #31/#59, gap
   /// G-01). A model id echoed back by the provider is observed only and is never
   /// persisted.
