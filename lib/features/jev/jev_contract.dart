@@ -13,7 +13,7 @@ enum JevProvider {
     id: 'openrouter',
     label: 'OpenRouter',
     endpoint: 'https://openrouter.ai/api/alpha/decisions',
-    model: 'typesafe/jev-latest',
+    model: '~typesafe/jev-latest',
   );
 
   const JevProvider({
@@ -32,12 +32,8 @@ enum JevProvider {
   /// Typed-decision endpoint of this provider.
   final String endpoint;
 
-  /// Pinned model identifier.
-  ///
-  /// OpenRouter retains the maintainer-selected `typesafe/jev-latest` spelling
-  /// (issue #101); request-schema rejection does not prove model availability
-  /// or credential validity. TypeSafe uses its documented `jev-latest` alias.
-  /// An echoed model id is observed only and is never persisted.
+  /// Provider default; a saved per-provider override takes precedence.
+  /// OpenRouter's documented latest alias includes the leading tilde.
   final String model;
 
   static JevProvider? tryFromId(String? id) {

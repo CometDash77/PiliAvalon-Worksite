@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/pages/jev_settings/view.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -48,6 +50,15 @@ class _FakeCredentialStore implements JevCredentialStore {
   }
 }
 
+class _FakeCatalog extends JevModelCatalog {
+  final response = Completer<JevModelCatalogResult>();
+  @override
+  Future<JevModelCatalogResult> load({
+    required JevProvider provider,
+    required String apiKey,
+  }) => response.future;
+}
+
 void main() {
   setUp(() {
     JevSettingsStore.resetCache();
@@ -60,6 +71,7 @@ void main() {
     required JevCredentialStore credentials,
     required JevKeyValidator validator,
     required List<String> messages,
+    JevModelCatalog? catalog,
   }) async {
     tester.view.physicalSize = const Size(1400, 3200);
     tester.view.devicePixelRatio = 1.0;
@@ -70,12 +82,176 @@ void main() {
           store: store,
           credentialStore: credentials,
           validator: validator,
+          catalog: catalog,
           onMessage: messages.add,
         ),
       ),
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('old validation cannot confirm a changed provider or model', (
+    tester,
+  ) async {
+    final completion = Completer<JevProbeResult>();
+    final store = JevSettingsStore(box: _MemoryBox());
+    final messages = <String>[];
+    await pumpPage(
+      tester,
+      store: store,
+      credentials: _FakeCredentialStore(),
+      messages: messages,
+      validator: JevKeyValidator(
+        probe: ({
+          required JevProvider provider,
+          required String apiKey,
+          String? model,
+        }) => completion.future,
+      ),
+    );
+    await tester.tap(find.text('OpenRouter'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('jev-api-key')),
+      'sk-or-v1-synthetic',
+    );
+    await tester.tap(find.text('验证'));
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const ValueKey('jev-model')),
+      '~vendor/new',
+    );
+    await tester.tap(find.text('保存模型'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('TypeSafe'));
+    await tester.pumpAndSettle();
+    completion.complete(const JevProbeResult(JevProbeOutcome.ok));
+    await tester.pumpAndSettle();
+    expect((await store.load()).provider, JevProvider.typeSafe);
+    expect((await store.load()).providerConfirmed, isFalse);
+    expect(messages.where((m) => m.startsWith('验证通过')), isEmpty);
+  });
+  testWidgets(
+    'catalog fills draft only and failure retains saved model and input',
+    (tester) async {
+      final store = JevSettingsStore(box: _MemoryBox());
+      final catalog = _FakeCatalog();
+      await pumpPage(
+        tester,
+        store: store,
+        credentials: _FakeCredentialStore(),
+        messages: [],
+        validator: JevKeyValidator(),
+        catalog: catalog,
+      );
+      await tester.tap(find.text('OpenRouter'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('jev-model')),
+        '~vendor/manual',
+      );
+      await tester.tap(find.text('获取上游模型'));
+      await tester.pump();
+      expect(find.text('获取中…'), findsOneWidget);
+      catalog.response.complete(
+        const JevModelCatalogResult(['~vendor/candidate']),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('jev-model')))
+            .controller!
+            .text,
+        '~vendor/manual',
+      );
+      await tester.tap(find.text('~vendor/candidate'));
+      await tester.pumpAndSettle();
+      expect(
+        (await store.load()).modelFor(JevProvider.openRouter),
+        '~typesafe/jev-latest',
+      );
+      await tester.tap(find.text('保存模型'));
+      await tester.pumpAndSettle();
+      expect(
+        (await store.load()).modelFor(JevProvider.openRouter),
+        '~vendor/candidate',
+      );
+      await tester.tap(find.text('恢复默认'));
+      await tester.pumpAndSettle();
+      expect(
+        (await store.load()).modelFor(JevProvider.openRouter),
+        '~typesafe/jev-latest',
+      );
+    },
+  );
+
+  testWidgets(
+    'failed catalog and retry keep manual draft and persisted configuration',
+    (tester) async {
+      final store = JevSettingsStore(box: _MemoryBox());
+      final catalog = _FakeCatalog();
+      await pumpPage(
+        tester,
+        store: store,
+        credentials: _FakeCredentialStore(),
+        messages: [],
+        validator: JevKeyValidator(),
+        catalog: catalog,
+      );
+      await tester.tap(find.text('OpenRouter'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('jev-model')),
+        '~vendor/manual',
+      );
+      await tester.tap(find.text('获取上游模型'));
+      await tester.pump();
+      catalog.response.complete(
+        const JevModelCatalogResult([], error: '目录失败，可重试'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('重试'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('jev-model')))
+            .controller!
+            .text,
+        '~vendor/manual',
+      );
+      expect(
+        (await store.load()).modelFor(JevProvider.openRouter),
+        '~typesafe/jev-latest',
+      );
+      await tester.tap(find.text('重试'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('jev-model')))
+            .controller!
+            .text,
+        '~vendor/manual',
+      );
+    },
+  );
+
+  testWidgets(
+    'model controls are available after explicit provider selection',
+    (tester) async {
+      await pumpPage(
+        tester,
+        store: JevSettingsStore(box: _MemoryBox()),
+        credentials: _FakeCredentialStore(),
+        validator: JevKeyValidator(),
+        messages: [],
+      );
+      await tester.tap(find.text('OpenRouter'));
+      await tester.pumpAndSettle();
+      expect(find.text('模型 ID'), findsOneWidget);
+      expect(find.text('保存模型'), findsOneWidget);
+      expect(find.text('获取上游模型'), findsOneWidget);
+      expect(find.text('恢复默认'), findsOneWidget);
+    },
+  );
 
   testWidgets('an unusable secure store keeps Jev off', (tester) async {
     final box = _MemoryBox();
@@ -90,10 +266,15 @@ void main() {
       store: JevSettingsStore(box: box),
       credentials: credentials,
       validator: JevKeyValidator(
-        probe: ({required JevProvider provider, required String apiKey}) async {
-          probes.add(provider);
-          return const JevProbeResult(JevProbeOutcome.ok);
-        },
+        probe:
+            ({
+              required JevProvider provider,
+              required String apiKey,
+              String? model,
+            }) async {
+              probes.add(provider);
+              return const JevProbeResult(JevProbeOutcome.ok);
+            },
       ),
       messages: <String>[],
     );
@@ -119,6 +300,7 @@ void main() {
         probe: ({
           required JevProvider provider,
           required String apiKey,
+          String? model,
         }) async => const JevProbeResult(JevProbeOutcome.ok),
       ),
       messages: <String>[],
@@ -162,10 +344,15 @@ void main() {
       store: JevSettingsStore(box: box),
       credentials: credentials,
       validator: JevKeyValidator(
-        probe: ({required JevProvider provider, required String apiKey}) async {
-          probes.add(provider);
-          return const JevProbeResult(JevProbeOutcome.ok);
-        },
+        probe:
+            ({
+              required JevProvider provider,
+              required String apiKey,
+              String? model,
+            }) async {
+              probes.add(provider);
+              return const JevProbeResult(JevProbeOutcome.ok);
+            },
       ),
       messages: <String>[],
     );
@@ -174,7 +361,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(box.values[JevSettingsStore.providerKey], 'typesafe');
 
-    await tester.enterText(find.byType(TextField), 'sk-or-v1-abc');
+    await tester.enterText(
+      find.byKey(const ValueKey('jev-api-key')),
+      'sk-or-v1-abc',
+    );
     await tester.pumpAndSettle();
     expect(find.text('格式提示与已选提供方不一致'), findsOneWidget);
 
@@ -209,6 +399,7 @@ void main() {
         probe: ({
           required JevProvider provider,
           required String apiKey,
+          String? model,
         }) async => const JevProbeResult(JevProbeOutcome.ok),
       ),
       messages: messages,
@@ -216,7 +407,10 @@ void main() {
 
     await tester.tap(find.text('OpenRouter'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'plain-key');
+    await tester.enterText(
+      find.byKey(const ValueKey('jev-api-key')),
+      'plain-key',
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(TextButton, '保存密钥'));
     await tester.pumpAndSettle();
@@ -256,6 +450,7 @@ void main() {
         probe: ({
           required JevProvider provider,
           required String apiKey,
+          String? model,
         }) async => const JevProbeResult(JevProbeOutcome.ok),
       ),
       messages: <String>[],
@@ -293,6 +488,7 @@ void main() {
         probe: ({
           required JevProvider provider,
           required String apiKey,
+          String? model,
         }) async => const JevProbeResult(JevProbeOutcome.ok),
       ),
       messages: <String>[],
@@ -318,20 +514,25 @@ void main() {
       store: JevSettingsStore(box: box),
       credentials: _FakeCredentialStore(),
       validator: JevKeyValidator(
-        probe: ({
-          required JevProvider provider,
-          required String apiKey,
-        }) async => const JevProbeResult(
-          JevProbeOutcome.rejectedRequest,
-          detail: 'HTTP 400：No endpoint found.',
-        ),
+        probe:
+            ({
+              required JevProvider provider,
+              required String apiKey,
+              String? model,
+            }) async => const JevProbeResult(
+              JevProbeOutcome.rejectedRequest,
+              detail: 'HTTP 400：No endpoint found.',
+            ),
       ),
       messages: messages,
     );
 
     await tester.tap(find.text('OpenRouter'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'sk-or-v1-abc');
+    await tester.enterText(
+      find.byKey(const ValueKey('jev-api-key')),
+      'sk-or-v1-abc',
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(TextButton, '验证'));
     await tester.pumpAndSettle();
@@ -357,6 +558,7 @@ void main() {
         probe: ({
           required JevProvider provider,
           required String apiKey,
+          String? model,
         }) async => const JevProbeResult(JevProbeOutcome.rejectedRequest),
       ),
       messages: <String>[],
@@ -364,12 +566,15 @@ void main() {
 
     await tester.tap(find.text('OpenRouter'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'sk-or-v1-abc');
+    await tester.enterText(
+      find.byKey(const ValueKey('jev-api-key')),
+      'sk-or-v1-abc',
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(TextButton, '验证'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('拒绝了请求格式'), findsOneWidget);
-    expect(find.textContaining('上游'), findsNothing);
+    expect(find.textContaining('上游：'), findsNothing);
   });
 }

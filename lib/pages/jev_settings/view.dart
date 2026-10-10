@@ -16,6 +16,7 @@ class JevSettingsPage extends StatefulWidget {
     this.store,
     this.credentialStore,
     this.validator,
+    this.catalog,
     this.preferenceStore,
     this.onMessage,
   });
@@ -24,6 +25,7 @@ class JevSettingsPage extends StatefulWidget {
   final JevSettingsStore? store;
   final JevCredentialStore? credentialStore;
   final JevKeyValidator? validator;
+  final JevModelCatalog? catalog;
 
   /// The local negative-feedback profile surface (issue #33).
   final JevPreferenceStore? preferenceStore;
@@ -43,6 +45,19 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   late final JevPreferenceStore _preferences =
       widget.preferenceStore ??
       JevPreferenceStore(box: _store.box, settings: _store);
+
+  late final JevModelCatalog _catalog = widget.catalog ?? JevModelCatalog();
+  final TextEditingController _modelController = TextEditingController();
+  int _generation = 0;
+  int _catalogGeneration = 0;
+  bool _catalogBusy = false;
+  JevModelCatalogResult? _catalogResult;
+
+  void _invalidateValidation() {
+    _generation++;
+    _validation = null;
+    _busy = false;
+  }
 
   final TextEditingController _keyController = TextEditingController();
 
@@ -64,6 +79,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   @override
   void dispose() {
     _keyController.dispose();
+    _modelController.dispose();
     super.dispose();
   }
 
@@ -97,6 +113,9 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     setState(() {
       _settings = JevSettingsStore.snapshot;
       _profile = profile;
+      final provider = _settings.provider;
+      if (provider != null)
+        _modelController.text = _settings.modelFor(provider);
       _keyStoreStatus = status;
       _hasStoredKey = storedKey != null;
       if (storedKey != null) {
@@ -110,20 +129,33 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     });
   }
 
-  Future<void> _saveSettings(JevSettings next) async {
+  Future<void> _saveQueue = Future<void>.value();
+
+  Future<bool> _saveSettings(JevSettings next) async {
+    if (!mounted) return false;
+    final previous = _settings;
+    setState(() => _settings = next);
+    final write = _saveQueue.then((_) => _store.save(next));
+    _saveQueue = write.catchError((Object _) {});
     try {
-      await _store.save(next);
-      if (!mounted) return;
-      setState(() => _settings = next);
+      await write;
+      return true;
     } catch (error) {
+      if (mounted && identical(_settings, next))
+        setState(() => _settings = previous);
       _toast('保存失败：$error');
+      return false;
     }
   }
 
   Future<void> _selectProvider(JevProvider provider) async {
     setState(() {
       _selection = _selection.withProvider(provider);
-      _validation = null;
+      _invalidateValidation();
+      _catalogGeneration++;
+      _catalogBusy = false;
+      _catalogResult = null;
+      _modelController.text = _settings.modelFor(provider);
     });
     await _saveSettings(
       _settings.copyWith(provider: provider, providerConfirmed: false),
@@ -151,7 +183,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     if (!mounted) return;
     setState(() {
       _hasStoredKey = true;
-      _validation = null;
+      _invalidateValidation();
     });
     await _saveSettings(
       _settings.copyWith(
@@ -175,14 +207,61 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     if (!mounted) return;
     setState(() {
       _selection = _selection.withKey('');
-      _validation = null;
+      _invalidateValidation();
       _hasStoredKey = false;
     });
     await _saveSettings(_settings.copyWith(providerConfirmed: false));
     _toast('已清除密钥');
   }
 
+  Future<void> _saveModel({bool restoreDefault = false}) async {
+    final provider = _selection.provider;
+    if (provider == null) return;
+    final model = restoreDefault
+        ? provider.model
+        : _modelController.text.trim();
+    if (model.isEmpty) {
+      _toast('模型 ID 不能为空');
+      return;
+    }
+    setState(_invalidateValidation);
+    final next = restoreDefault
+        ? _settings.withDefaultModel(provider)
+        : _settings.withModel(provider, model);
+    final generation = _generation;
+    final saved = await _saveSettings(next);
+    if (!saved ||
+        !mounted ||
+        generation != _generation ||
+        _selection.provider != provider)
+      return;
+    _modelController.text = _settings.modelFor(provider);
+    _toast('模型已保存，需重新验证');
+  }
+
+  Future<void> _loadModels() async {
+    final provider = _selection.provider;
+    if (provider == null) return;
+    final generation = ++_catalogGeneration;
+    setState(() {
+      _catalogBusy = true;
+      _catalogResult = null;
+    });
+    final result = await _catalog.load(
+      provider: provider,
+      apiKey: _selection.trimmedKey,
+    );
+    if (!mounted || generation != _catalogGeneration) return;
+    setState(() {
+      _catalogBusy = false;
+      _catalogResult = result;
+    });
+  }
+
   Future<void> _validateKey() async {
+    final provider = _selection.provider;
+    final generation = _generation;
+    final model = provider == null ? null : _settings.modelFor(provider);
     setState(() {
       _busy = true;
       _validation = null;
@@ -191,8 +270,9 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       final result = await _validator.validate(
         selection: _selection,
         apiKey: _selection.trimmedKey,
+        model: model,
       );
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(() {
         _validation = result;
         _busy = false;
@@ -204,12 +284,13 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
             providerConfirmed: true,
           ),
         );
+        if (!mounted || generation != _generation) return;
         _toast('验证通过：${result.provider?.label ?? ''}');
       } else {
         _toast(_validationMessage(result));
       }
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(() => _busy = false);
       _toast('验证失败：$error');
     }
@@ -228,6 +309,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       JevProbeOutcome.invalidKey => '$provider 拒绝了该密钥（401），请检查密钥与提供方选择',
       JevProbeOutcome.rateLimited => '$provider 限流或过载，稍后再试；候选保持可见',
       JevProbeOutcome.rejectedRequest => '$provider 拒绝了请求格式（不判定为密钥问题）',
+      JevProbeOutcome.modelNotFound =>
+        '$provider 找不到模型 ${result.model ?? ''}，请检查模型 ID、获取上游模型或恢复默认后重新验证',
       JevProbeOutcome.serverError => '$provider 服务端错误，稍后再试',
       JevProbeOutcome.timeout => '$provider 请求超时，稍后再试',
       JevProbeOutcome.networkError => '网络不可达，请检查网络后重试',
@@ -261,6 +344,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
           ..._buildProfileSection(),
           const Divider(height: 1),
           ..._buildProviderSection(errorColor),
+          const Divider(height: 1),
+          ..._buildModelSection(),
           const Divider(height: 1),
           ..._buildKeySection(errorColor),
           const Divider(height: 1),
@@ -313,8 +398,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         title: Text(provider.label),
         subtitle: Text(
           provider == JevProvider.typeSafe
-              ? '直连 TypeSafe System One（model: ${provider.model}）'
-              : '经 OpenRouter Jev Decisions（model: ${provider.model}）',
+              ? '直连 TypeSafe System One（model: ${_settings.modelFor(provider)}）'
+              : '经 OpenRouter Jev Decisions（model: ${_settings.modelFor(provider)}）',
         ),
         onTap: () => _selectProvider(provider),
       ),
@@ -333,6 +418,67 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       ),
   ];
 
+  List<Widget> _buildModelSection() => [
+    if (_selection.provider != null) ...[
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        child: TextField(
+          key: const ValueKey('jev-model'),
+          controller: _modelController,
+          decoration: const InputDecoration(
+            labelText: '模型 ID',
+            border: OutlineInputBorder(),
+            helperText: '保留 ~ 和 /；选择目录项只回填，保存后才生效',
+          ),
+          onChanged: (_) => setState(_invalidateValidation),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Wrap(
+          children: [
+            TextButton(
+              onPressed: () => _saveModel(),
+              child: const Text('保存模型'),
+            ),
+            TextButton(
+              onPressed: () => _saveModel(restoreDefault: true),
+              child: const Text('恢复默认'),
+            ),
+            TextButton(
+              onPressed: _catalogBusy ? null : _loadModels,
+              child: Text(_catalogBusy ? '获取中…' : '获取上游模型'),
+            ),
+          ],
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Text(
+          '当前生效：${_settings.modelFor(_selection.provider!)}；候选不代表验证通过',
+        ),
+      ),
+      if (_catalogResult case final result?) ...[
+        if (result.error != null || result.models.isEmpty)
+          custom.ListTile(
+            title: Text(result.error ?? '目录为空，可重试或手动填写；现有配置已保留'),
+            trailing: TextButton(
+              onPressed: _loadModels,
+              child: const Text('重试'),
+            ),
+          ),
+        for (final model in result.models)
+          custom.ListTile(
+            title: Text(model),
+            onTap: () => setState(() {
+              _modelController.text = model;
+              _invalidateValidation();
+            }),
+          ),
+      ],
+    ],
+  ];
+
   List<Widget> _buildKeySection(Color errorColor) => [
     if (_keyStoreStatus == JevKeyStoreStatus.unavailable)
       custom.ListTile(
@@ -346,6 +492,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: TextField(
+        key: const ValueKey('jev-api-key'),
         controller: _keyController,
         obscureText: _obscureKey,
         enabled: _keyStoreStatus == JevKeyStoreStatus.available,
@@ -365,8 +512,10 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
           ),
         ),
         onChanged: (value) => setState(() {
+          _catalogGeneration++;
+          _catalogBusy = false;
           _selection = _selection.withKey(value);
-          _validation = null;
+          _invalidateValidation();
         }),
       ),
     ),
@@ -391,7 +540,14 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
           ),
           const SizedBox(width: 8),
           TextButton(
-            onPressed: _busy || !_selection.canValidate ? null : _validateKey,
+            onPressed:
+                _busy ||
+                    !_selection.canValidate ||
+                    (_selection.provider != null &&
+                        _modelController.text.trim() !=
+                            _settings.modelFor(_selection.provider!))
+                ? null
+                : _validateKey,
             child: Text(_busy ? '验证中…' : '验证'),
           ),
           const SizedBox(width: 8),

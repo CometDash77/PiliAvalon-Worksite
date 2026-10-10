@@ -180,7 +180,7 @@ void main() {
           expect(
             body['model'],
             provider == JevProvider.openRouter
-                ? 'typesafe/jev-latest'
+                ? '~typesafe/jev-latest'
                 : 'jev-latest',
           );
           expect(acceptsDecisionsRequest(body), isTrue);
@@ -310,6 +310,27 @@ void main() {
   });
 
   test(
+    'screening sends the persisted override to the selected provider',
+    () async {
+      final harness = _Harness(providerKey: 'openrouter');
+      final store = JevSettingsStore(box: harness.settingsBox);
+      await store.save(
+        (await store.load()).withModel(
+          JevProvider.openRouter,
+          '~vendor/custom',
+        ),
+      );
+      final capture = _CapturingTransport(
+        reply: (index) => _answers({'candidate_1': 0.1}),
+      );
+      await harness.evaluator(capture).screen([
+        candidate('a'),
+      ], surface: JevSurface.homeWeb);
+      expect(capture.bodies.single['model'], '~vendor/custom');
+    },
+  );
+
+  test(
     'OpenRouter batches pin the maintainer-decided model id (issue #101)',
     () async {
       final capture = _CapturingTransport(
@@ -321,7 +342,7 @@ void main() {
           .evaluator(capture)
           .screen([candidate('a')], surface: JevSurface.homeWeb);
 
-      expect(capture.bodies.single['model'], 'typesafe/jev-latest');
+      expect(capture.bodies.single['model'], '~typesafe/jev-latest');
     },
   );
 

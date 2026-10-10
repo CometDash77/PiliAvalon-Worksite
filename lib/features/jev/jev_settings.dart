@@ -1,6 +1,6 @@
 import 'package:PiliPlus/features/jev/jev_contract.dart';
 import 'package:PiliPlus/utils/storage.dart';
-import 'package:flutter/foundation.dart' show immutable, setEquals;
+import 'package:flutter/foundation.dart' show immutable, setEquals, mapEquals;
 
 /// Persisted, non-secret Jev configuration (issues #32/#35).
 @immutable
@@ -10,7 +10,26 @@ class JevSettings {
     this.provider,
     this.surfaces = const <JevSurface>{},
     this.providerConfirmed = false,
+    this.modelOverrides = const <JevProvider, String>{},
   });
+
+  final Map<JevProvider, String> modelOverrides;
+
+  String modelFor(JevProvider provider) =>
+      modelOverrides[provider] ?? provider.model;
+
+  JevSettings withModel(JevProvider provider, String rawModel) {
+    final model = rawModel.trim();
+    if (model.isEmpty) throw ArgumentError('模型 ID 不能为空');
+    return copyWith(
+      modelOverrides: Map.unmodifiable({...modelOverrides, provider: model}),
+    );
+  }
+
+  JevSettings withDefaultModel(JevProvider provider) {
+    final next = {...modelOverrides}..remove(provider);
+    return copyWith(modelOverrides: Map.unmodifiable(next));
+  }
 
   /// Default state: Jev off, no provider chosen, no surface enabled.
   static const JevSettings disabled = JevSettings();
@@ -38,11 +57,13 @@ class JevSettings {
     JevProvider? provider,
     Set<JevSurface>? surfaces,
     bool? providerConfirmed,
+    Map<JevProvider, String>? modelOverrides,
   }) => JevSettings(
     enabled: enabled ?? this.enabled,
     provider: provider ?? this.provider,
     surfaces: surfaces ?? this.surfaces,
     providerConfirmed: providerConfirmed ?? this.providerConfirmed,
+    modelOverrides: modelOverrides ?? this.modelOverrides,
   );
 
   JevSettings withSurface(JevSurface surface, {required bool value}) {
@@ -59,6 +80,7 @@ class JevSettings {
   JevSettings withoutProvider() => JevSettings(
     enabled: enabled,
     surfaces: surfaces,
+    modelOverrides: modelOverrides,
   );
 
   @override
@@ -67,7 +89,8 @@ class JevSettings {
       other.enabled == enabled &&
       other.provider == provider &&
       other.providerConfirmed == providerConfirmed &&
-      setEquals(other.surfaces, surfaces);
+      setEquals(other.surfaces, surfaces) &&
+      mapEquals(other.modelOverrides, modelOverrides);
 
   @override
   int get hashCode => Object.hash(
@@ -75,6 +98,9 @@ class JevSettings {
     provider,
     providerConfirmed,
     Object.hashAllUnordered(surfaces),
+    Object.hashAllUnordered(
+      modelOverrides.entries.map((e) => Object.hash(e.key, e.value)),
+    ),
   );
 
   @override
@@ -134,6 +160,9 @@ class JevSettingsStore {
   static const String providerConfirmedKey = '$namespace.provider_confirmed';
   static const String surfacePrefix = '$namespace.surface.';
 
+  static String modelKey(JevProvider provider) =>
+      '$namespace.model.${provider.id}';
+
   static String surfaceKey(JevSurface surface) => '$surfacePrefix${surface.id}';
 
   /// Hive can hand back non-bool garbage after a bad migration: treat as off.
@@ -160,7 +189,13 @@ class JevSettingsStore {
     final provider = JevProvider.tryFromId(
       rawProvider is String ? rawProvider : null,
     );
+    final models = <JevProvider, String>{};
+    for (final entry in JevProvider.values) {
+      final raw = _box.get(modelKey(entry));
+      if (raw is String && raw.trim().isNotEmpty) models[entry] = raw.trim();
+    }
     final settings = JevSettings(
+      modelOverrides: Map.unmodifiable(models),
       enabled: _flag(_box.get(enabledKey, defaultValue: false)),
       provider: provider,
       surfaces: surfaces,
@@ -181,6 +216,14 @@ class JevSettingsStore {
     } else {
       await _box.put(providerKey, provider.id);
       await _box.put(providerConfirmedKey, settings.providerConfirmed);
+    }
+    for (final entry in JevProvider.values) {
+      final model = settings.modelOverrides[entry];
+      if (model == null) {
+        await _box.delete(modelKey(entry));
+      } else {
+        await _box.put(modelKey(entry), model);
+      }
     }
     for (final surface in JevSurface.values) {
       await _box.put(surfaceKey(surface), settings.surfaces.contains(surface));

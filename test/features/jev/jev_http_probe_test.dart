@@ -88,7 +88,7 @@ void main() {
       expect(
         data['model'],
         provider == JevProvider.openRouter
-            ? 'typesafe/jev-latest'
+            ? '~typesafe/jev-latest'
             : 'jev-latest',
       );
       expect(data['state'], isEmpty);
@@ -185,11 +185,55 @@ void main() {
 
   test('an accepted probe keeps detail empty', () async {
     final result = await _probe(
-      adapter: _StubAdapter(statusCode: 200, body: {'answers': {}}),
+      adapter: _StubAdapter(
+        statusCode: 200,
+        body: {
+          'answers': {
+            'probe_1': {'type': 'noul', 'noul': 0.5},
+          },
+        },
+      ),
     ).call(provider: JevProvider.openRouter, apiKey: 'sk-or-v1-abc');
 
     expect(result.outcome, JevProbeOutcome.ok);
     expect(result.detail, isNull);
+  });
+
+  test('empty or wrong typed answers cannot validate', () async {
+    for (final body in [
+      <String, Object?>{},
+      {'answers': {}},
+      {
+        'answers': {
+          'probe_1': {'type': 'text', 'noul': 0.5},
+        },
+      },
+      {
+        'answers': {
+          'probe_1': {'type': 'noul', 'noul': 2},
+        },
+      },
+    ]) {
+      final result = await _probe(adapter: _StubAdapter(body: body))
+          .call(provider: JevProvider.openRouter, apiKey: 'synthetic');
+      expect(result.outcome, JevProbeOutcome.malformedResponse);
+    }
+  });
+  test('missing model gets a targeted outcome with original summary', () async {
+    final adapter = _StubAdapter(
+      statusCode: 400,
+      body: {
+        'error': {'message': 'Model vendor/missing does not exist'},
+      },
+    );
+    final result = await _probe(adapter: adapter).call(
+      provider: JevProvider.openRouter,
+      apiKey: 'synthetic',
+      model: 'vendor/missing',
+    );
+    expect(result.outcome, JevProbeOutcome.modelNotFound);
+    expect(result.detail, 'HTTP 400：Model vendor/missing does not exist');
+    expect((adapter.requests.single.data as Map)['model'], 'vendor/missing');
   });
 
   test('timeouts stay timeouts without inventing a detail', () async {
@@ -213,7 +257,7 @@ void main() {
 
     final request = adapter.requests.single;
     final data = request.data as Map<String, Object?>;
-    expect(data['model'], 'typesafe/jev-latest');
+    expect(data['model'], '~typesafe/jev-latest');
     expect(request.uri.host, 'openrouter.ai');
   });
 
