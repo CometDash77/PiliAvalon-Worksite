@@ -39,7 +39,7 @@ void main() {
     expect(restored.modelFor(JevProvider.typeSafe), 'jev-preview');
   });
   test('blank override is rejected without silently choosing a model', () {
-    dynamic settings = const JevSettings();
+    dynamic settings = JevSettings.disabled;
     expect(
       () => settings.withModel(JevProvider.openRouter, '  '),
       throwsArgumentError,

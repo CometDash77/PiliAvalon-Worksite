@@ -106,17 +106,18 @@ void main() {
         )).error,
         isNotNull,
       );
-      adapter.status = 200;
-      adapter.body = {
-        'data': [
-          {
-            'id': 'recovered',
-            'architecture': {
-              'output_modalities': ['decisions'],
+      adapter
+        ..status = 200
+        ..body = {
+          'data': [
+            {
+              'id': 'recovered',
+              'architecture': {
+                'output_modalities': ['decisions'],
+              },
             },
-          },
-        ],
-      };
+          ],
+        };
       expect(
         (await catalog.load(
           provider: JevProvider.openRouter,

@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 
-import 'jev_contract.dart';
+import 'package:PiliPlus/features/jev/jev_contract.dart';
 
 class JevModelCatalogResult {
   const JevModelCatalogResult(this.models, {this.error});

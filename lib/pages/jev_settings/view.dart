@@ -114,8 +114,9 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       _settings = JevSettingsStore.snapshot;
       _profile = profile;
       final provider = _settings.provider;
-      if (provider != null)
+      if (provider != null) {
         _modelController.text = _settings.modelFor(provider);
+      }
       _keyStoreStatus = status;
       _hasStoredKey = storedKey != null;
       if (storedKey != null) {
@@ -141,8 +142,9 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       await write;
       return true;
     } catch (error) {
-      if (mounted && identical(_settings, next))
+      if (mounted && identical(_settings, next)) {
         setState(() => _settings = previous);
+      }
       _toast('保存失败：$error');
       return false;
     }
@@ -233,8 +235,9 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     if (!saved ||
         !mounted ||
         generation != _generation ||
-        _selection.provider != provider)
+        _selection.provider != provider) {
       return;
+    }
     _modelController.text = _settings.modelFor(provider);
     _toast('模型已保存，需重新验证');
   }
@@ -438,7 +441,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         child: Wrap(
           children: [
             TextButton(
-              onPressed: () => _saveModel(),
+              onPressed: _saveModel,
               child: const Text('保存模型'),
             ),
             TextButton(
