@@ -6,12 +6,13 @@ enum JevSurface {
   related('相关视频'),
   hot('热门视频'),
   ranking('排行榜'),
-  live('直播推荐'),
+  live('直播推荐', screeningWired: false),
   pgc('PGC 推荐'),
   music('BGM / 音乐推荐');
 
-  const JevSurface(this.label);
+  const JevSurface(this.label, {this.screeningWired = true});
   final String label;
+  final bool screeningWired;
 }
 
 class JevSettings {
@@ -30,7 +31,10 @@ class JevSettings {
   final int batchSize;
 
   bool enabledFor(JevSurface surface) =>
-      enabled && provider != null && (surfaceEnabled[surface] ?? true);
+      enabled &&
+      provider != null &&
+      surface.screeningWired &&
+      (surfaceEnabled[surface] ?? true);
 
   JevSettings copyWith({
     bool? enabled,
@@ -67,7 +71,9 @@ class JevSettings {
         if (value is bool) surfaces[surface] = value;
       }
     }
-    final provider = JevProvider.values.where((item) => item.name == json['provider']);
+    final provider = JevProvider.values.where(
+      (item) => item.name == json['provider'],
+    );
     final threshold = json['hideThreshold'];
     final batchSize = json['batchSize'];
     return JevSettings(
@@ -85,7 +91,12 @@ class JevSettings {
 }
 
 class JevCandidate {
-  const JevCandidate({required this.title, this.description, this.category, this.tags = const []});
+  const JevCandidate({
+    required this.title,
+    this.description,
+    this.category,
+    this.tags = const [],
+  });
 
   final String title;
   final String? description;
@@ -94,14 +105,23 @@ class JevCandidate {
 
   Map<String, Object?> toProviderJson() => {
     'title': _limit(title, 240),
-    if (_nonBlank(description) case final value?) 'description': _limit(value, 600),
+    if (_nonBlank(description) case final value?)
+      'description': _limit(value, 600),
     if (_nonBlank(category) case final value?) 'category': _limit(value, 100),
-    if (tags.isNotEmpty) 'tags': tags.take(12).map((tag) => _limit(tag, 80)).toList(growable: false),
+    if (tags.isNotEmpty)
+      'tags': tags
+          .take(12)
+          .map((tag) => _limit(tag, 80))
+          .toList(growable: false),
   };
 }
 
 class JevTheme {
-  const JevTheme({required this.label, required this.count, required this.updatedAt});
+  const JevTheme({
+    required this.label,
+    required this.count,
+    required this.updatedAt,
+  });
 
   final String label;
   final int count;

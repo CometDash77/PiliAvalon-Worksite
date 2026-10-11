@@ -5,6 +5,7 @@ import 'package:PiliPlus/features/shielding/shielding_models.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/user.dart';
 import 'package:PiliPlus/models_new/video/video_tag/data.dart';
+import 'package:PiliPlus/utils/recommendation_metrics.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 
@@ -13,6 +14,7 @@ const bool _tagEnrichmentEnabled = true;
 const int _defaultConcurrency = 5;
 const int _defaultTimeoutSeconds = 3;
 const Duration _tagCacheTTL = Duration(minutes: 30);
+const Duration _negativeTagCacheTTL = Duration(seconds: 30);
 const int _defaultTagCacheMaxMb = 10;
 const int _maxTagCacheMaxMb = 50;
 const int _bytesPerMb = 1024 * 1024;
@@ -55,14 +57,16 @@ int get tagEnrichCacheMaxBytes => tagEnrichCacheMaxMb * _bytesPerMb;
 
 class _TagCacheEntry {
   const _TagCacheEntry({
-    required this.tagNames,
+    required this.tags,
     required this.fetchedAt,
     required this.estimatedBytes,
   });
 
-  final List<String> tagNames;
+  final List<VideoTagItem>? tags;
   final DateTime fetchedAt;
   final int estimatedBytes;
+
+  bool get isNegative => tags == null;
 }
 
 /// Drives detail-tag enrichment + tag-only second-pass shielding for
@@ -88,13 +92,16 @@ class RecommendationTagEnricher {
   )
   _fetchTags;
 
-  static final Map<String, _TagCacheEntry> _cache = {};
+  static final Map<(String, Object?), _TagCacheEntry> _cache = {};
+  static final Map<(String, Object?), Future<LoadingState<List<VideoTagItem>?>>>
+  _inFlight = {};
   static int _cacheBytes = 0;
 
   /// Clears the shared static cache. Intended for tests; production
   /// code should not need to call this.
   static void resetCache() {
     _cache.clear();
+    _inFlight.clear();
     _cacheBytes = 0;
   }
 
@@ -121,6 +128,10 @@ class RecommendationTagEnricher {
   }) async {
     if (!_tagEnrichmentEnabled || survivors.isEmpty) return survivors;
 
+    final measurement = RecommendationMetrics.startPhase(
+      RecommendationPhase.tagEnrichment,
+      inputCount: survivors.length,
+    );
     _evictExpiredCache();
     _evictOverflow();
 
@@ -138,9 +149,10 @@ class RecommendationTagEnricher {
         continue;
       }
 
-      final cached = _cache[bvid];
+      final cached = _cache[(bvid, getCid(item))];
       if (cached != null) {
-        if (_tagOnlySecondPass(cached.tagNames, shieldRuleSet)) {
+        final tagNames = _tagNames(cached.tags);
+        if (tagNames == null || _tagOnlySecondPass(tagNames, shieldRuleSet)) {
           results[i] = item;
         }
         // else: blocked by detail tags → drop
@@ -161,7 +173,12 @@ class RecommendationTagEnricher {
       _evictOverflow();
     }
 
-    return results.whereType<T>().toList();
+    final filtered = results.whereType<T>().toList();
+    RecommendationMetrics.finishPhase(
+      measurement,
+      outputCount: filtered.length,
+    );
+    return filtered;
   }
 
   // ---- internals ---------------------------------------------------
@@ -194,26 +211,13 @@ class RecommendationTagEnricher {
         final item = survivors[index];
         final bvid = getBvid(item)!; // safe: null-bvid items never reach here
         final cid = getCid(item);
-
-        List<String>? tagNames;
-        try {
-          final res = await _fetchTags(bvid, cid).timeout(tagEnrichTimeout);
-          final tags = res.dataOrNull;
-          if (tags != null && tags.isNotEmpty) {
-            tagNames = tags
-                .map((t) => t.tagName)
-                .whereType<String>()
-                .where((n) => n.trim().isNotEmpty)
-                .toList();
-            if (tagNames.isEmpty) tagNames = null;
-          }
-        } catch (_) {
-          // fail-open: any error leaves tagNames as null
-        }
+        final key = (bvid, cid);
+        final res = await _fetchSharedTags(key, _fetchTags);
+        final tags = res.dataOrNull;
+        final tagNames = _tagNames(tags);
 
         if (tagNames != null && tagNames.isNotEmpty) {
           // Success: cache and then run second pass.
-          _putCacheEntry(bvid, tagNames);
           if (_tagOnlySecondPass(tagNames, shieldRuleSet)) {
             results[index] = item;
           }
@@ -234,34 +238,108 @@ class RecommendationTagEnricher {
     );
   }
 
-  static void _putCacheEntry(String bvid, List<String> tagNames) {
-    final estimatedBytes = _estimateEntryBytes(bvid, tagNames);
-    final previous = _cache[bvid];
+  /// Shared by recommendation enrichment and the video detail page so both
+  /// surfaces use the same cache and coalesce concurrent requests.
+  static Future<LoadingState<List<VideoTagItem>?>> fetchSharedTags({
+    required String bvid,
+    Object? cid,
+  }) => _fetchSharedTags(
+    (bvid, cid),
+    (keyBvid, keyCid) => UserHttp.videoTags(bvid: keyBvid, cid: keyCid),
+  );
+
+  static Future<LoadingState<List<VideoTagItem>?>> _fetchSharedTags(
+    (String, Object?) key,
+    Future<LoadingState<List<VideoTagItem>?>> Function(String, Object?) fetch,
+  ) {
+    _evictExpiredCache();
+    final cached = _cache[key];
+    if (cached != null) {
+      return Future.value(
+        cached.isNegative
+            ? const Error('Temporarily cached tag lookup failure')
+            : Success(cached.tags),
+      );
+    }
+    final existing = _inFlight[key];
+    if (existing != null) return existing;
+
+    late final Future<LoadingState<List<VideoTagItem>?>> request;
+    request = () async {
+      LoadingState<List<VideoTagItem>?> result;
+      try {
+        result = await Future<LoadingState<List<VideoTagItem>?>>.sync(
+          () => fetch(key.$1, key.$2),
+        ).timeout(tagEnrichTimeout);
+      } catch (error) {
+        result = Error(error.toString());
+      }
+
+      final tags = result.dataOrNull;
+      if (tags != null && tags.isNotEmpty) {
+        _putCacheEntry(key, tags);
+      } else {
+        _putNegativeCacheEntry(key);
+      }
+      _inFlight.remove(key);
+      _evictOverflow();
+      return result;
+    }();
+    _inFlight[key] = request;
+    return request;
+  }
+
+  static List<String>? _tagNames(List<VideoTagItem>? tags) {
+    if (tags == null || tags.isEmpty) return null;
+    final names = tags
+        .map((tag) => tag.tagName)
+        .whereType<String>()
+        .where((name) => name.trim().isNotEmpty)
+        .toList();
+    return names.isEmpty ? null : names;
+  }
+
+  static void _putCacheEntry((String, Object?) key, List<VideoTagItem> tags) {
+    final estimatedBytes = _estimateEntryBytes(key.$1, tags);
+    final previous = _cache[key];
     if (previous != null) {
       _cacheBytes -= previous.estimatedBytes;
     }
-    _cache[bvid] = _TagCacheEntry(
-      tagNames: tagNames,
+    _cache[key] = _TagCacheEntry(
+      tags: List.unmodifiable(tags),
       fetchedAt: DateTime.now(),
       estimatedBytes: estimatedBytes,
     );
     _cacheBytes += estimatedBytes;
   }
 
-  static int _estimateEntryBytes(String bvid, List<String> tagNames) {
+  static void _putNegativeCacheEntry((String, Object?) key) {
+    final previous = _cache.remove(key);
+    if (previous != null) _cacheBytes -= previous.estimatedBytes;
+    _cache[key] = _TagCacheEntry(
+      tags: null,
+      fetchedAt: DateTime.now(),
+      estimatedBytes: _estimatedEntryOverheadBytes + key.$1.length * 3,
+    );
+    _cacheBytes += _cache[key]!.estimatedBytes;
+  }
+
+  static int _estimateEntryBytes(String bvid, List<VideoTagItem> tags) {
     var bytes = _estimatedEntryOverheadBytes + bvid.length * 3;
-    for (final tag in tagNames) {
+    for (final tag in tags) {
       bytes += _estimatedEntryOverheadBytes ~/ 4;
-      bytes += tag.length * 3;
+      bytes += (tag.tagName?.length ?? 0) * 3;
+      bytes += (tag.tagType?.length ?? 0) * 3;
     }
     return bytes;
   }
 
   static void _evictExpiredCache() {
-    final cutoff = DateTime.now().subtract(_tagCacheTTL);
-    final expiredKeys = <String>[];
+    final now = DateTime.now();
+    final expiredKeys = <(String, Object?)>[];
     for (final entry in _cache.entries) {
-      if (entry.value.fetchedAt.isBefore(cutoff)) {
+      final ttl = entry.value.isNegative ? _negativeTagCacheTTL : _tagCacheTTL;
+      if (entry.value.fetchedAt.add(ttl).isBefore(now)) {
         expiredKeys.add(entry.key);
       }
     }

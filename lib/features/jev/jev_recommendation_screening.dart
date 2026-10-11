@@ -53,8 +53,8 @@ class JevRecommendationScreening {
   }
 
   Future<void> recordExplicitDislike({
-    required Iterable<String?> cardTitleAndReason,
-    String? feedbackReason,
+    String? displayedReason,
+    String? selectedReason,
   }) async {
     final settings = settingsStore.load();
     final provider = settings.provider;
@@ -62,8 +62,8 @@ class JevRecommendationScreening {
         await credentials.read(provider) != null;
     await profile.recordExplicitDislike(
       jevEnabled: isReady,
-      cardTitleAndReason: cardTitleAndReason,
-      feedbackReason: feedbackReason,
+      displayedReason: displayedReason,
+      selectedReason: selectedReason,
     );
   }
 }

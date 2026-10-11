@@ -1,6 +1,13 @@
 import 'package:PiliPlus/features/shielding/shielding_models.dart';
 
 abstract final class ShieldMatcher {
+  static final _compiledRules = Expando<_CompiledShieldRule>(
+    'ShieldMatcher compiled rule',
+  );
+  static final _scopedRules = Expando<Map<ShieldScope, List<ShieldRule>>>(
+    'ShieldMatcher scoped rules',
+  );
+
   static ShieldMatchResult match(
     ShieldCandidate candidate,
     ShieldRuleSet ruleSet,
@@ -8,19 +15,27 @@ abstract final class ShieldMatcher {
     if (!ruleSet.isScopeEnabled(candidate.scope)) {
       return ShieldMatchResult.visibleResult;
     }
+    final scopedRules = _scopedRules[ruleSet] ??= {};
+    final rules = scopedRules.putIfAbsent(
+      candidate.scope,
+      () => ruleSet.rules
+          .where(
+            (rule) =>
+                rule.enabled && _scopeMatches(rule.scope, candidate.scope),
+          )
+          .toList(growable: false),
+    );
+    if (rules.isEmpty) return ShieldMatchResult.visibleResult;
 
     final errors = <ShieldMatchError>[];
+    final context = _CandidateMatcherContext(candidate);
     ShieldRule? allowedBy;
     ShieldRule? blockedBy;
 
-    for (final rule in ruleSet.rules) {
-      if (!rule.enabled || !_scopeMatches(rule.scope, candidate.scope)) {
-        continue;
-      }
-
+    for (final rule in rules) {
       bool matched;
       try {
-        matched = _matches(rule, candidate);
+        matched = _matches(rule, context);
       } catch (e) {
         errors.add(ShieldMatchError(rule: rule, message: e.toString()));
         continue;
@@ -59,38 +74,56 @@ abstract final class ShieldMatcher {
           (candidateScope == ShieldScope.recommendation ||
               candidateScope == ShieldScope.comment));
 
-  static bool _matches(ShieldRule rule, ShieldCandidate candidate) {
-    final pattern = rule.pattern.toLowerCase();
-    if (pattern.trim().isEmpty) return false;
+  static bool _matches(ShieldRule rule, _CandidateMatcherContext context) {
+    final compiled = _compiledRules[rule] ??= _CompiledShieldRule(rule);
+    if (compiled.patternIsEmpty) return false;
     return switch (rule.matchMode) {
-      ShieldMatchMode.exact => _matchValues(rule, candidate).any(
-        (value) => value.toLowerCase() == pattern,
-      ),
-      ShieldMatchMode.contains => _matchValues(rule, candidate).any(
-        (value) => value.toLowerCase().contains(pattern),
-      ),
-      ShieldMatchMode.regex => _matchValues(rule, candidate).any(
-        RegExp(rule.pattern, caseSensitive: false).hasMatch,
-      ),
-      ShieldMatchMode.range => _matchNumbers(rule, candidate).any(
-        _rangeMatcher(rule.pattern),
-      ),
-      ShieldMatchMode.enumValue => _matchValues(rule, candidate).any(
-        (value) => _normalizeEnumValue(value) == _normalizeEnumValue(pattern),
-      ),
-      ShieldMatchMode.token => _tokenValues(rule, candidate).any(
-        (token) => token.toLowerCase() == rule.pattern.toLowerCase(),
-      ),
+      ShieldMatchMode.exact =>
+        context
+            .lowerValues(rule.type)
+            .any(
+              (value) => value == compiled.lowerPattern,
+            ),
+      ShieldMatchMode.contains =>
+        context
+            .lowerValues(rule.type)
+            .any(
+              (value) => value.contains(compiled.lowerPattern),
+            ),
+      ShieldMatchMode.regex => _matchRegex(compiled, rule, context),
+      ShieldMatchMode.range =>
+        context
+            .numbers(rule)
+            .any(
+              compiled.range.matches,
+            ),
+      ShieldMatchMode.enumValue =>
+        context
+            .enumValues(rule.type)
+            .any(
+              (value) => value == compiled.normalizedEnumPattern,
+            ),
+      ShieldMatchMode.token =>
+        context
+            .tokens(rule)
+            .any(
+              (token) => token.toLowerCase() == compiled.lowerPattern,
+            ),
     };
   }
 
-  static Iterable<String> _matchValues(
+  // The pre-optimization path constructed the RegExp before iterating the
+  // candidate values, so an invalid pattern was reported as a rule error even
+  // when the rule had no values to test. Compile eagerly to keep that error
+  // surface identical; the compiled instance is still cached per rule.
+  static bool _matchRegex(
+    _CompiledShieldRule compiled,
     ShieldRule rule,
-    ShieldCandidate candidate,
-  ) => _valuesForRule(
-    rule.type,
-    candidate,
-  ).where((value) => value.trim().isNotEmpty);
+    _CandidateMatcherContext context,
+  ) {
+    final regex = compiled.regex;
+    return context.rawValues(rule.type).any(regex.hasMatch);
+  }
 
   static Iterable<String> _valuesForRule(
     ShieldRuleType type,
@@ -124,6 +157,8 @@ abstract final class ShieldMatcher {
         );
       case ShieldRuleType.staffKeyword:
         yield* candidate.staffNames;
+      case ShieldRuleType.roomId:
+        yield ifNullEmpty(candidate.roomId);
       case ShieldRuleType.duration:
       case ShieldRuleType.playbackCount:
       case ShieldRuleType.danmakuCount:
@@ -133,10 +168,59 @@ abstract final class ShieldMatcher {
     }
   }
 
-  static Iterable<num> _matchNumbers(
-    ShieldRule rule,
-    ShieldCandidate candidate,
-  ) sync* {
+  static String _normalizeEnumValue(String value) =>
+      value.trim().toLowerCase().replaceAll(_enumSeparator, '');
+
+  static List<String> _splitTokens(Iterable<String?> values) {
+    final tokens = <String>[];
+    for (final value in values) {
+      if (value == null) continue;
+      for (final token in value.split(_tokenSeparator)) {
+        if (token.trim().isNotEmpty) tokens.add(token);
+      }
+    }
+    return tokens;
+  }
+
+  static final _tokenSeparator = RegExp(r'[\s,，。！？!?:：;；_\-]+');
+  static final _enumSeparator = RegExp(r'[\s_\-]+');
+}
+
+class _CandidateMatcherContext {
+  _CandidateMatcherContext(this.candidate);
+
+  final ShieldCandidate candidate;
+  final Map<ShieldRuleType, List<String>> _rawValues = {};
+  final Map<ShieldRuleType, List<String>> _lowerValues = {};
+  final Map<ShieldRuleType, List<String>> _enumValues = {};
+  final Map<ShieldRuleType, List<String>> _tokens = {};
+
+  List<String> rawValues(ShieldRuleType type) => _rawValues.putIfAbsent(
+    type,
+    () => ShieldMatcher._valuesForRule(
+      type,
+      candidate,
+    ).where((value) => value.trim().isNotEmpty).toList(growable: false),
+  );
+
+  List<String> lowerValues(ShieldRuleType type) => _lowerValues.putIfAbsent(
+    type,
+    () => rawValues(type)
+        .map((value) => value.toLowerCase())
+        .toList(
+          growable: false,
+        ),
+  );
+
+  List<String> enumValues(ShieldRuleType type) => _enumValues.putIfAbsent(
+    type,
+    () =>
+        rawValues(type)
+            .map(ShieldMatcher._normalizeEnumValue)
+            .toList(growable: false),
+  );
+
+  Iterable<num> numbers(ShieldRule rule) sync* {
     final value = switch (rule.type) {
       ShieldRuleType.duration => candidate.durationSeconds,
       ShieldRuleType.playbackCount => candidate.playbackCount,
@@ -148,40 +232,75 @@ abstract final class ShieldMatcher {
     if (value != null) yield value;
   }
 
-  static bool Function(num value) _rangeMatcher(String pattern) {
-    final range = _ParsedRange.parse(pattern);
-    return range.matches;
-  }
-
-  static String _normalizeEnumValue(String value) =>
-      value.trim().toLowerCase().replaceAll(RegExp(r'[\s_\-]+'), '');
-
-  static Iterable<String> _tokenValues(
-    ShieldRule rule,
-    ShieldCandidate candidate,
-  ) sync* {
-    if (rule.type == ShieldRuleType.userKeyword) {
-      yield* candidate.authorTokens;
-      yield* _splitTokens([candidate.authorName]);
-      return;
-    }
-    if (rule.type == ShieldRuleType.reasonKeyword) {
-      yield* _splitTokens([candidate.reason]);
-      return;
-    }
-    if (candidate.tokens.isNotEmpty) {
-      yield* candidate.tokens;
-      return;
-    }
-    yield* _splitTokens(_valuesForRule(rule.type, candidate));
-  }
-
-  static Iterable<String> _splitTokens(Iterable<String?> values) =>
-      values.whereType<String>().expand(
-        (value) => value
-            .split(RegExp(r'[\s,，。！？!?:：;；_\-]+'))
-            .where((token) => token.trim().isNotEmpty),
+  List<String> tokens(ShieldRule rule) => _tokens.putIfAbsent(
+    rule.type,
+    () {
+      if (rule.type == ShieldRuleType.userKeyword) {
+        return [
+          ...candidate.authorTokens,
+          ...ShieldMatcher._splitTokens([candidate.authorName]),
+        ];
+      }
+      if (rule.type == ShieldRuleType.reasonKeyword) {
+        return ShieldMatcher._splitTokens([candidate.reason]);
+      }
+      final candidateTokens = candidate.tokens.toList(growable: false);
+      if (candidateTokens.isNotEmpty) return candidateTokens;
+      return ShieldMatcher._splitTokens(
+        ShieldMatcher._valuesForRule(rule.type, candidate),
       );
+    },
+  );
+}
+
+class _CompiledShieldRule {
+  _CompiledShieldRule(this._rule)
+    : lowerPattern = _rule.pattern.toLowerCase(),
+      patternIsEmpty = _rule.pattern.trim().isEmpty,
+      normalizedEnumPattern = ShieldMatcher._normalizeEnumValue(
+        _rule.pattern,
+      );
+
+  final ShieldRule _rule;
+  final String lowerPattern;
+  final bool patternIsEmpty;
+  final String normalizedEnumPattern;
+  RegExp? _regex;
+  _ParsedRange? _range;
+  Object? _regexError;
+  Object? _rangeError;
+  StackTrace? _regexStack;
+  StackTrace? _rangeStack;
+  bool _regexFailed = false;
+  bool _rangeFailed = false;
+
+  RegExp get regex {
+    if (_regexFailed) Error.throwWithStackTrace(_regexError!, _regexStack!);
+    return _regex ??= _compileRegex();
+  }
+
+  RegExp _compileRegex() {
+    try {
+      return RegExp(_rule.pattern, caseSensitive: false);
+    } catch (error, stack) {
+      _regexFailed = true;
+      _regexError = error;
+      _regexStack = stack;
+      rethrow;
+    }
+  }
+
+  _ParsedRange get range {
+    if (_rangeFailed) Error.throwWithStackTrace(_rangeError!, _rangeStack!);
+    try {
+      return _range ??= _ParsedRange.parse(_rule.pattern);
+    } catch (error, stack) {
+      _rangeFailed = true;
+      _rangeError = error;
+      _rangeStack = stack;
+      rethrow;
+    }
+  }
 }
 
 String ifNullEmpty(String? value) => value ?? '';

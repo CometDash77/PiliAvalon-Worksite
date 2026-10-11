@@ -4,6 +4,7 @@ import 'package:PiliPlus/http/fav.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/user.dart';
 import 'package:PiliPlus/http/video.dart';
+import 'package:PiliPlus/features/shielding/shielding_recommend_tag_enricher.dart';
 import 'package:PiliPlus/models/common/video/source_type.dart';
 import 'package:PiliPlus/models_new/fav/fav_folder/data.dart';
 import 'package:PiliPlus/models_new/video/video_detail/data.dart';
@@ -147,7 +148,10 @@ abstract class CommonIntroController extends GetxController
   }
 
   Future<void> queryVideoTags() async {
-    final result = await UserHttp.videoTags(bvid: bvid, cid: cid.value);
+    final result = await RecommendationTagEnricher.fetchSharedTags(
+      bvid: bvid,
+      cid: cid.value,
+    );
     videoTags.value = result.dataOrNull;
   }
 

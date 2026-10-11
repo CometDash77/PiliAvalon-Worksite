@@ -3,6 +3,7 @@ import 'package:PiliPlus/http/user.dart';
 import 'package:PiliPlus/http/video.dart';
 import 'package:PiliPlus/models/home/rcmd/result.dart';
 import 'package:PiliPlus/models/model_video.dart';
+import 'package:PiliPlus/models/model_rec_video_item.dart';
 import 'package:PiliPlus/models_new/space/space_archive/item.dart';
 import 'package:PiliPlus/pages/mine/controller.dart';
 import 'package:PiliPlus/pages/search/widgets/search_text.dart';
@@ -10,6 +11,7 @@ import 'package:PiliPlus/pages/video/ai_conclusion/view.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/controller.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:PiliPlus/features/jev/jev_recommendation_screening.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
@@ -28,12 +30,14 @@ class VideoPopupMenu extends StatelessWidget {
   final double menuItemHeight;
   final BaseSimpleVideoItemModel videoItem;
   final VoidCallback? onRemove;
+  final bool isRecommendationCard;
 
   const VideoPopupMenu({
     super.key,
     required this.iconSize,
     required this.videoItem,
     this.onRemove,
+    this.isRecommendationCard = false,
     this.menuItemHeight = 45,
   });
 
@@ -133,6 +137,12 @@ class VideoPopupMenu extends StatelessWidget {
                               );
                               SmartDialog.dismiss();
                               if (res.isSuccess) {
+                                if (isRecommendationCard && (r != null || f != null)) {
+                                  await JevRecommendationScreening.create().recordExplicitDislike(
+                                    displayedReason: item.rcmdReason,
+                                    selectedReason: r?.name ?? f?.name,
+                                  );
+                                }
                                 SmartDialog.showToast(
                                   r?.toast ?? f!.toast!,
                                 );
@@ -224,6 +234,13 @@ class VideoPopupMenu extends StatelessWidget {
                                       );
                                       SmartDialog.dismiss();
                                       if (res.isSuccess) {
+                                        if (isRecommendationCard) {
+                                          await JevRecommendationScreening.create().recordExplicitDislike(
+                                            displayedReason: videoItem is BaseRcmdVideoItemModel
+                                                ? (videoItem as BaseRcmdVideoItemModel).rcmdReason
+                                                : null,
+                                          );
+                                        }
                                         SmartDialog.showToast('点踩成功');
                                         onRemove?.call();
                                       } else {

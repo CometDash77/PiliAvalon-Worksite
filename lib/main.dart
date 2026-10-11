@@ -27,6 +27,7 @@ import 'package:PiliPlus/utils/json_file_handler.dart';
 import 'package:PiliPlus/utils/max_screen_size.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
+import 'package:PiliPlus/utils/recommendation_metrics.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
@@ -93,6 +94,12 @@ Future<void> _initAppPath() async {
 void main() {
   ScaledWidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
+  if (kDebugMode &&
+      const bool.fromEnvironment('PILIPLUS_RECOMMENDATION_METRICS')) {
+    RecommendationMetrics.observer = RecommendationMetricsRecorder(
+      onRecord: (line) => debugPrint(line),
+    );
+  }
   runApp(
     BootstrapApp(
       initialize: _initializeStartup,

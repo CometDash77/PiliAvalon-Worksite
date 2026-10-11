@@ -1,4 +1,6 @@
 import 'package:PiliPlus/http/api.dart';
+import 'package:PiliPlus/features/jev/jev_models.dart';
+import 'package:PiliPlus/features/jev/jev_recommendation_screening.dart';
 import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models_new/music/bgm_detail.dart';
@@ -8,6 +10,7 @@ import 'package:PiliPlus/utils/wbi_sign.dart';
 import 'package:dio/dio.dart';
 
 abstract final class MusicHttp {
+  static final _jevScreening = JevRecommendationScreening.create();
   static Future<LoadingState<MusicDetail>> bgmDetail(String musicId) async {
     final res = await Request().get(
       Api.bgmDetail,
@@ -53,11 +56,24 @@ abstract final class MusicHttp {
       },
     );
     if (res.data['code'] == 0) {
-      return Success(
-        (res.data['data']?['list'] as List?)
-            ?.map((i) => BgmRecommend.fromJson(i))
-            .toList(),
+      final data = (res.data['data']?['list'] as List?)
+          ?.map((i) => BgmRecommend.fromJson(i))
+          .toList();
+      if (data == null) return const Success(null);
+      final screened = await _jevScreening.filter(
+        candidates: data,
+        surface: JevSurface.music,
+        toCandidate: (item) => JevCandidate(
+          title: item.title ?? '',
+          tags: item.labelList
+                  ?.map((label) => label.name)
+                  .whereType<String>()
+                  .toList() ??
+              const [],
+        ),
+        runLowerCostFilters: (items) => items,
       );
+      return Success(screened);
     } else {
       return Error(res.data['message']);
     }

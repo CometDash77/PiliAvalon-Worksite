@@ -9,6 +9,7 @@ import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/pages/rcmd/controller.dart';
 import 'package:PiliPlus/utils/grid.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:flutter/widgets.dart' show WidgetsBinding;
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -68,70 +69,78 @@ class _RcmdPageState extends State<RcmdPage>
       Loading() => _buildSkeleton,
       Success(:final response) =>
         response != null && response.isNotEmpty
-            ? SliverGrid.builder(
-                gridDelegate: gridDelegate,
-                itemBuilder: (context, index) {
-                  if (index == response.length - 1) {
-                    controller.onLoadMore();
-                  }
-                  if (controller.lastRefreshAt != null) {
-                    if (controller.lastRefreshAt == index) {
-                      return GestureDetector(
-                        onTap: () => controller
-                          ..animateToTop()
-                          ..onRefresh(),
-                        child: Card(
-                          child: Container(
-                            alignment: Alignment.center,
-                            padding: const .symmetric(horizontal: 10),
-                            child: Text(
-                              '上次看到这里\n点击刷新',
-                              textAlign: .center,
-                              style: TextStyle(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-                    final actualIndex = index > controller.lastRefreshAt!
-                        ? index - 1
-                        : index;
-                    return VideoCardV(
-                      videoItem: response[actualIndex],
-                      onRecommendationTapBvid: ExposureTracker.instance.clearExposure,
-                      onRemove: () {
-                        if (controller.lastRefreshAt != null &&
-                            actualIndex < controller.lastRefreshAt!) {
-                          controller.lastRefreshAt =
-                              controller.lastRefreshAt! - 1;
-                        }
-                        controller.loadingState
-                          ..value.data!.removeAt(actualIndex)
-                          ..refresh();
-                      },
-                    );
-                  } else {
-                    return VideoCardV(
-                      videoItem: response[index],
-                      onRecommendationTapBvid: ExposureTracker.instance.clearExposure,
-                      onRemove: () => controller.loadingState
-                        ..value.data!.removeAt(index)
-                        ..refresh(),
-                    );
-                  }
-                },
-                itemCount: controller.lastRefreshAt != null
-                    ? response.length + 1
-                    : response.length,
-              )
+            ? _buildItems(colorScheme, response)
             : HttpError(onReload: controller.onReload),
       Error(:final errMsg) => HttpError(
         errMsg: errMsg,
         onReload: controller.onReload,
       ),
     };
+  }
+
+  Widget _buildItems(ColorScheme colorScheme, List<dynamic> response) {
+    if (controller.hasPendingFirstScreenMeasurement) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) controller.recordFirstScreenVisible(response.length);
+      });
+    }
+    return SliverGrid.builder(
+      gridDelegate: gridDelegate,
+      itemBuilder: (context, index) {
+        if (index == response.length - 1) {
+          controller.onLoadMore();
+        }
+        if (controller.lastRefreshAt != null) {
+          if (controller.lastRefreshAt == index) {
+            return GestureDetector(
+              onTap: () => controller
+                ..animateToTop()
+                ..onRefresh(),
+              child: Card(
+                child: Container(
+                  alignment: Alignment.center,
+                  padding: const .symmetric(horizontal: 10),
+                  child: Text(
+                    '上次看到这里\n点击刷新',
+                    textAlign: .center,
+                    style: TextStyle(color: colorScheme.onSurfaceVariant),
+                  ),
+                ),
+              ),
+            );
+          }
+          final actualIndex = index > controller.lastRefreshAt!
+              ? index - 1
+              : index;
+          return VideoCardV(
+            videoItem: response[actualIndex],
+            isRecommendationCard: true,
+            onRecommendationTapBvid: ExposureTracker.instance.clearExposure,
+            onRemove: () {
+              if (controller.lastRefreshAt != null &&
+                  actualIndex < controller.lastRefreshAt!) {
+                controller.lastRefreshAt = controller.lastRefreshAt! - 1;
+              }
+              controller.loadingState
+                ..value.data!.removeAt(actualIndex)
+                ..refresh();
+            },
+          );
+        } else {
+          return VideoCardV(
+            videoItem: response[index],
+            isRecommendationCard: true,
+            onRecommendationTapBvid: ExposureTracker.instance.clearExposure,
+            onRemove: () => controller.loadingState
+              ..value.data!.removeAt(index)
+              ..refresh(),
+          );
+        }
+      },
+      itemCount: controller.lastRefreshAt != null
+          ? response.length + 1
+          : response.length,
+    );
   }
 
   Widget get _buildSkeleton => SliverGrid(

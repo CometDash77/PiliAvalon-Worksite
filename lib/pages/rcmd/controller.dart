@@ -1,6 +1,7 @@
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/video.dart';
 import 'package:PiliPlus/pages/common/common_list_controller.dart';
+import 'package:PiliPlus/utils/recommendation_metrics.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 
 class RcmdController extends CommonListController {
@@ -9,6 +10,8 @@ class RcmdController extends CommonListController {
 
   int? lastRefreshAt;
   late bool savedRcmdTip = Pref.savedRcmdTip;
+  RecommendationPhaseMeasurement? _firstScreenMeasurement;
+  bool _firstScreenReported = false;
 
   @override
   bool get isEnd => false;
@@ -17,7 +20,29 @@ class RcmdController extends CommonListController {
   void onInit() {
     super.onInit();
     page = 0;
+    _beginFirstScreenMeasurement();
     queryData();
+  }
+
+  bool get hasPendingFirstScreenMeasurement =>
+      _firstScreenMeasurement != null && !_firstScreenReported;
+
+  void recordFirstScreenVisible(int itemCount) {
+    if (!hasPendingFirstScreenMeasurement) return;
+    RecommendationMetrics.finishPhase(
+      _firstScreenMeasurement,
+      outputCount: itemCount,
+    );
+    _firstScreenMeasurement = null;
+    _firstScreenReported = true;
+  }
+
+  void _beginFirstScreenMeasurement() {
+    _firstScreenReported = false;
+    _firstScreenMeasurement = RecommendationMetrics.startPhase(
+      RecommendationPhase.firstScreenVisible,
+      inputCount: 0,
+    );
   }
 
   @override
@@ -54,6 +79,7 @@ class RcmdController extends CommonListController {
   Future<void> onRefresh() {
     page = 0;
     isEnd = false;
+    if (!isLoading) _beginFirstScreenMeasurement();
     return queryData();
   }
 }

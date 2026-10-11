@@ -158,6 +158,9 @@ test/features/*
 !test/features/shielding/**
 !test/features/channel_quiet/
 !test/features/channel_quiet/**
+!test/features/jev/
+test/features/jev/*
+!test/features/jev/jev_foundation_test.dart
 !test/pages/
 test/pages/*
 !test/pages/setting/
@@ -187,3 +190,9 @@ tool/worksite_ci_monitor_hook_test.py
 nul
 reasonix.toml
 docs/
+!docs/
+docs/*
+!docs/diagnostics/
+docs/diagnostics/*
+!docs/diagnostics/recommendation-metrics.md
+!docs/diagnostics/recommendation-metrics-smoke-2026-10-02.png

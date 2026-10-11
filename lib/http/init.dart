@@ -12,6 +12,7 @@ import 'package:PiliPlus/utils/accounts/account.dart';
 import 'package:PiliPlus/utils/accounts/account_manager/account_mgr.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/login_utils.dart';
+import 'package:PiliPlus/utils/recommendation_metrics.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:archive/archive.dart';
@@ -229,6 +230,10 @@ class Request {
       dio.interceptors.add(
         RetryInterceptor(dio, Pref.retryCount, Pref.retryDelay),
       );
+    }
+
+    if (RecommendationMetrics.enabled) {
+      dio.interceptors.add(RecommendationMetricsInterceptor());
     }
 
     // 日志拦截器 输出请求、响应内容

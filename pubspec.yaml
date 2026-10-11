@@ -105,6 +105,7 @@ dependencies:
       url: https://github.com/bggRGjQaUbCoE/flutter_sortable_wrap.git
       ref: master
   flutter_svg: ^2.0.14
+  flutter_secure_storage: 11.2.0
   flutter_volume_controller: ^2.0.0
   font_awesome_flutter:
     git:

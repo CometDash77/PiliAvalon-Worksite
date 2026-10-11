@@ -2,6 +2,7 @@ import 'package:PiliPlus/features/jev/jev_feedback_profile.dart';
 import 'package:PiliPlus/features/jev/jev_models.dart';
 import 'package:PiliPlus/features/jev/jev_evaluator.dart';
 import 'package:PiliPlus/features/jev/jev_secure_key_store.dart';
+import 'package:PiliPlus/features/jev/jev_settings_store.dart';
 import 'package:PiliPlus/features/jev/jev_storage.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -18,23 +19,35 @@ String jevValidationFailureMessage(DioException error) {
     400 || 422 => '当前 Provider 拒绝了验证请求；请更新应用后重试。',
     _ => '无法连接当前 Provider。请检查网络后重试。',
   };
-  final detail = jevUpstreamErrorDetail(error.response?.statusCode, error.response?.data);
+  final detail = jevUpstreamErrorDetail(
+    error.response?.statusCode,
+    error.response?.data,
+  );
   return detail == null
       ? '$base 密钥不会尝试发送给其他 Provider。'
       : '$base 上游响应：$detail。密钥不会尝试发送给其他 Provider。';
 }
 
 class JevSettingsPage extends StatefulWidget {
-  const JevSettingsPage({super.key});
+  const JevSettingsPage({
+    super.key,
+    this.settingsStore,
+    this.profile,
+    this.credentials,
+  });
+
+  final JevSettingsStore? settingsStore;
+  final JevFeedbackProfile? profile;
+  final JevCredentialStore? credentials;
 
   @override
   State<JevSettingsPage> createState() => _JevSettingsPageState();
 }
 
 class _JevSettingsPageState extends State<JevSettingsPage> {
-  final _settingsStore = createJevSettingsStore();
-  final _profile = createJevFeedbackProfile();
-  final _credentials = JevCredentialStore(FlutterJevSecretStorage());
+  late final JevSettingsStore _settingsStore;
+  late final JevFeedbackProfile _profile;
+  late final JevCredentialStore _credentials;
   late JevSettings _settings;
   bool _secureStoreAvailable = false;
   bool _hasKey = false;
@@ -46,6 +59,10 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   @override
   void initState() {
     super.initState();
+    _settingsStore = widget.settingsStore ?? createJevSettingsStore();
+    _profile = widget.profile ?? createJevFeedbackProfile();
+    _credentials =
+        widget.credentials ?? JevCredentialStore(FlutterJevSecretStorage());
     _settings = _settingsStore.load();
     _loadSecureState();
   }
@@ -54,7 +71,9 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     await _profile.pruneExpired();
     final available = await _credentials.available;
     final provider = _settings.provider;
-    final storedKey = available && provider != null ? await _credentials.read(provider) : null;
+    final storedKey = available && provider != null
+        ? await _credentials.read(provider)
+        : null;
     if (!mounted) return;
     setState(() {
       _secureStoreAvailable = available;
@@ -84,26 +103,41 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
           decoration: const InputDecoration(labelText: '密钥'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('取消')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
           FilledButton(
             onPressed: () async {
               try {
-              final input = controller.text.trim();
-              if (_settings.provider == JevProvider.typeSafe && input.startsWith('sk-or-v1-')) {
-                final confirmed = await showDialog<bool>(
-                  context: dialogContext,
-                  builder: (context) => AlertDialog(
-                    title: const Text('密钥格式与所选 Provider 不同'),
-                    content: const Text('此格式常见于 OpenRouter。系统不会替你更换 Provider，也不会把密钥发送给另一个 Provider。确认继续将其保存为 TypeSafe 密钥吗？'),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('返回')),
-                      FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('仍保存到 TypeSafe')),
-                    ],
-                  ),
+                final input = controller.text.trim();
+                if (_settings.provider == JevProvider.typeSafe &&
+                    input.startsWith('sk-or-v1-')) {
+                  final confirmed = await showDialog<bool>(
+                    context: dialogContext,
+                    builder: (context) => AlertDialog(
+                      title: const Text('密钥格式与所选 Provider 不同'),
+                      content: const Text(
+                        '此格式常见于 OpenRouter。系统不会替你更换 Provider，也不会把密钥发送给另一个 Provider。确认继续将其保存为 TypeSafe 密钥吗？',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('返回'),
+                        ),
+                        FilledButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('仍保存到 TypeSafe'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed != true) return;
+                }
+                await _credentials.save(
+                  provider: _settings.provider!,
+                  value: input,
                 );
-                if (confirmed != true) return;
-              }
-              await _credentials.save(provider: _settings.provider!, value: input);
                 controller.clear();
                 if (!mounted) return;
                 Navigator.pop(dialogContext);
@@ -160,9 +194,14 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       if (!result.containsKey(0)) throw StateError('missing answer');
       if (mounted) setState(() => _validationMessage = 'Provider 验证成功');
     } on DioException catch (error) {
-      if (mounted) setState(() => _validationMessage = jevValidationFailureMessage(error));
+      if (mounted)
+        setState(() => _validationMessage = jevValidationFailureMessage(error));
     } catch (_) {
-      if (mounted) setState(() => _validationMessage = '验证失败。请检查所选 Provider、密钥和网络；密钥不会尝试发送给其他 Provider。');
+      if (mounted)
+        setState(
+          () => _validationMessage =
+              '验证失败。请检查所选 Provider、密钥和网络；密钥不会尝试发送给其他 Provider。',
+        );
     } finally {
       if (mounted) setState(() => _validating = false);
     }
@@ -178,80 +217,144 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
             children: [
               SwitchListTile(
                 title: const Text('启用 Jev'),
-                subtitle: Text(_secureStoreAvailable && _hasKey
-                    ? '仅在本地规则过滤后评估推荐'
-                    : '需要可用的安全存储、provider 和密钥'),
+                subtitle: Text(
+                  _secureStoreAvailable && _hasKey
+                      ? '仅在本地规则过滤后评估推荐'
+                      : '需要可用的安全存储、provider 和密钥',
+                ),
                 value: _settings.enabled,
-                onChanged: _secureStoreAvailable && _hasKey && _settings.provider != null
+                onChanged:
+                    _secureStoreAvailable &&
+                        _hasKey &&
+                        _settings.provider != null
                     ? (value) => _update(_settings.copyWith(enabled: value))
                     : null,
               ),
               ListTile(
                 title: const Text('Provider'),
-                subtitle: Text('${_settings.provider?.name == 'typeSafe' ? 'TypeSafe' : _settings.provider == null ? '尚未选择' : 'OpenRouter'}；必须手动选择，密钥格式不会自动切换 Provider'),
+                subtitle: Text(
+                  '${_settings.provider?.name == 'typeSafe'
+                      ? 'TypeSafe'
+                      : _settings.provider == null
+                      ? '尚未选择'
+                      : 'OpenRouter'}；必须手动选择，密钥格式不会自动切换 Provider',
+                ),
                 trailing: DropdownButton<JevProvider>(
                   value: _settings.provider,
                   hint: const Text('选择'),
                   items: const [
-                    DropdownMenuItem(value: JevProvider.typeSafe, child: Text('TypeSafe')),
-                    DropdownMenuItem(value: JevProvider.openRouter, child: Text('OpenRouter')),
+                    DropdownMenuItem(
+                      value: JevProvider.typeSafe,
+                      child: Text('TypeSafe'),
+                    ),
+                    DropdownMenuItem(
+                      value: JevProvider.openRouter,
+                      child: Text('OpenRouter'),
+                    ),
                   ],
                   onChanged: (provider) {
                     if (provider != null && provider != _settings.provider) {
-                      _update(_settings.copyWith(provider: provider, enabled: false)).then((_) => _loadSecureState());
+                      _update(
+                        _settings.copyWith(provider: provider, enabled: false),
+                      ).then((_) => _loadSecureState());
                     }
                   },
                 ),
               ),
               ListTile(
                 title: const Text('Provider 连接验证'),
-                subtitle: Text(_validationMessage ?? '使用合成样例，只请求当前选择的 Provider'),
+                subtitle: Text(
+                  _validationMessage ?? '使用合成样例，只请求当前选择的 Provider',
+                ),
                 trailing: FilledButton.tonal(
-                  onPressed: _hasKey && _settings.provider != null && !_validating ? _validateProvider : null,
+                  onPressed:
+                      _hasKey && _settings.provider != null && !_validating
+                      ? _validateProvider
+                      : null,
                   child: _validating
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
                       : const Text('验证'),
                 ),
               ),
               ListTile(
                 title: const Text('Provider 密钥'),
-                subtitle: Text(!_secureStoreAvailable ? '本设备的安全存储不可用；Jev 已禁用' : _hasKey ? '密钥仅保存在系统安全存储中' : '尚未保存'),
+                subtitle: Text(
+                  !_secureStoreAvailable
+                      ? '本设备的安全存储不可用；Jev 已禁用'
+                      : _hasKey
+                      ? '密钥仅保存在系统安全存储中'
+                      : '尚未保存',
+                ),
                 trailing: Wrap(
                   spacing: 4,
                   children: [
-                    TextButton(onPressed: _secureStoreAvailable && _settings.provider != null ? _enterKey : null, child: Text(_hasKey ? '更换' : '添加')),
-                    if (_hasKey) IconButton(onPressed: _deleteKey, icon: const Icon(Icons.delete_outline), tooltip: '删除密钥'),
+                    TextButton(
+                      onPressed:
+                          _secureStoreAvailable && _settings.provider != null
+                          ? _enterKey
+                          : null,
+                      child: Text(_hasKey ? '更换' : '添加'),
+                    ),
+                    if (_hasKey)
+                      IconButton(
+                        onPressed: _deleteKey,
+                        icon: const Icon(Icons.delete_outline),
+                        tooltip: '删除密钥',
+                      ),
                   ],
                 ),
               ),
               const Divider(),
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
-                child: Text('独立推荐场景开关', style: TextStyle(fontWeight: FontWeight.w600)),
+                child: Text(
+                  '独立推荐场景开关',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
               for (final surface in JevSurface.values)
                 SwitchListTile(
                   title: Text(surface.label),
-                  value: _settings.surfaceEnabled[surface] ?? true,
-                  onChanged: (value) => _update(_settings.copyWith(
-                    surfaceEnabled: {..._settings.surfaceEnabled, surface: value},
-                  )),
+                  subtitle: surface.screeningWired
+                      ? null
+                      : const Text('尚未接线：本版本打开也不会生效'),
+                  value:
+                      surface.screeningWired &&
+                      (_settings.surfaceEnabled[surface] ?? true),
+                  onChanged: surface.screeningWired
+                      ? (value) => _update(
+                          _settings.copyWith(
+                            surfaceEnabled: {
+                              ..._settings.surfaceEnabled,
+                              surface: value,
+                            },
+                          ),
+                        )
+                      : null,
                 ),
               const Divider(),
               ListTile(
                 title: const Text('本地负反馈主题'),
-                subtitle: Text('${_profile.load().length} / ${JevFeedbackProfile.maxThemes} 个主题；六个月后过期'),
+                subtitle: Text(
+                  '${_profile.load().length} / ${JevFeedbackProfile.maxThemes} 个主题；六个月后过期',
+                ),
                 trailing: TextButton(
-                  onPressed: _profile.load().isEmpty ? null : () async {
-                    await _profile.deleteAll();
-                    if (mounted) setState(() {});
-                  },
+                  onPressed: _profile.load().isEmpty
+                      ? null
+                      : () async {
+                          await _profile.deleteAll();
+                          if (mounted) setState(() {});
+                        },
                   child: const Text('清空'),
                 ),
               ),
               for (final theme in _profile.load())
                 ListTile(
-                    title: Text(theme.label),
+                  title: Text(theme.label),
                   subtitle: Text('约 ${theme.count} 次'),
                   trailing: IconButton(
                     tooltip: '删除主题',
@@ -265,16 +368,24 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
               const Divider(),
               ListTile(
                 title: const Text('隐私说明'),
-                subtitle: Text(_privacyExpanded
-                    ? '只发送候选标题及已有的短简介、分类或标签，以及最多 20 个本地归纳主题和大致次数。不发送观看/浏览历史、账号标识、Cookie、原始点踩记录、视频 ID、链接或作者信息。关闭 Jev 时暂停收集，已有主题继续过期。'
-                    : '发送最少候选信息与本地负反馈主题'),
-                trailing: Icon(_privacyExpanded ? Icons.expand_less : Icons.expand_more),
-                onTap: () => setState(() => _privacyExpanded = !_privacyExpanded),
+                subtitle: Text(
+                  _privacyExpanded
+                      ? '只发送候选标题及已有的短简介、分类或标签，以及最多 20 个本地归纳主题和大致次数。不发送观看/浏览历史、账号标识、Cookie、原始点踩记录、视频 ID、链接或作者信息。关闭 Jev 时暂停收集，已有主题继续过期。'
+                      : '发送最少候选信息与本地负反馈主题',
+                ),
+                trailing: Icon(
+                  _privacyExpanded ? Icons.expand_less : Icons.expand_more,
+                ),
+                onTap: () =>
+                    setState(() => _privacyExpanded = !_privacyExpanded),
               ),
               if (!_secureStoreAvailable)
                 const Padding(
                   padding: EdgeInsets.all(16),
-                  child: Text('安全存储不可用时不会使用或保存 Jev 密钥。', style: TextStyle(color: Colors.red)),
+                  child: Text(
+                    '安全存储不可用时不会使用或保存 Jev 密钥。',
+                    style: TextStyle(color: Colors.red),
+                  ),
                 ),
             ],
           ),

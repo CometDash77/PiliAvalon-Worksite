@@ -377,7 +377,7 @@ void main() {
       expect(result, isEmpty);
     });
 
-    test('failed tag fetch is not cached', () async {
+    test('failed tag fetch is briefly negatively cached', () async {
       final fetcher = _FakeTagFetcher();
       // First call: simulate failure by not setting a response.
       // The fake returns Error by default when no response is set.
@@ -395,8 +395,7 @@ void main() {
 
       final firstCallCount = fetcher.fetchLog.length;
 
-      // Now set a success response. Since failure wasn't cached, a
-      // second call should fetch again.
+      // A short-lived negative entry prevents an immediate retry storm.
       fetcher.setResponse('BV1', _tags(['now-available']));
 
       await enricher.enrichAndFilter<String>(
@@ -406,8 +405,75 @@ void main() {
         getCid: (_) => null,
       );
 
-      // Should have fetched again (not from cache).
-      expect(fetcher.fetchLog.length, greaterThan(firstCallCount));
+      expect(fetcher.fetchLog.length, firstCallCount);
+    });
+
+    test(
+      'overlapping calls for the same bvid and cid share one request',
+      () async {
+        final fetcher = _FakeTagFetcher()
+          ..setResponse('BV1', _tags(['shared']))
+          ..setDelay('BV1', const Duration(milliseconds: 50));
+        final enricher1 = RecommendationTagEnricher(fetchTags: fetcher.call);
+        final enricher2 = RecommendationTagEnricher(fetchTags: fetcher.call);
+
+        await Future.wait([
+          enricher1.enrichAndFilter<String>(
+            ['first'],
+            ShieldRuleSet(),
+            getBvid: (_) => 'BV1',
+            getCid: (_) => 1,
+          ),
+          enricher2.enrichAndFilter<String>(
+            ['second'],
+            ShieldRuleSet(),
+            getBvid: (_) => 'BV1',
+            getCid: (_) => 1,
+          ),
+        ]);
+
+        expect(fetcher.fetchLog, ['BV1']);
+      },
+    );
+
+    test('tag cache distinguishes cid for the same bvid', () async {
+      final fetcher = _FakeTagFetcher()..setResponse('BV1', _tags(['shared']));
+      final enricher = RecommendationTagEnricher(fetchTags: fetcher.call);
+
+      await enricher.enrichAndFilter<String>(
+        ['cid-1'],
+        ShieldRuleSet(),
+        getBvid: (_) => 'BV1',
+        getCid: (_) => 1,
+      );
+      await enricher.enrichAndFilter<String>(
+        ['cid-2'],
+        ShieldRuleSet(),
+        getBvid: (_) => 'BV1',
+        getCid: (_) => 2,
+      );
+
+      expect(fetcher.fetchLog, ['BV1', 'BV1']);
+    });
+
+    test('detail tag provider reuses recommendation cache entry', () async {
+      final fetcher = _FakeTagFetcher()
+        ..setResponse('BV1', _tags(['shared-detail-tag']));
+      final enricher = RecommendationTagEnricher(fetchTags: fetcher.call);
+
+      await enricher.enrichAndFilter<String>(
+        ['recommendation'],
+        ShieldRuleSet(),
+        getBvid: (_) => 'BV1',
+        getCid: (_) => 123,
+      );
+      final result = await RecommendationTagEnricher.fetchSharedTags(
+        bvid: 'BV1',
+        cid: 123,
+      );
+
+      expect(fetcher.fetchLog, ['BV1']);
+      expect(result.dataOrNull?.single.tagName, 'shared-detail-tag');
     });
 
     test(

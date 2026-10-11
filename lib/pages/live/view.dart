@@ -7,11 +7,13 @@ import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/pair.dart';
+import 'package:PiliPlus/features/shielding/live_shielding.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models_new/live/live_feed_index/card_data_list_item.dart';
 import 'package:PiliPlus/models_new/live/live_feed_index/card_list.dart';
 import 'package:PiliPlus/pages/live/controller.dart';
 import 'package:PiliPlus/pages/live/widgets/live_item_app.dart';
+import 'package:PiliPlus/pages/live/widgets/live_shield_button.dart';
 import 'package:PiliPlus/pages/live_area/view.dart';
 import 'package:PiliPlus/pages/live_follow/view.dart';
 import 'package:PiliPlus/pages/search/widgets/search_text.dart';
@@ -50,29 +52,34 @@ class _LivePageState extends State<LivePage>
   Widget build(BuildContext context) {
     super.build(context);
     final ThemeData theme = Theme.of(context);
-    return Container(
-      clipBehavior: Clip.hardEdge,
-      margin: const EdgeInsets.symmetric(horizontal: Style.safeSpace),
-      decoration: const BoxDecoration(borderRadius: Style.mdRadius),
-      child: refreshIndicator(
-        onRefresh: controller.onRefresh,
-        child: CustomScrollView(
-          controller: controller.scrollController,
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.only(
-                top: Style.cardSpace,
-                bottom: 100,
+    return NotificationListener<ScrollNotification>(
+      onNotification: _onScrollNotification,
+      child: Container(
+        clipBehavior: Clip.hardEdge,
+        margin: const EdgeInsets.symmetric(horizontal: Style.safeSpace),
+        decoration: const BoxDecoration(borderRadius: Style.mdRadius),
+        child: refreshIndicator(
+          onRefresh: controller.onRefresh,
+          child: CustomScrollView(
+            controller: controller.scrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.only(
+                  top: Style.cardSpace,
+                  bottom: 100,
+                ),
+                sliver: SliverMainAxisGroup(
+                  slivers: [
+                    Obx(() => _buildTop(theme, controller.topState.value)),
+                    Obx(
+                      () => _buildBody(theme, controller.loadingState.value),
+                    ),
+                  ],
+                ),
               ),
-              sliver: SliverMainAxisGroup(
-                slivers: [
-                  Obx(() => _buildTop(theme, controller.topState.value)),
-                  Obx(() => _buildBody(theme, controller.loadingState.value)),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -238,20 +245,21 @@ class _LivePageState extends State<LivePage>
                     if (index == response.length - 1) {
                       controller.onLoadMore();
                     }
-                    final item = response[index];
-                    if (item is LiveCardList) {
-                      return LiveCardVApp(
-                        item: item.cardData!.smallCardV1!,
-                        showFirstFrame: controller.showFirstFrame,
-                      );
-                    }
+                    final card = LiveShielding.cardOf(response[index]);
+                    if (card == null) return const SizedBox.shrink();
                     return LiveCardVApp(
-                      item: item,
+                      item: card,
                       showFirstFrame: controller.showFirstFrame,
+                      shieldAction: LiveShieldButton(
+                        item: card,
+                        onRuleChanged: controller.refilterLoadedItems,
+                      ),
                     );
                   },
                   itemCount: response.length,
                 )
+              : controller.isFilteredEmpty
+              ? _buildFilteredEmpty(theme)
               : HttpError(onReload: controller.onReload),
         ],
       ),
@@ -260,6 +268,54 @@ class _LivePageState extends State<LivePage>
         onReload: controller.onReload,
       ),
     };
+  }
+
+  /// Resumes automatic paging on a real user scroll gesture only: a page fully
+  /// hidden by shielding rules must not chain-request more cards by itself.
+  bool _onScrollNotification(ScrollNotification notification) {
+    if (notification is OverscrollNotification ||
+        (notification is ScrollUpdateNotification &&
+            notification.dragDetails != null)) {
+      controller.resumeAutoPaging();
+    }
+    return false;
+  }
+
+  /// A page whose cards were all removed by the live shielding rules. It stays
+  /// distinct from the server empty and error states, and reloading re-runs the
+  /// rules instead of pulling a page only to refill the grid with hidden cards.
+  Widget _buildFilteredEmpty(ThemeData theme) {
+    final hidden = controller.hiddenCardCount;
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.only(top: 80),
+        child: Column(
+          children: [
+            Icon(
+              Icons.visibility_off_outlined,
+              size: 40,
+              color: theme.colorScheme.outline,
+            ),
+            const SizedBox(height: 10),
+            Text('本页卡片已被屏蔽规则隐藏', style: theme.textTheme.bodyMedium),
+            if (hidden > 0) ...[
+              const SizedBox(height: 4),
+              Text(
+                '共隐藏 $hidden 张',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.outline,
+                ),
+              ),
+            ],
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: controller.onReload,
+              child: const Text('重新加载'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   List<Widget> _buildFollowList(ThemeData theme, LiveCardList item) {

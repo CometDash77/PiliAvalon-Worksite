@@ -6,6 +6,7 @@ import 'package:PiliPlus/grpc/url.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:PiliPlus/utils/shielding_runtime.dart';
 import 'package:fixnum/fixnum.dart';
 
 abstract final class ReplyGrpc {
@@ -16,7 +17,10 @@ abstract final class ReplyGrpc {
   );
   static bool enableFilter = replyRegExp.pattern.isNotEmpty;
   static bool useLegacyTextFilter = false;
-  static ShieldRuleSet Function()? shieldRuleSetProvider;
+  static ShieldRuleSet Function()? get shieldRuleSetProvider =>
+      ShieldingRuntime.ruleSetProvider;
+  static set shieldRuleSetProvider(ShieldRuleSet Function()? provider) =>
+      ShieldingRuntime.ruleSetProvider = provider;
 
   // static Future replyInfo({required int rpid}) {
   //   return _request(
@@ -40,8 +44,7 @@ abstract final class ReplyGrpc {
   }
 
   static bool needRemoveGrpc(ReplyInfo reply) {
-    final ruleSet =
-        shieldRuleSetProvider?.call() ?? ShieldSettingsStore().snapshot();
+    final ruleSet = ShieldingRuntime.snapshot();
     final commentShieldingEnabled = ruleSet.isScopeEnabled(ShieldScope.comment);
     return (commentShieldingEnabled &&
             useLegacyTextFilter &&

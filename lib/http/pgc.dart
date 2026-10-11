@@ -1,4 +1,6 @@
 import 'package:PiliPlus/http/api.dart';
+import 'package:PiliPlus/features/jev/jev_models.dart';
+import 'package:PiliPlus/features/jev/jev_recommendation_screening.dart';
 import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/pgc_review_type.dart';
@@ -12,6 +14,7 @@ import 'package:PiliPlus/utils/accounts.dart';
 import 'package:dio/dio.dart';
 
 abstract final class PgcHttp {
+  static final _jevScreening = JevRecommendationScreening.create();
   static Future<LoadingState<PgcIndexResult>> pgcIndexResult({
     required int page,
     required Map<String, dynamic> params,
@@ -84,7 +87,15 @@ abstract final class PgcHttp {
       },
     );
     if (res.data['code'] == 0) {
-      return Success(PgcIndexResult.fromJson(res.data['data']).list);
+      final list = PgcIndexResult.fromJson(res.data['data']).list;
+      if (list == null) return const Success(null);
+      final screened = await _jevScreening.filter(
+        candidates: list,
+        surface: JevSurface.pgc,
+        toCandidate: (item) => JevCandidate(title: item.title ?? '', category: item.badge),
+        runLowerCostFilters: (items) => items,
+      );
+      return Success(screened);
     } else {
       return Error(res.data['message']);
     }

@@ -70,6 +70,31 @@ class ExposureTracker {
     return kept;
   }
 
+  /// Filters records already in a blocking state without counting candidates
+  /// as exposed before later screening stages decide whether they are shown.
+  List<T> filterExisting<T>(List<T> items, {required String? Function(T) getBvid}) {
+    final store = _ensureStore;
+    if (store == null) return items;
+    final config = _loadConfig();
+    if (!config.enabled) return items;
+    return items.where((item) {
+      final bvid = getBvid(item);
+      return bvid == null || store.shouldKeepExisting(bvid, config);
+    }).toList();
+  }
+
+  /// Counts only items that survived final screening and are about to render.
+  void recordVisible<T>(List<T> items, {required String? Function(T) getBvid}) {
+    final store = _ensureStore;
+    if (store == null) return;
+    final config = _loadConfig();
+    if (!config.enabled) return;
+    for (final item in items) {
+      final bvid = getBvid(item);
+      if (bvid != null) store.recordAndShouldKeep(bvid, config);
+    }
+  }
+
   /// Removes the counting record for [bvid] when it is *not* in cooling.
   ///
   /// Cooling records survive — they represent an active filter that should

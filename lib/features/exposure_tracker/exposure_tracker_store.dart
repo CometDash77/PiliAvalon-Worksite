@@ -134,6 +134,23 @@ class ExposureTrackerStore {
     return !crossed;
   }
 
+  /// A side-effect-free view of the existing record, for use before an
+  /// asynchronous final screening stage. It does not increment exposure.
+  bool shouldKeepExisting(String bvid, ExposureTrackerConfig config) {
+    if (!config.enabled) return true;
+    final normalized = config.normalized();
+    final existing = box.get(bvid.trim());
+    if (existing == null) return true;
+    final now = clock();
+    if (existing.isCooling) {
+      return now.difference(existing.coolingStartAt!).inDays >= normalized.coolingDays;
+    }
+    if (now.difference(existing.firstExposedAt).inDays >= normalized.windowDays) {
+      return true;
+    }
+    return existing.exposureCount + 1 < normalized.threshold;
+  }
+
   /// Deletes the record for [bvid] only when it is *not* in cooling.
   ///
   /// Cooling records survive — they represent an active filter that should

@@ -23,12 +23,14 @@ class JevFeedbackProfile {
       if (raw is! String) return const [];
       final decoded = jsonDecode(raw);
       if (decoded is! List) return const [];
-      final themes = decoded
-          .whereType<Map>()
-          .map((item) => JevTheme.fromJson(item.cast<String, Object?>()))
-          .where((theme) => !theme.updatedAt.isBefore(_sixMonthsBefore(_clock())))
-          .toList()
-        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      final themes = _newestFirst(
+        decoded
+            .whereType<Map>()
+            .map((item) => JevTheme.fromJson(item.cast<String, Object?>()))
+            .where(
+              (theme) => !theme.updatedAt.isBefore(_sixMonthsBefore(_clock())),
+            ),
+      );
       return themes.take(maxThemes).toList(growable: false);
     } catch (_) {
       return const [];
@@ -38,41 +40,49 @@ class JevFeedbackProfile {
   /// Call only for an explicit dislike on a recommendation card, and only
   /// when the Jev master switch is on. Stores themes and approximate counts,
   /// never the source card or its identifiers.
+  ///
+  /// A card title is deliberately absent: it identifies one video rather than
+  /// expressing a reusable negative preference. The selected reason wins over
+  /// the displayed reason; a dislike with neither reason leaves the profile
+  /// unchanged.
   Future<void> recordExplicitDislike({
     required bool jevEnabled,
-    required Iterable<String?> cardTitleAndReason,
-    String? feedbackReason,
+    String? displayedReason,
+    String? selectedReason,
     DateTime? at,
   }) async {
     if (!jevEnabled) return;
     final now = at ?? _clock();
     await pruneExpired();
-    final terms = <String>{
-      ...cardTitleAndReason.expand(_extractThemes),
-      ..._extractThemes(feedbackReason),
-    };
+    final reason = selectedReason ?? displayedReason;
+    final terms = _extractThemes(reason).toSet();
     if (terms.isEmpty) return;
-    final current = load().toList();
+    final current = load();
     final byLabel = {for (final theme in current) theme.label: theme};
-    for (final term in terms) {
-      final old = byLabel[term];
-      byLabel[term] = JevTheme(
-        label: term,
-        count: _approxNext(old?.count ?? 0),
-        updatedAt: now,
-      );
-    }
-    final updated = byLabel.values.toList()
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    final updated = <JevTheme>[
+      for (final term in terms)
+        JevTheme(
+          label: term,
+          count: _approxNext(byLabel[term]?.count ?? 0),
+          updatedAt: now,
+        ),
+      for (final theme in current)
+        if (!terms.contains(theme.label)) theme,
+    ];
     await box.put(
       storageKey,
-      jsonEncode(updated.take(maxThemes).map((theme) => theme.toJson()).toList()),
+      jsonEncode(
+        updated.take(maxThemes).map((theme) => theme.toJson()).toList(),
+      ),
     );
   }
 
   Future<void> deleteTheme(String label) async {
     final next = load().where((theme) => theme.label != label).toList();
-    await box.put(storageKey, jsonEncode(next.map((theme) => theme.toJson()).toList()));
+    await box.put(
+      storageKey,
+      jsonEncode(next.map((theme) => theme.toJson()).toList()),
+    );
   }
 
   Future<void> deleteAll() => box.delete(storageKey);
@@ -80,16 +90,36 @@ class JevFeedbackProfile {
   Future<void> pruneExpired({DateTime? at}) async {
     final now = at ?? _clock();
     final cutoff = _sixMonthsBefore(now);
-    final active = load().where((theme) => !theme.updatedAt.isBefore(cutoff)).toList();
-    await box.put(storageKey, jsonEncode(active.map((theme) => theme.toJson()).toList()));
+    final active = load()
+        .where((theme) => !theme.updatedAt.isBefore(cutoff))
+        .toList();
+    await box.put(
+      storageKey,
+      jsonEncode(active.map((theme) => theme.toJson()).toList()),
+    );
   }
 
   List<Map<String, Object?>> providerSummary() => [
-    for (final theme in load()) {
-      'label': theme.label,
-      'approximate_count': theme.count,
-    },
+    for (final theme in load())
+      {
+        'label': theme.label,
+        'approximate_count': theme.count,
+      },
   ];
+
+  /// Sorts newest first while preserving stored order for equal timestamps.
+  static List<JevTheme> _newestFirst(Iterable<JevTheme> themes) {
+    final sorted = <JevTheme>[];
+    for (final theme in themes) {
+      var index = 0;
+      while (index < sorted.length &&
+          !theme.updatedAt.isAfter(sorted[index].updatedAt)) {
+        index++;
+      }
+      sorted.insert(index, theme);
+    }
+    return sorted;
+  }
 
   static int _approxNext(int count) {
     const buckets = [1, 2, 3, 5, 10, 20, 50];
@@ -104,8 +134,22 @@ class JevFeedbackProfile {
         : DateTime(date.year, targetMonth + 1, 0).day;
     final day = date.day.clamp(1, lastTargetDay);
     return date.isUtc
-        ? DateTime.utc(date.year, targetMonth, day, date.hour, date.minute, date.second)
-        : DateTime(date.year, targetMonth, day, date.hour, date.minute, date.second);
+        ? DateTime.utc(
+            date.year,
+            targetMonth,
+            day,
+            date.hour,
+            date.minute,
+            date.second,
+          )
+        : DateTime(
+            date.year,
+            targetMonth,
+            day,
+            date.hour,
+            date.minute,
+            date.second,
+          );
   }
 
   static Iterable<String> _extractThemes(String? raw) sync* {

@@ -1,16 +1,15 @@
 import 'dart:convert';
 
 import 'package:PiliPlus/common/constants.dart';
-import 'package:PiliPlus/features/exposure_tracker/exposure_tracker.dart';
-import 'package:PiliPlus/features/shielding/home_feed_comment_gate.dart';
+import 'package:PiliPlus/features/jev/jev_models.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
-import 'package:PiliPlus/features/shielding/shielding_recommend_tag_enricher.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo;
 import 'package:PiliPlus/http/api.dart';
 import 'package:PiliPlus/http/browser_ua.dart';
 import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/http/loading_state.dart';
+import 'package:PiliPlus/http/recommendation_screening.dart';
 import 'package:PiliPlus/http/login.dart';
 import 'package:PiliPlus/models/common/account_type.dart';
 import 'package:PiliPlus/models/common/video/video_type.dart';
@@ -36,7 +35,6 @@ import 'package:PiliPlus/utils/app_sign.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
-import 'package:PiliPlus/utils/recommend_filter.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
@@ -49,6 +47,7 @@ import 'package:protobuf/protobuf.dart';
 
 /// view层根据 status 判断渲染逻辑
 abstract final class VideoHttp {
+  static final _screening = VideoRecommendationScreening();
   static RegExp zoneRegExp = RegExp(Pref.banWordForZone, caseSensitive: false);
   static bool enableFilter = zoneRegExp.pattern.isNotEmpty;
   static bool useLegacyZoneTextFilter = false;
@@ -71,43 +70,21 @@ abstract final class VideoHttp {
       }),
     );
     if (res.data['code'] == 0) {
-      final shieldRuleSet = ShieldSettingsStore().snapshot();
-      final List<RcmdVideoItemModel> survivors = <RcmdVideoItemModel>[];
+      final candidates = <RcmdVideoItemModel, Map<String, dynamic>>{};
       for (final i in res.data['data']['item']) {
-        //过滤掉live与ad，以及拉黑用户
         if (i['goto'] == 'av' &&
-            (i['owner'] != null &&
-                !GlobalData().blackMids.contains(i['owner']['mid']))) {
-          RcmdVideoItemModel videoItem = RcmdVideoItemModel.fromJson(i);
-          final visible = ShieldingAdapters.isVisible(
-            ShieldingAdapters.fromRecommendationJson(
-              videoItem,
-              (i as Map).cast<String, dynamic>(),
-            ),
-            shieldRuleSet,
-          );
-          if (!RecommendFilter.filter(videoItem) && visible) {
-            survivors.add(videoItem);
-          }
+            i['owner'] != null &&
+            !GlobalData().blackMids.contains(i['owner']['mid'])) {
+          candidates[RcmdVideoItemModel.fromJson(i)] = (i as Map)
+              .cast<String, dynamic>();
         }
       }
-      final enricher = RecommendationTagEnricher();
-      final list = await enricher.enrichAndFilter(
-        survivors,
-        shieldRuleSet,
-        getBvid: (item) => item.bvid,
-        getCid: (item) => item.cid,
-      );
-      final gatedList = await HomeFeedCommentGate.filter(
-        list,
-        config: CommentShieldingStore().snapshot(),
-        ruleSet: shieldRuleSet,
-        getAid: (item) => item.aid,
-      );
       return Success(
-        ExposureTracker.instance.filterAndRecord(
-          gatedList,
-          getBvid: (item) => item.bvid,
+        await _screening.run(
+          candidates.keys.toList(),
+          surface: JevSurface.homeWeb,
+          toCandidate: (item) =>
+              ShieldingAdapters.fromRecommendationJson(item, candidates[item]!),
         ),
       );
     } else {
@@ -168,52 +145,30 @@ abstract final class VideoHttp {
       ),
     );
     if (res.data['code'] == 0) {
-      final shieldRuleSet = ShieldSettingsStore().snapshot();
-      final List<RcmdVideoItemAppModel> survivors = <RcmdVideoItemAppModel>[];
+      final candidates = <RcmdVideoItemAppModel, Map<String, dynamic>>{};
       for (final i in res.data['data']['items']) {
-        // 屏蔽推广和拉黑用户
         if (i['card_goto'] != 'ad_av' &&
             i['card_goto'] != 'ad_web_s' &&
             i['ad_info'] == null &&
             i['can_play'] == 1 &&
-            (i['args'] != null &&
-                !GlobalData().blackMids.contains(i['args']['up_id']))) {
+            i['args'] != null &&
+            !GlobalData().blackMids.contains(i['args']['up_id'])) {
           if (useLegacyZoneTextFilter &&
               enableFilter &&
               i['args']?['tname'] != null &&
               zoneRegExp.hasMatch(i['args']['tname'])) {
             continue;
           }
-          RcmdVideoItemAppModel videoItem = RcmdVideoItemAppModel.fromJson(i);
-          final visible = ShieldingAdapters.isVisible(
-            ShieldingAdapters.fromRecommendationJson(
-              videoItem,
-              (i as Map).cast<String, dynamic>(),
-            ),
-            shieldRuleSet,
-          );
-          if (!RecommendFilter.filter(videoItem) && visible) {
-            survivors.add(videoItem);
-          }
+          candidates[RcmdVideoItemAppModel.fromJson(i)] = (i as Map)
+              .cast<String, dynamic>();
         }
       }
-      final enricher = RecommendationTagEnricher();
-      final list = await enricher.enrichAndFilter(
-        survivors,
-        shieldRuleSet,
-        getBvid: (item) => item.bvid,
-        getCid: (item) => item.cid,
-      );
-      final gatedList = await HomeFeedCommentGate.filter(
-        list,
-        config: CommentShieldingStore().snapshot(),
-        ruleSet: shieldRuleSet,
-        getAid: (item) => item.aid,
-      );
       return Success(
-        ExposureTracker.instance.filterAndRecord(
-          gatedList,
-          getBvid: (item) => item.bvid,
+        await _screening.run(
+          candidates.keys.toList(),
+          surface: JevSurface.homeApp,
+          toCandidate: (item) =>
+              ShieldingAdapters.fromRecommendationJson(item, candidates[item]!),
         ),
       );
     } else {
@@ -231,26 +186,16 @@ abstract final class VideoHttp {
       queryParameters: {'pn': pn, 'ps': ps},
     );
     if (res.data['code'] == 0) {
-      List<HotVideoItemModel> list = <HotVideoItemModel>[];
+      final list = <HotVideoItemModel>[];
       for (final i in res.data['data']['list']) {
-        if (!GlobalData().blackMids.contains(i['owner']['mid']) &&
-            !RecommendFilter.filterTitle(i['title']) &&
-            !RecommendFilter.filterLikeRatio(
-              i['stat']['like'],
-              i['stat']['view'],
-            )) {
-          if (useLegacyZoneTextFilter &&
-              enableFilter &&
-              i['tname'] != null &&
-              zoneRegExp.hasMatch(i['tname'])) {
-            continue;
-          }
-          list.add(HotVideoItemModel.fromJson(i));
-        }
+        if (_canAddRank(i)) list.add(HotVideoItemModel.fromJson(i));
       }
-      final shieldRuleSet = ShieldSettingsStore().snapshot();
       return Success(
-        ShieldingAdapters.filterRecommendationVideos(list, shieldRuleSet),
+        await _screening.run(
+          list,
+          surface: JevSurface.hot,
+          toCandidate: ShieldingAdapters.fromRelatedVideo,
+        ),
       );
     } else {
       return Error(res.data['message']);
@@ -383,27 +328,22 @@ abstract final class VideoHttp {
       queryParameters: {'bvid': bvid},
     );
     if (res.data['code'] == 0) {
-      final items = (res.data['data'] as List?)?.map(
-        (i) => HotVideoItemModel.fromJson(i),
+      final items = (res.data['data'] as List?)
+          ?.map(
+            (i) => HotVideoItemModel.fromJson(i),
+          )
+          .toList();
+      if (items == null) return const Success(null);
+      return Success(
+        await _screening.run(
+          items,
+          surface: JevSurface.related,
+          toCandidate: (item) => ShieldingAdapters.fromRelatedVideo(
+            item,
+            scope: ShieldScope.videoDetail,
+          ),
+        ),
       );
-      final list = RecommendFilter.applyFilterToRelatedVideos
-          ? items
-                ?.where(
-                  (i) =>
-                      !RecommendFilter.filterLikeRatio(
-                        i.stat.like,
-                        i.stat.view,
-                      ) &&
-                      !(i.duration > 0 &&
-                          i.duration < RecommendFilter.minDurationForRcmd),
-                )
-                .toList()
-          : items?.toList();
-      final shieldRuleSet = ShieldSettingsStore().snapshot();
-      final visibleList = list == null
-          ? null
-          : ShieldingAdapters.filterRelatedVideos(list, shieldRuleSet);
-      return Success(visibleList);
     } else {
       return Error(res.data['message']);
     }
@@ -926,23 +866,12 @@ abstract final class VideoHttp {
     return null;
   }
 
-  static bool _canAddRank(Map i) {
-    if (!GlobalData().blackMids.contains(i['owner']['mid']) &&
-        !RecommendFilter.filterTitle(i['title']) &&
-        !RecommendFilter.filterLikeRatio(
-          i['stat']['like'],
-          i['stat']['view'],
-        )) {
-      if (useLegacyZoneTextFilter &&
+  static bool _canAddRank(Map i) =>
+      !GlobalData().blackMids.contains(i['owner']['mid']) &&
+      !(useLegacyZoneTextFilter &&
           enableFilter &&
           i['tname'] != null &&
-          zoneRegExp.hasMatch(i['tname'])) {
-        return false;
-      }
-      return true;
-    }
-    return false;
-  }
+          zoneRegExp.hasMatch(i['tname']));
 
   // 视频排行
   static Future<LoadingState<List<HotVideoItemModel>>> getRankVideoList(
@@ -953,23 +882,16 @@ abstract final class VideoHttp {
       queryParameters: await WbiSign.makSign({'rid': rid, 'type': 'all'}),
     );
     if (res.data['code'] == 0) {
-      List<HotVideoItemModel> list = <HotVideoItemModel>[];
+      final list = <HotVideoItemModel>[];
       for (final i in res.data['data']['list']) {
-        if (_canAddRank(i)) {
-          list.add(HotVideoItemModel.fromJson(i));
-          // final List? others = i['others'];
-          // if (others != null && others.isNotEmpty) {
-          //   for (final j in others) {
-          //     if (_canAddRank(j)) {
-          //       list.add(HotVideoItemModel.fromJson(j));
-          //     }
-          //   }
-          // }
-        }
+        if (_canAddRank(i)) list.add(HotVideoItemModel.fromJson(i));
       }
-      final shieldRuleSet = ShieldSettingsStore().snapshot();
       return Success(
-        ShieldingAdapters.filterRecommendationVideos(list, shieldRuleSet),
+        await _screening.run(
+          list,
+          surface: JevSurface.ranking,
+          toCandidate: ShieldingAdapters.fromRelatedVideo,
+        ),
       );
     } else {
       return Error(res.data['message']);

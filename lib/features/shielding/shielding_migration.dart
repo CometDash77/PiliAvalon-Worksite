@@ -1,6 +1,6 @@
 // ignore_for_file: cascade_invocations
 
-import 'package:PiliPlus/utils/recommend_filter.dart';
+import 'package:PiliPlus/features/shielding/recommendation_filter.dart';
 import 'package:PiliPlus/features/shielding/shielding_models.dart';
 
 // =============================================================================
@@ -90,19 +90,19 @@ class ShieldMigrationReport {
 }
 
 // =============================================================================
-// RecommendFilterAnalyzer — 分析 RecommendFilter 静态配置
+// RecommendFilterAnalyzer — 分析显式旧过滤配置
 // =============================================================================
 
 abstract final class RecommendFilterAnalyzer {
-  /// 分析当前 RecommendFilter 的静态字段，生成迁移候选分析报告
-  static ShieldMigrationReport analyze() {
+  /// 分析调用方提供的旧过滤配置，不读取过滤器或存储。
+  static ShieldMigrationReport analyze(RecommendationFilterConfig config) {
     final candidates = <ShieldMigrationCandidate>[];
     final now = DateTime.now();
 
-    candidates.addAll(_analyzeBanWords(now));
-    candidates.addAll(_analyzeDuration(now));
-    candidates.addAll(_analyzePlayAndLike(now));
-    candidates.add(_analyzeExemptFollowed());
+    candidates.addAll(_analyzeBanWords(now, config));
+    candidates.addAll(_analyzeDuration(now, config));
+    candidates.addAll(_analyzePlayAndLike(now, config));
+    candidates.add(_analyzeExemptFollowed(config));
     candidates.addAll(_analyzeTags());
 
     return ShieldMigrationReport(
@@ -113,10 +113,13 @@ abstract final class RecommendFilterAnalyzer {
 
   /// 标题关键词过滤 → keyword+regex 规则候选
   ///
-  /// RecommendFilter.rcmdRegExp 是一个 RegExp，其 pattern 来自
+  /// config.rcmdRegExp 是一个 RegExp，其 pattern 来自
   /// SettingBoxKey.banWordForRecommend 的字符串。
-  static List<ShieldMigrationCandidate> _analyzeBanWords(DateTime now) {
-    final pattern = RecommendFilter.rcmdRegExp.pattern;
+  static List<ShieldMigrationCandidate> _analyzeBanWords(
+    DateTime now,
+    RecommendationFilterConfig config,
+  ) {
+    final pattern = config.rcmdRegExp?.pattern ?? '';
     if (pattern.isEmpty) {
       return [
         const ShieldMigrationCandidate(
@@ -190,8 +193,11 @@ abstract final class RecommendFilterAnalyzer {
   }
 
   /// 视频时长过滤 → 无直接映射，给出分析备注
-  static List<ShieldMigrationCandidate> _analyzeDuration(DateTime now) {
-    final minDuration = RecommendFilter.minDurationForRcmd;
+  static List<ShieldMigrationCandidate> _analyzeDuration(
+    DateTime now,
+    RecommendationFilterConfig config,
+  ) {
+    final minDuration = config.minDurationForRcmd;
     if (minDuration <= 0) {
       return [
         const ShieldMigrationCandidate(
@@ -220,10 +226,13 @@ abstract final class RecommendFilterAnalyzer {
   }
 
   /// 播放量 / 点赞率过滤 → 无直接映射
-  static List<ShieldMigrationCandidate> _analyzePlayAndLike(DateTime now) {
+  static List<ShieldMigrationCandidate> _analyzePlayAndLike(
+    DateTime now,
+    RecommendationFilterConfig config,
+  ) {
     final candidates = <ShieldMigrationCandidate>[];
 
-    final minPlay = RecommendFilter.minPlayForRcmd;
+    final minPlay = config.minPlayForRcmd;
     candidates.add(
       minPlay > 0
           ? ShieldMigrationCandidate(
@@ -244,7 +253,7 @@ abstract final class RecommendFilterAnalyzer {
             ),
     );
 
-    final minLikeRatio = RecommendFilter.minLikeRatioForRecommend;
+    final minLikeRatio = config.minLikeRatioForRecommend;
     candidates.add(
       minLikeRatio > 0
           ? ShieldMigrationCandidate(
@@ -266,7 +275,7 @@ abstract final class RecommendFilterAnalyzer {
     );
 
     // exemptFilterForFollowed — 旧豁免标记
-    final exempt = RecommendFilter.exemptFilterForFollowed;
+    final exempt = config.exemptFilterForFollowed;
     candidates.add(
       ShieldMigrationCandidate(
         oldSettingKey: 'exemptFilterForFollowed',
@@ -285,8 +294,10 @@ abstract final class RecommendFilterAnalyzer {
   }
 
   /// applyFilterToRelatedVideos — 旧开关
-  static ShieldMigrationCandidate _analyzeExemptFollowed() {
-    final apply = RecommendFilter.applyFilterToRelatedVideos;
+  static ShieldMigrationCandidate _analyzeExemptFollowed(
+    RecommendationFilterConfig config,
+  ) {
+    final apply = config.applyFilterToRelatedVideos;
     return ShieldMigrationCandidate(
       oldSettingKey: 'applyFilterToRelatedVideos',
       oldSettingValue: apply.toString(),

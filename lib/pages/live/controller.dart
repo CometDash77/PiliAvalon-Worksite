@@ -1,4 +1,6 @@
 import 'package:PiliPlus/common/widgets/pair.dart';
+import 'package:PiliPlus/features/shielding/live_shielding.dart';
+import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/http/live.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models_new/live/live_feed_index/card_data_list_item.dart';
@@ -13,6 +15,15 @@ import 'package:flutter/widgets.dart' show ScrollController;
 import 'package:get/get.dart';
 
 class LiveController extends CommonListController with AccountMixin {
+  LiveController({ShieldRuleSet Function()? ruleSetProvider})
+    : _ruleSetProvider = ruleSetProvider ?? _storedRuleSet;
+
+  final ShieldRuleSet Function() _ruleSetProvider;
+
+  /// Keeps this feature independent of any in-flight runtime hook: the rules
+  /// are read straight from the shielding store on every page load.
+  static ShieldRuleSet _storedRuleSet() => ShieldSettingsStore().snapshot();
+
   @override
   void onInit() {
     super.onInit();
@@ -20,6 +31,26 @@ class LiveController extends CommonListController with AccountMixin {
   }
 
   int? count;
+
+  /// Size of the latest source page, before live shielding removed anything.
+  int sourcePageCount = 0;
+
+  /// Cards live shielding removed from the loaded pages so far.
+  int hiddenCardCount = 0;
+
+  /// Set when the loaded page was fully hidden, so automatic paging stops
+  /// instead of requesting more pages to refill the grid with blocked cards.
+  bool autoPagingPaused = false;
+
+  int _lastRawPageSize = 0;
+
+  /// Raw cards accepted from the server, used to decide source exhaustion.
+  /// The visible count must never drive this: shielding shortens it.
+  int _sourceLoadedCount = 0;
+
+  /// True when the visible list is empty only because live shielding removed
+  /// every loaded card, which stays distinguishable from a server empty page.
+  bool get isFilteredEmpty => sourcePageCount > 0;
 
   // area
   int? areaId;
@@ -40,19 +71,68 @@ class LiveController extends CommonListController with AccountMixin {
 
   @override
   void checkIsEnd(int length) {
-    if (count != null && length >= count!) {
+    if (count != null && _sourceLoadedCount >= count!) {
       isEnd = true;
     }
   }
 
   @override
   List? getDataList(response) {
-    return response.cardList;
+    final dataList = response.cardList as List?;
+    _lastRawPageSize = dataList?.length ?? 0;
+    sourcePageCount = _lastRawPageSize;
+    _sourceLoadedCount += _lastRawPageSize;
+    return dataList;
+  }
+
+  @override
+  void handleListResponse(List dataList) {
+    final removed = LiveShielding.removeBlocked(dataList, _ruleSetProvider());
+    hiddenCardCount += removed;
+    autoPagingPaused = removed > 0 && removed == _lastRawPageSize;
+  }
+
+  /// Re-applies the live rules to the already loaded page, so a rule saved from
+  /// a card entry removes every newly matching card without another request.
+  int refilterLoadedItems() {
+    if (loadingState.value case Success(:final response)) {
+      final items = response;
+      if (items == null || items.isEmpty) return 0;
+      final removed = LiveShielding.removeBlocked(items, _ruleSetProvider());
+      if (removed == 0) return 0;
+      hiddenCardCount += removed;
+      loadingState.refresh();
+      return removed;
+    }
+    return 0;
+  }
+
+  /// Clears the pause left by a fully hidden page. Driven by an actual user
+  /// scroll gesture, which is what makes the next page a user request instead
+  /// of a chain request caused by shielding.
+  Future<void> resumeAutoPaging() async {
+    if (!autoPagingPaused) return;
+    autoPagingPaused = false;
+    if (isEnd || isLoading) return;
+    if (!scrollController.hasClients) return;
+    if (scrollController.position.extentAfter > 8) return;
+    await onLoadMore();
+  }
+
+  @override
+  Future<void> onLoadMore() {
+    if (autoPagingPaused) return Future.value();
+    return super.onLoadMore();
   }
 
   @override
   bool customHandleResponse(bool isRefresh, Success response) {
     if (isRefresh) {
+      sourcePageCount = 0;
+      hiddenCardCount = 0;
+      autoPagingPaused = false;
+      _lastRawPageSize = 0;
+      _sourceLoadedCount = 0;
       final res = response.response;
       if (res is LiveIndexData) {
         if (res.hasMore == 0) {

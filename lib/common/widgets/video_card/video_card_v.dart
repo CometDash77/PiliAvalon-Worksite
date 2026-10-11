@@ -24,12 +24,14 @@ class VideoCardV extends StatelessWidget {
   final BaseRcmdVideoItemModel videoItem;
   final VoidCallback? onRemove;
   final ValueChanged<String>? onRecommendationTapBvid;
+  final bool isRecommendationCard;
 
   const VideoCardV({
     super.key,
     required this.videoItem,
     this.onRemove,
     this.onRecommendationTapBvid,
+    this.isRecommendationCard = false,
   });
 
   Future<void> onPushDetail() async {
@@ -151,6 +153,7 @@ class VideoCardV extends StatelessWidget {
               iconSize: 17,
               videoItem: videoItem,
               onRemove: onRemove,
+              isRecommendationCard: isRecommendationCard,
             ),
           ),
       ],

@@ -173,10 +173,11 @@ void main() {
     });
 
     test(
-      'total settings count includes new inline range filtering entries',
+      'total settings count includes range filtering and Jev entry',
       () {
         final list = recommendSettings;
-        expect(list.length, 24);
+        expect(list.length, 25);
+        expect(list.first.effectiveTitle, 'Jev 个性化筛选');
       },
     );
 

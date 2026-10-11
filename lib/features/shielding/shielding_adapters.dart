@@ -60,11 +60,7 @@ abstract final class ShieldingAdapters {
       authorTokens: _tokens([authorName]),
       category: category,
       tags: tags,
-      tokens: _tokens([
-        item.title,
-        reason,
-        ...tags,
-      ]),
+      tokens: _tokens([item.title, reason, ...tags]),
       durationSeconds: durationSeconds,
       playbackCount: playbackCount,
       danmakuCount: danmakuCount,
@@ -131,10 +127,7 @@ abstract final class ShieldingAdapters {
     authorName: item.owner.name,
     authorTokens: _tokens([item.owner.name]),
     category: item.tname,
-    tokens: _tokens([
-      item.title,
-      item.tname,
-    ]),
+    tokens: _tokens([item.title, item.tname]),
     durationSeconds: item.duration > 0 ? item.duration : null,
     playbackCount: item.stat.view,
     danmakuCount: item.stat.danmu,
@@ -165,6 +158,13 @@ abstract final class ShieldingAdapters {
 
   static bool isVisible(ShieldCandidate candidate, ShieldRuleSet ruleSet) =>
       ShieldMatcher.match(candidate, ruleSet).visible;
+
+  static Iterable<String> _tokens(Iterable<String?> values) => values
+      .whereType<String>()
+      .expand((value) => value.split(_tokenSeparator))
+      .where((value) => value.trim().isNotEmpty);
+
+  static final _tokenSeparator = RegExp(r'[\s,，。！？!?:：;；]+');
 
   static List<HotVideoItemModel> filterRecommendationVideos(
     List<HotVideoItemModel> items,
@@ -207,12 +207,6 @@ abstract final class ShieldingAdapters {
     }
     return const [];
   }
-
-  static List<String> _tokens(Iterable<String?> values) => values
-      .whereType<String>()
-      .expand((value) => value.split(RegExp(r'[\s,，。！？!?:：;；]+')))
-      .where((value) => value.trim().isNotEmpty)
-      .toList();
 }
 
 String? _string(Object? value) => value?.toString();

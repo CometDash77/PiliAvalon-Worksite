@@ -1,4 +1,5 @@
 import 'package:PiliPlus/features/exposure_tracker/exposure_tracker_settings.dart';
+import 'package:PiliPlus/pages/jev_settings/view.dart';
 import 'package:PiliPlus/features/shielding/shielding_models.dart';
 import 'package:PiliPlus/features/shielding/shielding_recommend_tag_enricher.dart';
 import 'package:PiliPlus/features/shielding/shielding_store.dart';
@@ -14,6 +15,12 @@ import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 
 List<SettingsModel> get recommendSettings => [
+  NormalModel(
+    title: 'Jev 个性化筛选',
+    subtitle: 'Provider 密钥、安全存储、推荐场景和本地负反馈主题',
+    leading: const Icon(Icons.auto_awesome_outlined),
+    onTap: (_, _) => Get.to<void>(() => const JevSettingsPage()),
+  ),
   const SwitchModel(
     title: '首页使用app端推荐',
     subtitle: '若web端推荐不太符合预期，可尝试切换至app端推荐',
@@ -61,20 +68,20 @@ List<SettingsModel> get recommendSettings => [
   //   suffix: '%',
   //   key: SettingBoxKey.minLikeRatioForRecommend,
   //   values: [0, 1, 2, 3, 4],
-  //   onChanged: (value) => RecommendFilter.minLikeRatioForRecommend = value,
+  //   onChanged: (value) => RecommendFilter.updateSettings(minLikeRatioForRecommend: value),
   // ),
   // getVideoFilterSelectModel(
   //   title: '视频时长',
   //   suffix: 's',
   //   key: SettingBoxKey.minDurationForRcmd,
   //   values: [0, 30, 60, 90, 120],
-  //   onChanged: (value) => RecommendFilter.minDurationForRcmd = value,
+  //   onChanged: (value) => RecommendFilter.updateSettings(minDurationForRcmd: value),
   // ),
   // getVideoFilterSelectModel(
   //   title: '播放量',
   //   key: SettingBoxKey.minPlayForRcmd,
   //   values: [0, 50, 100, 500, 1000],
-  //   onChanged: (value) => RecommendFilter.minPlayForRcmd = value,
+  //   onChanged: (value) => RecommendFilter.updateSettings(minPlayForRcmd: value),
   // ),
   _buildDerivedMetricModel(
     title: '互动率过滤',
@@ -83,10 +90,11 @@ List<SettingsModel> get recommendSettings => [
     thresholdKey: SettingBoxKey.minInteractionRateForRecommend,
     defaultThreshold: 1.0,
     getThreshold: () => RecommendFilter.minInteractionRateForRecommend,
-    onSwitchChanged: (value) =>
-        RecommendFilter.filterInteractionRateForRecommend = value,
+    onSwitchChanged: (value) => RecommendFilter.updateSettings(
+      filterInteractionRateForRecommend: value,
+    ),
     onThresholdChanged: (value) =>
-        RecommendFilter.minInteractionRateForRecommend = value,
+        RecommendFilter.updateSettings(minInteractionRateForRecommend: value),
   ),
   _buildDerivedMetricModel(
     title: '三连率过滤',
@@ -96,9 +104,9 @@ List<SettingsModel> get recommendSettings => [
     defaultThreshold: 3.0,
     getThreshold: () => RecommendFilter.minTripleRateForRecommend,
     onSwitchChanged: (value) =>
-        RecommendFilter.filterTripleRateForRecommend = value,
+        RecommendFilter.updateSettings(filterTripleRateForRecommend: value),
     onThresholdChanged: (value) =>
-        RecommendFilter.minTripleRateForRecommend = value,
+        RecommendFilter.updateSettings(minTripleRateForRecommend: value),
   ),
   _buildDerivedMetricModel(
     title: '内容价值过滤',
@@ -108,9 +116,9 @@ List<SettingsModel> get recommendSettings => [
     defaultThreshold: 10.0,
     getThreshold: () => RecommendFilter.minContentValueForRecommend,
     onSwitchChanged: (value) =>
-        RecommendFilter.filterContentValueForRecommend = value,
+        RecommendFilter.updateSettings(filterContentValueForRecommend: value),
     onThresholdChanged: (value) =>
-        RecommendFilter.minContentValueForRecommend = value,
+        RecommendFilter.updateSettings(minContentValueForRecommend: value),
   ),
   SwitchModel(
     title: '已关注UP豁免推荐过滤',
@@ -118,7 +126,8 @@ List<SettingsModel> get recommendSettings => [
     leading: const Icon(Icons.favorite_border_outlined),
     setKey: SettingBoxKey.exemptFilterForFollowed,
     defaultVal: true,
-    onChanged: (value) => RecommendFilter.exemptFilterForFollowed = value,
+    onChanged: (value) =>
+        RecommendFilter.updateSettings(exemptFilterForFollowed: value),
   ),
   SwitchModel(
     title: '过滤器也应用于详情页相关视频',
@@ -126,7 +135,8 @@ List<SettingsModel> get recommendSettings => [
     leading: const Icon(Icons.explore_outlined),
     setKey: SettingBoxKey.applyFilterToRelatedVideos,
     defaultVal: true,
-    onChanged: (value) => RecommendFilter.applyFilterToRelatedVideos = value,
+    onChanged: (value) =>
+        RecommendFilter.updateSettings(applyFilterToRelatedVideos: value),
   ),
   SwitchModel(
     title: '相关视频屏蔽',
