@@ -260,15 +260,6 @@ Get-ChildItem -Path "$env:GITHUB_WORKSPACE/lib/scripts/material" -Filter *.patch
 cd $MaterialUiDir.FullName
 
 foreach ($patch in $patches_material) {
-    if ($patch -eq $BottomSheetAndroidPatchMaterial) {
-        $bottomSheetFile = Join-Path $MaterialUiDir.FullName "lib/src/bottom_sheet.dart"
-        $gestureSettingsLine = "..gestureSettings = MediaQuery.maybeGestureSettingsOf(context)"
-        if (Select-String -Path $bottomSheetFile -SimpleMatch -Pattern $gestureSettingsLine -Quiet) {
-            Write-Host "$patch already provided by material_ui"
-            continue
-        }
-    }
-
     git apply "$env:GITHUB_WORKSPACE/$patch"
     if ($LASTEXITCODE -eq 0) {
         Write-Host "$patch applied"
