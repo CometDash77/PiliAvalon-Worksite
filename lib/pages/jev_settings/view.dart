@@ -4,6 +4,7 @@ import 'package:PiliPlus/common/widgets/flutter/list_tile.dart' as custom;
 import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/pages/jev_settings/jev_rules_page.dart';
+import 'package:PiliPlus/pages/jev_settings/jev_screen_log_page.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:material_ui/material_ui.dart' hide ListTile;
 
@@ -358,6 +359,15 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
                 builder: (_) =>
                     JevRulesPage(store: JevRuleStore(box: _store.box)),
               ),
+            ),
+          ),
+          custom.ListTile(
+            leading: const Icon(Icons.receipt_long_outlined),
+            title: const Text('筛选日志'),
+            subtitle: const Text('查看最近被屏蔽的视频与评论，确认筛选是否生效'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(builder: (_) => const JevScreenLogPage()),
             ),
           ),
           const Divider(height: 1),

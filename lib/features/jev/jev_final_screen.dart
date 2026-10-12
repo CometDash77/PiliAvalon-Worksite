@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:PiliPlus/features/jev/jev_contract.dart';
+import 'package:PiliPlus/features/jev/jev_screen_log.dart';
 import 'package:PiliPlus/features/jev/jev_evaluator.dart';
 import 'package:PiliPlus/features/shielding/live_shielding.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
@@ -61,10 +64,32 @@ class JevFinalScreen<T> {
       final hidden = screening.hidden;
       var anyHidden = false;
       final keep = List<bool>.filled(items.length, true);
+      final kind = T == ReplyInfo
+          ? JevScreenLogKind.comment
+          : JevScreenLogKind.video;
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final blocked = <JevScreenLogEntry>[];
       for (var k = 0; k < indices.length && k < hidden.length; k++) {
         if (hidden[k]) {
           keep[indices[k]] = false;
           anyHidden = true;
+          final candidate = candidates[k];
+          blocked.add(
+            JevScreenLogEntry(
+              time: now,
+              kind: kind,
+              surface: surface.id,
+              title: candidate.title,
+              snippet: candidate.snippet ?? _tagSummary(candidate.tags),
+            ),
+          );
+        }
+      }
+      if (blocked.isNotEmpty) {
+        try {
+          unawaited(JevScreenLog.instance.record(blocked));
+        } catch (_) {
+          // 日志失败不影响筛选。
         }
       }
       if (!anyHidden) return items;
@@ -203,3 +228,6 @@ class JevFinalScreen<T> {
     return JevCandidate(title: value, tags: tags);
   }
 }
+
+String? _tagSummary(List<String> tags) => tags.isEmpty ? null : tags.join(' / ');
+
