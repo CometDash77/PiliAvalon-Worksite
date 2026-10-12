@@ -309,6 +309,8 @@ void main() {
     final surfaces = tester
         .widgetList<SwitchListTile>(find.byType(SwitchListTile))
         .toList();
+    // 母开关 + 判定缓存开关(issue #123) + 各生效入口；评论过滤开关区块已随
+    // issue #122 移除，不再计入。
     expect(surfaces.length, JevSurface.values.length + 2);
     for (final tile in surfaces.skip(1)) {
       expect(tile.onChanged, isNull);
@@ -326,7 +328,10 @@ void main() {
       expect(tile.onChanged, isNotNull);
     }
     // A surface with no call site says so and cannot be switched on.
-    for (final tile in enabled.skip(1).where((tile) => tile.subtitle != null)) {
+    // 判定缓存开关(issue #123)自带副标题但不是生效入口，按 key 排除。
+    for (final tile in enabled.skip(1).where((tile) =>
+        tile.subtitle != null &&
+        tile.key != const ValueKey('jev-verdict-cache-enabled'))) {
       expect(tile.onChanged, isNull);
       expect(tile.value, isFalse);
     }
@@ -590,65 +595,6 @@ void main() {
     expect(find.textContaining('拒绝了请求格式'), findsOneWidget);
     expect(find.textContaining('上游：'), findsNothing);
   });
-  testWidgets(
-    'comment criterion saves, survives reopening and restores preset',
-    (tester) async {
-      final store = JevSettingsStore(box: _MemoryBox());
-      await store.save(const JevSettings(enabled: true));
-      final credentials = _FakeCredentialStore();
-      final validator = JevKeyValidator(
-        probe: ({required provider, required apiKey, String? model}) async =>
-            const JevProbeResult(JevProbeOutcome.ok),
-      );
-      await pumpPage(
-        tester,
-        store: store,
-        credentials: credentials,
-        validator: validator,
-        messages: [],
-      );
-      final switchFinder = find.byKey(const ValueKey('jev-comment-enabled'));
-      await tester.ensureVisible(switchFinder);
-      expect(tester.widget<SwitchListTile>(switchFinder).value, isFalse);
-      await tester.tap(switchFinder);
-      await tester.pumpAndSettle();
-      expect((await store.load()).commentEnabled, isTrue);
-      await tester.enterText(
-        find.byKey(const ValueKey('jev-comment-criteria')),
-        '隐藏剧透，保留批评',
-      );
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('jev-comment-save')),
-      );
-      await tester.tap(find.byKey(const ValueKey('jev-comment-save')));
-      await tester.pumpAndSettle();
-      expect((await store.load()).commentCriteria, '隐藏剧透，保留批评');
-      await tester.pumpWidget(const SizedBox());
-      await pumpPage(
-        tester,
-        store: store,
-        credentials: credentials,
-        validator: validator,
-        messages: [],
-      );
-      expect(
-        tester
-            .widget<TextField>(
-              find.byKey(const ValueKey('jev-comment-criteria')),
-            )
-            .controller!
-            .text,
-        '隐藏剧透，保留批评',
-      );
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('jev-comment-restore')),
-      );
-      await tester.tap(find.byKey(const ValueKey('jev-comment-restore')));
-      await tester.pumpAndSettle();
-      expect(
-        (await store.load()).commentCriteria,
-        JevSettings.defaultCommentCriteria,
-      );
-    },
-  );
+  // 评论过滤标准区块已在 issue #122 中随双轨合并移除：独立开关与标准文本
+  // 不复存在，评论面只消费「判断规则」页的评论规则。
 }

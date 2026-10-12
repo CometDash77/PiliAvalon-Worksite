@@ -454,8 +454,13 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       subtitle: const Text(
         '同一视频在有效期内复用上次的判定，不再重复请求上游；规则、模型或偏好档变化时整批作废',
       ),
-      value: _cacheEnabled,
-      onChanged: (value) => _saveCacheConfig(enabled: value),
+      // 总开关关闭时 Jev 整体失效，缓存开关随其余开关一起显示为关。
+      value: _settings.enabled && _cacheEnabled,
+      // 与其余开关一致：总开关关闭时缓存开关不可用（页面既有契约，测试
+      // per-surface switches need the master switch 校验）。
+      onChanged: _settings.enabled
+          ? (value) => _saveCacheConfig(enabled: value)
+          : null,
     ),
     Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),

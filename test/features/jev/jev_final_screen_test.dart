@@ -140,10 +140,15 @@ class _TestStat extends BaseStat {
   }
 }
 
-HotVideoItemModel _hot(String title) => HotVideoItemModel.fromJson({
-  'aid': 1,
+/// 判定缓存按卡片身份分组(issue #123, bvid 优先)：递增 aid 并配以不同的
+/// bvid，避免多个条目被当作同一视频的别名而只评估一个位置。
+int _hotSeq = 0;
+HotVideoItemModel _hot(String title) {
+  _hotSeq += 1;
+  return HotVideoItemModel.fromJson({
+  'aid': _hotSeq,
   'cid': 101,
-  'bvid': 'BV1',
+  'bvid': 'BV' + _hotSeq.toString(),
   'videos': 1,
   'tid': 17,
   'tname': '游戏',
@@ -156,7 +161,8 @@ HotVideoItemModel _hot(String title) => HotVideoItemModel.fromJson({
   'duration': 600,
   'owner': {'mid': 42, 'name': '玩家UP'},
   'stat': {'view': 1000, 'like': 50, 'danmaku': 1},
-});
+  });
+}
 
 RecommendationBatch _batch() => RecommendationBatch(
   ruleSet: ShieldRuleSet(rules: []),

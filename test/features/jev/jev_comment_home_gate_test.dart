@@ -5,6 +5,7 @@ import 'package:PiliPlus/features/jev/jev_comment_screening.dart';
 import 'package:PiliPlus/features/jev/jev_contract.dart';
 import 'package:PiliPlus/features/jev/jev_credential_store.dart';
 import 'package:PiliPlus/features/jev/jev_evaluator.dart';
+import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/jev/jev_settings.dart';
 import 'package:PiliPlus/features/shielding/home_feed_comment_gate.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
@@ -38,9 +39,18 @@ class _Key implements JevCredentialStore {
 
 ReplyInfo _reply(String text) => ReplyInfo(content: Content(message: text));
 
+JevRule _rule({String question = '这条评论是否在灌水?', bool enabled = true}) =>
+    JevRule(
+      id: 'r1',
+      target: JevRuleTarget.comment,
+      question: question,
+      enabled: enabled,
+    );
+
 void main() {
   late Directory directory;
   late JevSettingsStore settings;
+  late JevRuleStore rulesStore;
   setUpAll(() async {
     directory = await Directory.systemTemp.createTemp('jev_comment_gate_');
     Hive.init(directory.path);
@@ -53,15 +63,18 @@ void main() {
   });
   setUp(() async {
     HomeFeedCommentGate.resetDecisionCache();
-    settings = JevSettingsStore(box: _Box());
+    final box = _Box();
+    settings = JevSettingsStore(box: box);
+    rulesStore = JevRuleStore(box: box);
     await settings.save(
       const JevSettings(
         enabled: true,
         provider: JevProvider.openRouter,
         providerConfirmed: true,
-        commentEnabled: true,
+        surfaces: {JevSurface.comment},
       ),
     );
+    await rulesStore.save(JevRuleConfig(rules: [_rule()]));
   });
 
   Future<List<int>> run(
@@ -109,9 +122,20 @@ void main() {
         },
   );
 
-  Object answers(double value) => {
+  // The merged pipeline asks one sufficiency gate plus one verdict per rule
+  // per candidate; the single-rule fixture answers both keys.
+  Object answers(double value, {int candidates = 1}) => {
     'answers': {
-      'candidate_1': {'type': 'noul', 'noul': value},
+      for (var i = 1; i <= candidates; i++) ...{
+        'candidate_' + i.toString() + '_rule_1_context': const {
+          'type': 'noul',
+          'noul': 0.98,
+        },
+        'candidate_' + i.toString() + '_rule_1': {
+          'type': 'noul',
+          'noul': value,
+        },
+      },
     },
   };
 
@@ -212,7 +236,7 @@ void main() {
   );
 
   test(
-    'criteria edit, disabled and blank policies take effect on same aid',
+    'rule edit, disable and removal take effect on the same aid',
     () async {
       var calls = 0;
       Future<Object?> transport({
@@ -221,25 +245,25 @@ void main() {
         required Map<String, Object?> body,
       }) async {
         calls++;
-        final criteria = (body['state'] as Map)['criteria'];
-        return answers(criteria == '保留全部' ? 0 : 1);
+        final questions = body['questions'] as Map;
+        final instructions =
+            (questions['candidate_1_rule_1'] as Map)['instructions']
+                as String;
+        return answers(instructions.contains('灌水') ? 1 : 0);
       }
 
       expect(await run(transport), isEmpty);
-      await settings.save(
-        (await settings.load()).copyWith(commentCriteria: '保留全部'),
+      // Editing the question changes the fingerprint, so the cached
+      // decision for this aid is regenerated.
+      await rulesStore.save(
+        JevRuleConfig(rules: [_rule(question: '这条评论是否值得保留?')]),
       );
       expect(await run(transport), [1]);
-      await settings.save(
-        (await settings.load()).copyWith(commentEnabled: false),
-      );
+      // Disabling the only rule turns the merged pipeline off entirely.
+      await rulesStore.save(JevRuleConfig(rules: [_rule(enabled: false)]));
       expect(await run(transport), [1]);
-      await settings.save(
-        (await settings.load()).copyWith(
-          commentEnabled: true,
-          commentCriteria: '',
-        ),
-      );
+      // Removing it keeps the same behavior without any provider call.
+      await rulesStore.save(JevRuleConfig());
       expect(await run(transport), [1]);
       expect(calls, 2);
     },
@@ -248,12 +272,22 @@ void main() {
   test(
     'visible pinned comment keeps card after ordinary comments hide',
     () async {
+      // Candidate order is [upTop, ...replies]: the pinned comment stays
+      // visible (0.01) while the ordinary one hides (0.99).
       expect(
         await run(
           ({required provider, required apiKey, required body}) async => {
             'answers': {
-              'candidate_1': {'type': 'noul', 'noul': 0.01},
-              'candidate_2': {'type': 'noul', 'noul': 0.99},
+              'candidate_1_rule_1_context': const {
+                'type': 'noul',
+                'noul': 0.98,
+              },
+              'candidate_1_rule_1': const {'type': 'noul', 'noul': 0.01},
+              'candidate_2_rule_1_context': const {
+                'type': 'noul',
+                'noul': 0.98,
+              },
+              'candidate_2_rule_1': const {'type': 'noul', 'noul': 0.99},
             },
           },
           pinned: _reply('正常讨论'),
@@ -263,3 +297,4 @@ void main() {
     },
   );
 }
+

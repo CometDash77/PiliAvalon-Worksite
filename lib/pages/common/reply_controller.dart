@@ -79,17 +79,27 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
       ..addAll(visible);
   }
 
-  Future<List<ReplyInfo>> screenComments(List<ReplyInfo> replies) async {
+  Future<List<ReplyInfo>> screenComments(
+    List<ReplyInfo> replies, {
+    Map<ReplyInfo, String>? parentBodies,
+  }) async {
     final candidates = <ReplyInfo>[];
-    void collect(List<ReplyInfo> items) {
+    final parents = <String?>[];
+    void collect(List<ReplyInfo> items, String? inheritedParent) {
       for (final reply in items) {
+        final ownParent = parentBodies?[reply] ?? inheritedParent;
         candidates.add(reply);
-        collect(reply.replies);
+        parents.add(ownParent);
+        final message = reply.content.message;
+        collect(
+          reply.replies,
+          message.trim().isNotEmpty ? message : ownParent,
+        );
       }
     }
 
-    collect(replies);
-    final result = await commentScreening.filter(candidates);
+    collect(replies, null);
+    final result = await commentScreening.filter(candidates, parents: parents);
     final visible = Set<ReplyInfo>.identity()..addAll(result.replies);
     List<ReplyInfo> rebuild(List<ReplyInfo> items) {
       final survivors = items.where(visible.contains).toList();

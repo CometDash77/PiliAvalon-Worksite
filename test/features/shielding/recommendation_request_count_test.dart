@@ -124,6 +124,15 @@ class _JevMemoryBox implements JevSettingsBox {
 class _JevFakeCredentials implements JevCredentialStore {
   @override
   Future<String?> read() async => 'sk-gauge-key';
+
+  @override
+  Future<JevKeyStoreStatus> status() async => JevKeyStoreStatus.available;
+
+  @override
+  Future<void> write(String apiKey) async {}
+
+  @override
+  Future<void> delete() async {}
 }
 
 /// 打开 Jev（homeWeb 面 + typesafe）并把计次传输端点接进评测器的装配。

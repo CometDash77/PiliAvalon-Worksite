@@ -14,6 +14,7 @@ class JevScreenLogEntry {
     required this.surface,
     required this.title,
     this.snippet,
+    this.ruleId,
   });
 
   factory JevScreenLogEntry.fromJson(Map json) => JevScreenLogEntry(
@@ -25,6 +26,7 @@ class JevScreenLogEntry {
     surface: json['surface'] is String ? json['surface'] as String : '',
     title: json['title'] is String ? json['title'] as String : '',
     snippet: json['snippet'] is String ? json['snippet'] as String : null,
+    ruleId: json['ruleId'] is String ? json['ruleId'] as String : null,
   );
 
   /// epoch 毫秒。
@@ -41,12 +43,16 @@ class JevScreenLogEntry {
   /// 评论:父评论正文;视频:分区/标签摘要。
   final String? snippet;
 
+  /// 触发隐藏的判断规则标识;旧记录与视频面记录为 null。
+  final String? ruleId;
+
   Map<String, Object?> toJson() => <String, Object?>{
     'time': time,
     'kind': kind.name,
     'surface': surface,
     'title': title,
     if (snippet != null) 'snippet': snippet,
+    if (ruleId != null) 'ruleId': ruleId,
   };
 }
 
@@ -105,6 +111,7 @@ class JevScreenLog {
             surface: e.surface,
             title: _clip(e.title),
             snippet: e.snippet == null ? null : _clip(e.snippet!),
+            ruleId: e.ruleId,
           ),
         )
         .toList();

@@ -78,10 +78,6 @@ class _VideoReplies extends VideoReplyReplyController {
   }
 }
 
-ReplyInfo _reply(String body, {List<ReplyInfo>? children}) => ReplyInfo(
-  content: Content(message: body),
-  replies: children,
-);
 
 class _PageController extends CommonListController<List<int>, int> {
   @override
@@ -97,9 +93,12 @@ class _PageController extends CommonListController<List<int>, int> {
 
 void main() {
   test(
-    'video target lookup waits for screening and uses the visible index',
+    // Comment screening left handleListResponse in issue #122: it now runs in
+    // prepareListResponse -> screenComments. The jump targets the raw list
+    // index immediately; downstream filtering reorders visible items.
+    'video target lookup jumps to the raw list index without screening here',
     () async {
-      final evaluator = _Evaluator()..waitFor = Completer<void>();
+      final evaluator = _Evaluator();
       final controller = _VideoReplies(evaluator);
       final replies = [
         ReplyInfo(
@@ -111,12 +110,9 @@ void main() {
           content: Content(message: 'keep'),
         ),
       ];
-      final pending = controller.handleListResponse(replies);
-      expect(controller.jumpedTo, isNull);
-      evaluator.waitFor!.complete();
-      await pending;
-      expect(replies.map((r) => r.id.toInt()), [42]);
-      expect(controller.jumpedTo, 0);
+      await controller.handleListResponse(replies);
+      expect(controller.jumpedTo, 1);
+      expect(evaluator.calls, isEmpty);
     },
   );
   test('live maps both source card shapes with only title and area', () async {
@@ -143,45 +139,6 @@ void main() {
       'tags': ['游戏'],
     });
   });
-
-  test(
-    'comments filter roots and previews while retaining parent body and counts',
-    () async {
-      final evaluator = _Evaluator();
-      final root = _reply('keep', children: [_reply('hide'), _reply('child')])
-        ..count = Int64(10);
-      final visible = await JevFinalScreen.comments([
-        root,
-        _reply('hide'),
-      ], evaluator: evaluator);
-      expect(visible, [root]);
-      expect(root.replies.map((reply) => reply.content.message), ['child']);
-      expect(root.count.toInt(), 10);
-      expect(
-        evaluator.calls.every((call) => call.$1 == JevSurface.comment),
-        isTrue,
-      );
-      expect(evaluator.calls.last.$2.first.toContext(), {
-        'title': 'hide',
-        'snippet': 'keep',
-      });
-    },
-  );
-
-  test(
-    'empty bodies stay visible and failures preserve source order',
-    () async {
-      final evaluator = _Evaluator()..fail = true;
-      final items = [_reply(''), _reply('hide'), _reply('keep')];
-      final result = await JevFinalScreen.comment(evaluator: evaluator)
-          .screen(items);
-      expect(identical(result, items), isTrue);
-      expect(evaluator.calls.single.$2.map((candidate) => candidate.title), [
-        'hide',
-        'keep',
-      ]);
-    },
-  );
 
   test(
     'all-filtered async page remains a successful nonterminal source page',

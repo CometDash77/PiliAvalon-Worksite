@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:PiliPlus/features/jev/jev.dart';
+import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -82,7 +83,7 @@ Map<String, Object?> _answers(Map<String, Object?> values) =>
       'answers': <String, Object?>{
         for (final entry in values.entries)
           entry.key: entry.value is Map
-              ? Map<String, Object?>.of(entry.value as Map)
+              ? (entry.value as Map).cast<String, Object?>()
               : <String, Object?>{'noul': entry.value},
       },
     };

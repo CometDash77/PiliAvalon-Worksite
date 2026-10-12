@@ -121,63 +121,6 @@ class JevFinalScreen<T> {
         evaluator: evaluator,
       );
 
-  /// Only body text and the already available parent body leave the device.
-  static JevFinalScreen<ReplyInfo> comment({
-    String? parentBody,
-    JevEvaluator? evaluator,
-  }) => JevFinalScreen<ReplyInfo>(
-    surface: JevSurface.comment,
-    toCandidate: (reply) {
-      final body = reply.content.message.trim();
-      if (body.isEmpty) return null;
-      final parent = parentBody?.trim();
-      return JevCandidate(
-        title: body,
-        snippet: parent == null || parent.isEmpty ? null : parent,
-      );
-    },
-    evaluator: evaluator,
-  );
-
-  /// Screens both main replies and their inline child previews in source order.
-  static Future<List<ReplyInfo>> comments(
-    List<ReplyInfo> replies, {
-    String? parentBody,
-    JevEvaluator? evaluator,
-  }) async {
-    final visible = await comment(
-      parentBody: parentBody,
-      evaluator: evaluator,
-    ).screen(replies);
-    // Batch child previews across parents, instead of one paid round per root.
-    final previews = <(ReplyInfo, String)>[
-      for (final parent in visible)
-        for (final child in parent.replies) (child, parent.content.message),
-    ];
-    if (previews.isEmpty) return visible;
-    final screened = await JevFinalScreen<(ReplyInfo, String)>(
-      surface: JevSurface.comment,
-      evaluator: evaluator,
-      toCandidate: (item) {
-        final body = item.$1.content.message.trim();
-        return body.isEmpty
-            ? null
-            : JevCandidate(title: body, snippet: item.$2);
-      },
-    ).screen(previews);
-    if (!identical(screened, previews)) {
-      final keep = Set<ReplyInfo>.identity()
-        ..addAll(screened.map((item) => item.$1));
-      for (final parent in visible) {
-        final children = parent.replies.where(keep.contains).toList();
-        parent.replies
-          ..clear()
-          ..addAll(children);
-      }
-    }
-    return visible;
-  }
-
   static JevFinalScreen<HotVideoItemModel> hotVideo({
     required JevSurface surface,
     JevEvaluator? evaluator,
@@ -243,3 +186,4 @@ String? jevVideoLocalKey(BaseVideoItemModel item) {
   if (aid != null) return 'aid:$aid';
   return null;
 }
+

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:PiliPlus/features/jev/jev_final_screen.dart';
 import 'package:PiliPlus/features/jev/jev_evaluator.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo, DetailListReply, Mode;
@@ -113,32 +112,14 @@ class VideoReplyReplyController extends ReplyController
     }
     final root = _screenedFirstFloor!;
     await handleListResponse(dataList);
-    // Video-detail children go through the Jev final screen with parent
-    // context; other pages rely on shielding plus comment screening.
-    if (isVideoDetail) {
-      final jevVisible = await JevFinalScreen.comments(
-        dataList,
-        parentBody: parentBody ?? root.content.message,
-        evaluator: jevEvaluator,
-      );
-      if (isClosed) return;
-      if (!identical(jevVisible, dataList)) {
-        dataList
-          ..clear()
-          ..addAll(jevVisible);
-      }
-    }
-    var rootCandidates = applyShielding([root]);
-    if (isVideoDetail) {
-      rootCandidates = await JevFinalScreen.comment(
-        evaluator: jevEvaluator,
-      ).screen(rootCandidates);
-      if (isClosed) return;
-    }
-    final visible = await screenComments([
-      ...rootCandidates,
-      ...dataList,
-    ]);
+    // Children were detached from the root for first-floor screening; hand
+    // the merged comment pipeline their parent context explicitly.
+    final visible = await screenComments(
+      [...applyShielding([root]), ...dataList],
+      parentBodies: {
+        for (final child in dataList) child: parentBody ?? root.content.message,
+      },
+    );
     _screenedFirstFloor = visible.any((r) => identical(r, root)) ? root : null;
     dataList
       ..clear()
