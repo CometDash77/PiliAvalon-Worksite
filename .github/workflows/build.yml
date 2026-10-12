@@ -48,7 +48,7 @@ on:
                 type: boolean
 
             tag:
-                description: "tag"
+                description: "Release tag; supports {count} {hash} {version} {run_id} placeholders resolved at build time"
                 required: false
                 default: ""
                 type: string
@@ -197,6 +197,9 @@ jobs:
               run: |
                   release_tag="${{ github.event.inputs.tag }}"
                   release_tag="${release_tag//\{run_id\}/${GITHUB_RUN_ID}}"
+                  release_tag="${release_tag//\{count\}/${{ env.version_code }}}"
+                  release_tag="${release_tag//\{hash\}/${{ env.short_hash }}}"
+                  release_tag="${release_tag//\{version\}/${{ env.version }}}"
                   echo "release_tag=${release_tag}" >> "$GITHUB_ENV"
               shell: bash
 
