@@ -137,6 +137,56 @@ class JevVerdictCache {
   /// 原样完成，但新的挂载会落空而自行发送——与标签缓存 clear 语义一致。
   static void resetCache() => _generations.clear();
 
+  // ---- 落盘接缝（issue #123 Q1：本期进程内不落盘，仅预留序列化口） ----
+
+  /// 把当前全部代的判定序列化为可 JSON 的快照。在飞请求不导出——未完成
+  /// 的判定本来就不确定，落盘没有意义。进程退出前调用并持久化返回值，
+  /// 下次启动用 [restoreSnapshot] 恢复；本期不接线，仅保证结构稳定。
+  static Map<String, Object?> exportSnapshot() => <String, Object?>{
+    'version': 1,
+    'generations': <String, Object?>{
+      for (final gen in _generations.entries)
+        gen.key: <Object?>[
+          for (final entry in gen.value.entries.entries)
+            <String, Object?>{
+              'identity': entry.key,
+              'hide': entry.value.hide,
+              'storedAt': entry.value.storedAt.millisecondsSinceEpoch,
+            },
+        ],
+    },
+  };
+
+  /// 恢复 [exportSnapshot] 的产物：整体替换现有缓存内容。结构损坏的条目
+  /// 静默跳过——快照来自本机旧进程，宁可少缓存也不恢复出脏判定。
+  static void restoreSnapshot(Map<String, Object?> snapshot) {
+    if (snapshot['version'] != 1) return;
+    final gens = snapshot['generations'];
+    if (gens is! Map) return;
+    final restored = <String, _JevGeneration>{};
+    for (final gen in gens.entries) {
+      final key = gen.key;
+      final list = gen.value;
+      if (key is! String || list is! List) continue;
+      final generation = _JevGeneration();
+      for (final item in list) {
+        if (item is! Map) continue;
+        final identity = item['identity'];
+        final hide = item['hide'];
+        final storedAt = item['storedAt'];
+        if (identity is! String || hide is! bool || storedAt is! int) continue;
+        generation.entries[identity] = _JevVerdictEntry(
+          hide: hide,
+          storedAt: DateTime.fromMillisecondsSinceEpoch(storedAt),
+        );
+      }
+      if (generation.entries.isNotEmpty) restored[key] = generation;
+    }
+    _generations
+      ..clear()
+      ..addAll(restored);
+  }
+
   /// 当前全部代内的判定条数（设置页展示用）。
   static int get cachedEntryCount {
     var total = 0;

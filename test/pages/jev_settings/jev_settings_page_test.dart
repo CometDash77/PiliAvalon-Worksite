@@ -309,7 +309,8 @@ void main() {
     final surfaces = tester
         .widgetList<SwitchListTile>(find.byType(SwitchListTile))
         .toList();
-    expect(surfaces.length, JevSurface.values.length + 2);
+    // Master + per-surface + issue #123 cache toggle + comment toggle.
+    expect(surfaces.length, JevSurface.values.length + 3);
     for (final tile in surfaces.skip(1)) {
       expect(tile.onChanged, isNull);
       expect(tile.value, isFalse);
@@ -321,12 +322,18 @@ void main() {
         .widgetList<SwitchListTile>(find.byType(SwitchListTile))
         .toList();
     final wired = enabled.skip(1).where((tile) => tile.subtitle == null);
-    expect(wired.length, JevSurface.values.length - 1);
+    // 8 wired surfaces + the issue #123 cache toggle (subtitle null).
+    expect(wired.length, JevSurface.values.length);
     for (final tile in wired) {
       expect(tile.onChanged, isNotNull);
     }
     // A surface with no call site says so and cannot be switched on.
-    for (final tile in enabled.skip(1).where((tile) => tile.subtitle != null)) {
+    // The comment toggle has a subtitle but its own enabled gate, so it is
+    // excluded here (covered by the comment criterion test below).
+    for (final tile in enabled.skip(1).where(
+      (tile) =>
+          tile.subtitle != null && tile.key != const ValueKey('jev-comment-enabled'),
+    )) {
       expect(tile.onChanged, isNull);
       expect(tile.value, isFalse);
     }

@@ -5,6 +5,7 @@ import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/jev/jev_screen_log.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart';
 import 'package:PiliPlus/models/model_hot_video_item.dart';
+import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -102,6 +103,9 @@ class Harness {
     }
     settingsBox.values[JevSettingsStore.providerKey] = 'typesafe';
     settingsBox.values[JevSettingsStore.providerConfirmedKey] = true;
+    // 终审判定缓存是进程内静态区；日志测试关注实时判定，直接关闭以免
+    // 跨用例命中（#123）。
+    settingsBox.values[SettingBoxKey.jevVerdictCacheEnabled] = false;
   }
 
   final MemoryBox settingsBox;
@@ -116,9 +120,11 @@ class Harness {
 }
 
 HotVideoItemModel hot(String title) => HotVideoItemModel.fromJson({
+  // bvid 按 title 派生：判定缓存身份取 localKey，恒同 bvid 会把不同
+  // 标题的假视频并成同组并跨用例命中（#123）。
   'aid': 1,
   'cid': 101,
-  'bvid': 'BV1',
+  'bvid': 'BV$title',
   'videos': 1,
   'tid': 17,
   'tname': '游戏',
