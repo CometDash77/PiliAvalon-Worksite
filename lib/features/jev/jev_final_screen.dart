@@ -7,6 +7,7 @@ import 'package:PiliPlus/features/shielding/live_shielding.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo;
 import 'package:PiliPlus/models/model_hot_video_item.dart';
+import 'package:PiliPlus/models/model_video.dart';
 import 'package:PiliPlus/models_new/music/bgm_recommend_list.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_index_result/list.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_rank/pgc_rank_item_model.dart';
@@ -185,6 +186,7 @@ class JevFinalScreen<T> {
     toCandidate: (item) => _fromTitle(
       item.title,
       tags: [if (item.tname?.trim().isNotEmpty == true) item.tname!.trim()],
+      localKey: jevVideoLocalKey(item),
     ),
     evaluator: evaluator,
   );
@@ -222,12 +224,22 @@ class JevFinalScreen<T> {
   static JevCandidate? _fromTitle(
     String? title, {
     List<String> tags = const [],
+    String? localKey,
   }) {
     final value = title?.trim();
     if (value == null || value.isEmpty) return null;
-    return JevCandidate(title: value, tags: tags);
+    return JevCandidate(title: value, tags: tags, localKey: localKey);
   }
 }
 
 String? _tagSummary(List<String> tags) => tags.isEmpty ? null : tags.join(' / ');
 
+/// 视频面卡片的本地缓存身份（issue #123）：bvid 优先，退回 aid；都没有就留
+/// 空，评测器回退到规范化标题。仅用于本地判定缓存，绝不进上游载荷（#34）。
+String? jevVideoLocalKey(BaseVideoItemModel item) {
+  final bvid = item.bvid?.trim();
+  if (bvid != null && bvid.isNotEmpty) return 'bvid:$bvid';
+  final aid = item.aid;
+  if (aid != null) return 'aid:$aid';
+  return null;
+}

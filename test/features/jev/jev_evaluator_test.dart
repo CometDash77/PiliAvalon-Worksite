@@ -122,6 +122,7 @@ class _Harness {
     credentials: credentials,
     settings: JevSettingsStore(box: settingsBox),
     preferences: JevPreferenceStore(box: preferenceBox),
+    verdictCache: JevVerdictCache(box: settingsBox),
   );
 }
 
@@ -129,6 +130,7 @@ void main() {
   setUp(() {
     JevSettingsStore.resetCache();
     JevPreferenceStore.resetCache();
+    JevVerdictCache.resetCache();
   });
 
   JevCandidate candidate(String title) => JevCandidate(title: title);

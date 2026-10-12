@@ -5,6 +5,7 @@ import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/pages/jev_settings/jev_rules_page.dart';
 import 'package:PiliPlus/pages/jev_settings/jev_screen_log_page.dart';
+import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:material_ui/material_ui.dart' hide ListTile;
 
@@ -51,7 +52,6 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
 
   late final JevModelCatalog _catalog = widget.catalog ?? JevModelCatalog();
   final TextEditingController _modelController = TextEditingController();
-  final TextEditingController _commentController = TextEditingController();
   int _generation = 0;
   int _catalogGeneration = 0;
   bool _catalogBusy = false;
@@ -74,6 +74,12 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   bool _obscureKey = true;
   bool _hasStoredKey = false;
 
+  // Issue #123: verdict-cache bounds, read from the settings box in _load().
+  bool _cacheEnabled = true;
+  int _cacheEntries = 0;
+  final TextEditingController _cacheTtlController = TextEditingController();
+  final TextEditingController _cacheMaxController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -84,7 +90,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   void dispose() {
     _keyController.dispose();
     _modelController.dispose();
-    _commentController.dispose();
+    _cacheTtlController.dispose();
+    _cacheMaxController.dispose();
     super.dispose();
   }
 
@@ -101,6 +108,16 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     final settings = await _store.load();
     final profile = await _preferences.load();
     final status = await _credentials.status();
+    // Issue #123: verdict-cache bounds live in the settings box; reads are
+    // defensive so a broken box keeps the page usable.
+    var cacheEnabled = true;
+    var cacheTtl = JevVerdictCache.ttlMinutesDefault;
+    var cacheMax = JevVerdictCache.maxEntriesDefault;
+    try {
+      cacheEnabled = JevVerdictCache.enabledIn(_store.box);
+      cacheTtl = JevVerdictCache.ttlMinutesIn(_store.box);
+      cacheMax = JevVerdictCache.maxEntriesIn(_store.box);
+    } catch (_) {}
     String? storedKey;
     if (status == JevKeyStoreStatus.available) {
       try {
@@ -118,7 +135,10 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     setState(() {
       _settings = JevSettingsStore.snapshot;
       _profile = profile;
-      _commentController.text = _settings.commentCriteria;
+      _cacheEnabled = cacheEnabled;
+      _cacheEntries = JevVerdictCache.cachedEntryCount;
+      _cacheTtlController.text = '$cacheTtl';
+      _cacheMaxController.text = '$cacheMax';
       final provider = _settings.provider;
       if (provider != null) {
         _modelController.text = _settings.modelFor(provider);
@@ -349,10 +369,12 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         ),
         children: [
           ..._buildSwitchSection(),
+          ..._buildCacheSection(),
+          const Divider(height: 1),
           custom.ListTile(
             leading: const Icon(Icons.rule_outlined),
             title: const Text('判断规则'),
-            subtitle: const Text('分别管理视频、评论、直播间的问题、隐藏答案和执行阈值'),
+            subtitle: const Text('分别管理视频、评论、直播间的问题、隐藏答案和执行阈值；评论过滤只使用这里的评论规则（issue #122）'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push<void>(
               MaterialPageRoute(
@@ -370,8 +392,6 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
               MaterialPageRoute(builder: (_) => const JevScreenLogPage()),
             ),
           ),
-          const Divider(height: 1),
-          ..._buildCommentSection(),
           const Divider(height: 1),
           ..._buildProfileSection(),
           const Divider(height: 1),
@@ -419,40 +439,47 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       ),
   ];
 
-  Future<void> _saveCommentCriteria({bool restorePreset = false}) async {
-    final criteria = restorePreset
-        ? JevSettings.defaultCommentCriteria
-        : _commentController.text;
-    if (await _saveSettings(_settings.copyWith(commentCriteria: criteria))) {
-      if (!mounted) return;
-      _commentController.text = criteria;
-      _toast(restorePreset ? '已恢复评论预设' : '评论标准已保存');
-    }
-  }
-
-  List<Widget> _buildCommentSection() => [
+  /// Issue #123: configurable bounds for the video-surface verdict cache.
+  /// Values clamp to the cache's own limits on save; 清空 wipes the in-memory
+  /// cache immediately. In-flight requests are unaffected by design.
+  List<Widget> _buildCacheSection() => [
+    const Padding(
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Text('判定结果缓存（视频面）'),
+    ),
     SwitchListTile(
-      key: const ValueKey('jev-comment-enabled'),
-      title: const Text('Jev 评论过滤'),
-      subtitle: const Text('主评论、楼中楼、对话及首页可见评论判断共用此标准；默认关闭'),
-      value: _settings.commentEnabled,
-      onChanged: _settings.enabled
-          ? (value) => _saveSettings(_settings.copyWith(commentEnabled: value))
-          : null,
+      key: const ValueKey('jev-verdict-cache-enabled'),
+      secondary: const Icon(Icons.cached_outlined),
+      title: const Text('缓存判定结果'),
+      subtitle: const Text(
+        '同一视频在有效期内复用上次的判定，不再重复请求上游；规则、模型或偏好档变化时整批作废',
+      ),
+      value: _cacheEnabled,
+      onChanged: (value) => _saveCacheConfig(enabled: value),
     ),
     Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: TextField(
-        key: const ValueKey('jev-comment-criteria'),
-        controller: _commentController,
-        minLines: 3,
-        maxLines: 6,
-        maxLength: 4000,
+        key: const ValueKey('jev-verdict-cache-ttl'),
+        controller: _cacheTtlController,
+        keyboardType: TextInputType.number,
         decoration: const InputDecoration(
-          labelText: '评论过滤标准（可自定义）',
-          helperText: '保存后生效；留空不调用 Jev。上下文不足、不确定或请求失败时保留评论。',
-          helperMaxLines: 2,
+          labelText: '缓存有效期（分钟）',
           border: OutlineInputBorder(),
+          helperText: '范围 1–10080，默认 1440（24 小时）；过期后照常请求上游',
+        ),
+      ),
+    ),
+    Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: TextField(
+        key: const ValueKey('jev-verdict-cache-max-entries'),
+        controller: _cacheMaxController,
+        keyboardType: TextInputType.number,
+        decoration: const InputDecoration(
+          labelText: '缓存条目上限',
+          border: OutlineInputBorder(),
+          helperText: '范围 1–5000，默认 500；超出后从最旧的开始淘汰',
         ),
       ),
     ),
@@ -461,23 +488,68 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       child: Wrap(
         children: [
           TextButton(
-            key: const ValueKey('jev-comment-save'),
-            onPressed: _saveCommentCriteria,
-            child: const Text('保存评论标准'),
+            onPressed: () => _saveCacheConfig(),
+            child: const Text('保存缓存设置'),
           ),
-          TextButton(
-            key: const ValueKey('jev-comment-restore'),
-            onPressed: () => _saveCommentCriteria(restorePreset: true),
-            child: const Text('恢复评论预设'),
-          ),
+          TextButton(onPressed: _clearVerdicts, child: const Text('清空判定缓存')),
         ],
       ),
     ),
-    const Padding(
-      padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
-      child: Text('启用后仅向已确认提供方发送评论正文和此标准，不发送作者、评论 ID 或账号信息。'),
+    Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      child: Text('当前缓存 $_cacheEntries 条判定'),
+    ),
+    const custom.ListTile(
+      dense: true,
+      leading: Icon(Icons.info_outline),
+      title: Text('缓存只保存在内存：重启应用即清空；超时、失败与低置信的判定不会入缓存'),
     ),
   ];
+
+  Future<void> _saveCacheConfig({bool? enabled}) async {
+    final nextEnabled = enabled ?? _cacheEnabled;
+    final ttl =
+        int.tryParse(_cacheTtlController.text.trim()) ??
+        JevVerdictCache.ttlMinutesDefault;
+    final maxEntries =
+        int.tryParse(_cacheMaxController.text.trim()) ??
+        JevVerdictCache.maxEntriesDefault;
+    final clampedTtl = ttl < JevVerdictCache.ttlMinutesMin
+        ? JevVerdictCache.ttlMinutesMin
+        : (ttl > JevVerdictCache.ttlMinutesMax
+              ? JevVerdictCache.ttlMinutesMax
+              : ttl);
+    final clampedMax = maxEntries < JevVerdictCache.maxEntriesMin
+        ? JevVerdictCache.maxEntriesMin
+        : (maxEntries > JevVerdictCache.maxEntriesMax
+              ? JevVerdictCache.maxEntriesMax
+              : maxEntries);
+    try {
+      await _store.box.put(SettingBoxKey.jevVerdictCacheEnabled, nextEnabled);
+      await _store.box.put(SettingBoxKey.jevVerdictCacheTtlMinutes, clampedTtl);
+      await _store.box.put(
+        SettingBoxKey.jevVerdictCacheMaxEntries,
+        clampedMax,
+      );
+    } catch (error) {
+      _toast('缓存设置保存失败：$error');
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _cacheEnabled = nextEnabled;
+      _cacheEntries = JevVerdictCache.cachedEntryCount;
+      _cacheTtlController.text = '$clampedTtl';
+      _cacheMaxController.text = '$clampedMax';
+    });
+    _toast('缓存设置已保存');
+  }
+
+  void _clearVerdicts() {
+    JevVerdictCache.resetCache();
+    setState(() => _cacheEntries = JevVerdictCache.cachedEntryCount);
+    _toast('已清空判定缓存');
+  }
 
   List<Widget> _buildProviderSection(Color errorColor) => [
     const Padding(
@@ -778,14 +850,14 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   Widget _buildPrivacySection() => const ExpansionTile(
     leading: Icon(Icons.privacy_tip_outlined),
     title: Text('隐私说明'),
-    subtitle: Text('只发送最小候选内容、启用规则与所需负反馈摘要；评论过滤发送正文与自定义标准'),
+    subtitle: Text('只发送最小候选内容、启用规则与所需负反馈摘要；评论过滤发送正文与规则上下文'),
     childrenPadding: EdgeInsets.fromLTRB(16, 0, 16, 12),
     children: [
       Text('发送：启用规则中的问题、答案含义与选项；视频标题及已有短简介/标签，评论正文及必要回复上下文，直播推荐卡标题/分区。启用内置规则时发送最多 20 个未过期负主题及大致次数。'),
       SizedBox(height: 8),
       Text('不发送：完整浏览/观看历史、账号标识、cookie、原始点踩记录、UP 主、视频 ID、链接、长篇元数据。'),
       SizedBox(height: 8),
-      Text('不额外抓取：视频字幕、作者历史、直播房间消息。评论规则仅在视频详情评论列表生效。规则保存在本机，编辑保存不会发起模型请求。'),
+      Text('不额外抓取：视频字幕、作者历史、直播房间消息。评论规则在视频详情评论列表、楼中楼/对话页与首页评论门控生效。规则保存在本机，编辑保存不会发起模型请求。'),
       SizedBox(height: 8),
       Text('低置信、超时、限流、缺答、密钥缺失或无效、provider 报错、安全存储不可用时，候选一律保持可见。'),
     ],

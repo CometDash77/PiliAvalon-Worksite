@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:PiliPlus/features/shielding/home_feed_comment_gate.dart';
@@ -17,8 +18,8 @@ import 'package:hive_ce/hive.dart';
 // -----------------------------------------------------------------------------
 // ticket #79（map #47）：每页上游请求数 量具
 //
-// 量的是什么：首页推荐面跑「一页」时打出去的**上游请求个数**（标签 + 评论），
-// 以及这发生在跨页重复候选上的变化。
+// 量的是什么：首页推荐面跑「一页」时打出去的**上游请求个数**（标签 + 评论；
+// #123 起另记 Jev 终审请求数口径），以及这发生在跨页重复候选上的变化。
 //
 // 量具诚实边界（读的时候请连同这一段一起读）：
 // 1. 驱动的全是已入库产品类：RecommendationPipeline、
@@ -87,6 +88,66 @@ class _CountingCommentLoader {
       };
 }
 
+/// 计数的 Jev 终审传输端点：一次调用 = 一次上游请求，记录请求体供载荷断言。
+class _CountingJevTransport {
+  int calls = 0;
+  final List<Map<String, Object?>> bodies = [];
+
+  JevTransport get transport => ({required provider, required apiKey, required body}) async {
+    calls++;
+    bodies.add(body);
+    // 每批至多 3 个槽位（JevLimits.batchSize），全部 keep：判定不砍候选。
+    return {
+      'answers': {
+        'candidate_1': {'noul': 0.10},
+        'candidate_2': {'noul': 0.10},
+        'candidate_3': {'noul': 0.10},
+      },
+    };
+  };
+}
+
+/// Jev 设置内存箱：与 lib 的 Hive 实现同接口。
+class _JevMemoryBox implements JevSettingsBox {
+  final Map<String, Object> values = {};
+
+  @override
+  Object? get(String key, {Object? defaultValue}) => values[key] ?? defaultValue;
+
+  @override
+  Future<void> put(String key, Object? value) async => values[key] = value!;
+
+  @override
+  Future<void> delete(String key) async => values.remove(key);
+}
+
+class _JevFakeCredentials implements JevCredentialStore {
+  @override
+  Future<String?> read() async => 'sk-gauge-key';
+}
+
+/// 打开 Jev（homeWeb 面 + typesafe）并把计次传输端点接进评测器的装配。
+class _JevRig {
+  _JevRig() {
+    final settingsBox = _JevMemoryBox();
+    settingsBox.values[JevSettingsStore.enabledKey] = true;
+    settingsBox.values[JevSettingsStore.surfaceKey(JevSurface.homeWeb)] = true;
+    settingsBox.values[JevSettingsStore.providerKey] = 'typesafe';
+    settingsBox.values[JevSettingsStore.providerConfirmedKey] = true;
+    transport = _CountingJevTransport();
+    evaluator = JevEvaluator(
+      transport: transport.transport,
+      credentials: _JevFakeCredentials(),
+      settings: JevSettingsStore(box: settingsBox),
+      preferences: JevPreferenceStore(box: settingsBox),
+      verdictCache: JevVerdictCache(box: settingsBox),
+    );
+  }
+
+  late final _CountingJevTransport transport;
+  late final JevEvaluator evaluator;
+}
+
 class _TestVideo extends BaseVideoItemModel {
   _TestVideo(int index) {
     title = 'video $index';
@@ -136,12 +197,17 @@ RecommendationBatch _batch() => RecommendationBatch(
 RecommendationSurface<RecommendationFeedEntry<_TestVideo>> _homeFeedSurface({
   required _CountingTagFetcher tagFetcher,
   required _CountingCommentLoader commentLoader,
+  JevEvaluator? jevEvaluator,
 }) {
   final production = RecommendationSurfaces.homeFeed<_TestVideo>(
     jevSurface: JevSurface.homeWeb,
+    jevEvaluator: jevEvaluator,
   );
   return RecommendationSurface<RecommendationFeedEntry<_TestVideo>>(
     judge: production.judge,
+    // #123 起：终审阶段与其他面同装配。Jev 默认关（设置箱空）→ disabled →
+    // 0 次终审请求，旧断言不受影响；显式挂 jevEvaluator 的测试才会计入。
+    finalScreen: production.finalScreen,
     enrichTags: (entries, batch) =>
         RecommendationTagEnricher(
           fetchTags: tagFetcher.call,
@@ -162,13 +228,22 @@ RecommendationSurface<RecommendationFeedEntry<_TestVideo>> _homeFeedSurface({
 }
 
 class _PageResult {
-  const _PageResult(this.survivors, this.tagRequests, this.commentRequests);
+  const _PageResult(
+    this.survivors,
+    this.tagRequests,
+    this.commentRequests, [
+    this.jevRequests = 0,
+  ]);
 
   final int survivors;
   final int tagRequests;
   final int commentRequests;
 
+  /// #123 扩展口径：Jev 终审请求数。Jev 关闭时恒为 0。
+  final int jevRequests;
+
   /// 上游请求数 = 取列表 1（构造常数，不经本量具）+ 标签 + 评论。
+  /// Jev 终审请求数单列（jevRequests），不并入历史口径。
   int get upstream => tagRequests + commentRequests;
 }
 
@@ -177,15 +252,18 @@ class _PageResult {
 void _clearSharedCaches() {
   RecommendationTagEnricher.resetCache();
   HomeFeedCommentGate.resetDecisionCache();
+  JevVerdictCache.resetCache();
 }
 
 Future<_PageResult> _runPage({
   required List<RecommendationFeedEntry<_TestVideo>> candidates,
   required _CountingTagFetcher tagFetcher,
   required _CountingCommentLoader commentLoader,
+  _JevRig? jev,
 }) async {
   final tagBefore = tagFetcher.requests;
   final commentBefore = commentLoader.requested.length;
+  final jevBefore = jev?.transport.calls ?? 0;
 
   final kept =
       await RecommendationPipeline<RecommendationFeedEntry<_TestVideo>>(
@@ -193,6 +271,7 @@ Future<_PageResult> _runPage({
         surface: _homeFeedSurface(
           tagFetcher: tagFetcher,
           commentLoader: commentLoader,
+          jevEvaluator: jev?.evaluator,
         ),
         candidateSource: (batch) => candidates,
       ).run();
@@ -201,6 +280,7 @@ Future<_PageResult> _runPage({
     kept.length,
     tagFetcher.requests - tagBefore,
     commentLoader.requested.length - commentBefore,
+    jev == null ? 0 : jev.transport.calls - jevBefore,
   );
 }
 
@@ -231,6 +311,7 @@ void main() {
   setUp(() {
     RecommendationTagEnricher.resetCache();
     HomeFeedCommentGate.resetDecisionCache();
+    JevVerdictCache.resetCache();
     HomeFeedCommentGate.decisionCacheClock = DateTime.now;
   });
 
@@ -361,6 +442,61 @@ void main() {
       );
       expect(expired.commentRequests, _pageSize, reason: '越过 30s 窗口后重新判定');
       expect(expired.tagRequests, 0, reason: '30min 标签成功缓存仍在窗口内');
+    });
+
+    test('Jev 终审请求数：第 2 页全重复时命中判定缓存为 0（#123）', () async {
+      final tagFetcher = _CountingTagFetcher();
+      final commentLoader = _CountingCommentLoader();
+      final jev = _JevRig();
+      final page = [for (var i = 0; i < _pageSize; i++) _entry(i)];
+
+      _clearSharedCaches();
+      final first = await _runPage(
+        candidates: page,
+        tagFetcher: tagFetcher,
+        commentLoader: commentLoader,
+        jev: jev,
+      );
+
+      // 冷页：20 个候选（bvid 互异 → 20 个缓存身份）、批上限 3 → ceil(20/3)=7。
+      expect(
+        first.jevRequests,
+        7,
+        reason: '20 候选 ÷ 批大小 3 = 7 次终审请求（冷缓存）',
+      );
+      expect(
+        first.survivors,
+        _pageSize,
+        reason: 'keep 判定不砍候选：终审阶段不改变量具的存活口径',
+      );
+
+      // 暖页：同一批视频（同 bvid → 同缓存身份）在 TTL 内复用判定。
+      final second = await _runPage(
+        candidates: page,
+        tagFetcher: tagFetcher,
+        commentLoader: commentLoader,
+        jev: jev,
+      );
+      expect(
+        second.jevRequests,
+        0,
+        reason: '#123 验收：TTL 内二次进终审的上游请求数为 0',
+      );
+
+      // #34 红线：任何终审请求体都不含视频身份（bvid/aid 一律不上游）。
+      for (final body in jev.transport.bodies) {
+        final encoded = jsonEncode(body);
+        expect(
+          encoded.contains('bvid:'),
+          isFalse,
+          reason: '请求体含 bvid: $encoded',
+        );
+        expect(
+          encoded.contains('aid:'),
+          isFalse,
+          reason: '请求体含 aid: $encoded',
+        );
+      }
     });
 
     test('其余推荐面没有每页上游请求阶段', () {
