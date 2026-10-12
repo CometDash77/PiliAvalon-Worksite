@@ -129,6 +129,7 @@ class _VideoReplyReplyPanelState extends State<VideoReplyReplyPanel>
     _controller = Get.put(
       VideoReplyReplyController(
         hasRoot: widget.firstFloor != null,
+        initialRoot: widget.firstFloor,
         id: widget.id,
         oid: widget.oid,
         rpid: widget.rpid,
@@ -187,8 +188,7 @@ class _VideoReplyReplyPanelState extends State<VideoReplyReplyPanel>
     );
   }
 
-  ReplyInfo? get firstFloor =>
-      widget.firstFloor ?? _controller.firstFloor.value;
+  ReplyInfo? get firstFloor => _controller.firstFloor.value;
 
   ScrollController get scrollController =>
       _controller.nestedController ?? _controller.scrollController;
@@ -204,17 +204,13 @@ class _VideoReplyReplyPanelState extends State<VideoReplyReplyPanel>
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           if (!isDialogue) ...[
-            if ((widget.firstFloor ?? _controller.firstFloor.value)
-                case final firstFloor?)
-              _header(theme, firstFloor)
-            else
-              Obx(() {
-                final firstFloor = _controller.firstFloor.value;
-                if (firstFloor == null) {
-                  return const SliverToBoxAdapter();
-                }
-                return _header(theme, firstFloor);
-              }),
+            Obx(() {
+              final firstFloor = _controller.firstFloor.value;
+              if (firstFloor == null) {
+                return const SliverToBoxAdapter();
+              }
+              return _header(theme, firstFloor);
+            }),
             _sortWidget(theme.colorScheme),
           ],
           Obx(

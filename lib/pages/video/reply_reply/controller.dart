@@ -28,13 +28,9 @@ class VideoReplyReplyController extends ReplyController
     this.isVideoDetail = false,
     this.parentBody,
     this.jevEvaluator,
+    this.initialRoot,
   });
   final int? dialog;
-  final bool isVideoDetail;
-  final String? parentBody;
-  final JevEvaluator? jevEvaluator;
-  ReplyInfo? _visibleFirstFloor;
-  String? _rootBody;
   int? id;
   // 视频aid 请求时使用的oid
   int oid;
@@ -43,7 +39,13 @@ class VideoReplyReplyController extends ReplyController
   int replyType;
 
   bool hasRoot = false;
+  final bool isVideoDetail;
+  final String? parentBody;
+  final JevEvaluator? jevEvaluator;
+  final ReplyInfo? initialRoot;
   final firstFloor = Rxn<ReplyInfo>();
+  ReplyInfo? _screenedFirstFloor;
+  bool _hasPendingFirstFloor = false;
 
   final index = RxnInt();
 
@@ -86,47 +88,79 @@ class VideoReplyReplyController extends ReplyController
     // reply2Reply // isDialogue.not
     if (data is DetailListReply) {
       count.value = data.root.count.toInt();
-      if (isRefresh && !hasRoot) {
-        firstFloor.value = isVideoDetail
-            ? _visibleFirstFloor
-            : applyFirstFloorShielding(data.root);
-      }
     }
 
     return false;
   }
 
   @override
-  Future<void> handleListResponse(List<ReplyInfo> dataList) async {
-    final targetId = id;
-    id = null;
-    // Non-video pages keep their existing synchronous lookup behavior.
-    if (!isVideoDetail && targetId != null) {
-      setIndexById(Int64(targetId), dataList);
-    }
-    super.handleListResponse(dataList);
-    if (isVideoDetail) {
-      final visible = await JevFinalScreen.comments(
-        dataList,
-        parentBody: parentBody ?? _rootBody,
-        evaluator: jevEvaluator,
-      );
-      if (isClosed) return;
-      if (!identical(visible, dataList)) {
-        dataList
-          ..clear()
-          ..addAll(visible);
-      }
-      if (targetId != null) {
-        // The next-frame scroll must target the final visible list, after Jev.
-        setIndexById(Int64(targetId), dataList);
-      }
+  Future<void> beforeListResponse(bool isRefresh, response) async {
+    if (isRefresh && (response is DetailListReply || initialRoot != null)) {
+      // Children are screened by the list pipeline. Screen only the root here.
+      final source = initialRoot ?? (response as DetailListReply).root;
+      _screenedFirstFloor = ReplyInfo.fromBuffer(source.writeToBuffer())
+        ..replies.clear();
+      _hasPendingFirstFloor = true;
     }
   }
 
-  // Detail cursors describe the unfiltered source, including all-hidden pages.
   @override
-  void checkIsEnd(int length) {}
+  Future<void> prepareListResponse(List<ReplyInfo> dataList) async {
+    if (!_hasPendingFirstFloor) {
+      return super.prepareListResponse(dataList);
+    }
+    final root = _screenedFirstFloor!;
+    await handleListResponse(dataList);
+    // Video-detail children go through the Jev final screen with parent
+    // context; other pages rely on shielding plus comment screening.
+    if (isVideoDetail) {
+      final jevVisible = await JevFinalScreen.comments(
+        dataList,
+        parentBody: parentBody ?? root.content.message,
+        evaluator: jevEvaluator,
+      );
+      if (isClosed) return;
+      if (!identical(jevVisible, dataList)) {
+        dataList
+          ..clear()
+          ..addAll(jevVisible);
+      }
+    }
+    var rootCandidates = applyShielding([root]);
+    if (isVideoDetail) {
+      rootCandidates = await JevFinalScreen.comment(
+        evaluator: jevEvaluator,
+      ).screen(rootCandidates);
+      if (isClosed) return;
+    }
+    final visible = await screenComments([
+      ...rootCandidates,
+      ...dataList,
+    ]);
+    _screenedFirstFloor = visible.any((r) => identical(r, root)) ? root : null;
+    dataList
+      ..clear()
+      ..addAll(visible.where((r) => !identical(r, root)));
+  }
+
+  @override
+  void afterListResponse(bool isRefresh, response) {
+    if (_hasPendingFirstFloor && isRefresh) {
+      _screenedFirstFloor?.replies.addAll(getDataList(response) ?? []);
+      firstFloor.value = _screenedFirstFloor;
+      _screenedFirstFloor = null;
+      _hasPendingFirstFloor = false;
+    }
+  }
+
+  @override
+  void handleListResponse(List<ReplyInfo> dataList) {
+    if (id != null) {
+      setIndexById(Int64(id!), dataList);
+      id = null;
+    }
+    super.handleListResponse(dataList);
+  }
 
   ReplyInfo? applyFirstFloorShielding(ReplyInfo reply) {
     final visible = applyShielding([reply]);
@@ -166,40 +200,22 @@ class VideoReplyReplyController extends ReplyController
   }
 
   @override
-  Future<LoadingState> customGetData() async {
-    final response = await (dialog != null
-        ? ReplyGrpc.dialogList(
-            type: replyType,
-            oid: oid,
-            root: rpid,
-            dialog: dialog!,
-            offset: paginationReply?.nextOffset,
-          )
-        : ReplyGrpc.detailList(
-            type: replyType,
-            oid: oid,
-            root: rpid,
-            rpid: id ?? 0,
-            mode: mode,
-            offset: paginationReply?.nextOffset,
-          ));
-    if (response case Success(:final response)) {
-      if (isVideoDetail && response is DetailListReply) {
-        _rootBody = response.root.content.message;
-        if (!hasRoot) {
-          final root = applyFirstFloorShielding(response.root);
-          final visible = root == null
-              ? <ReplyInfo>[]
-              : await JevFinalScreen.comment(evaluator: jevEvaluator)
-                    .screen([root]);
-          if (!isClosed) {
-            _visibleFirstFloor = visible.isEmpty ? null : visible.single;
-          }
-        }
-      }
-    }
-    return response;
-  }
+  Future<LoadingState> customGetData() => dialog != null
+      ? ReplyGrpc.dialogList(
+          type: replyType,
+          oid: oid,
+          root: rpid,
+          dialog: dialog!,
+          offset: paginationReply?.nextOffset,
+        )
+      : ReplyGrpc.detailList(
+          type: replyType,
+          oid: oid,
+          root: rpid,
+          rpid: id ?? 0,
+          mode: mode,
+          offset: paginationReply?.nextOffset,
+        );
 
   @override
   Future<void> onReload() {
@@ -210,7 +226,12 @@ class VideoReplyReplyController extends ReplyController
   }
 
   @override
-  void onReply(ReplyInfo? replyItem, {int? oid, int? replyType, int? index}) {
+  void onReply(
+    ReplyInfo? replyItem, {
+    int? oid,
+    int? replyType,
+    int? index,
+  }) {
     assert(replyItem != null && index != null);
 
     final (bool inputDisable, String? hint) = replyHint;
@@ -245,14 +266,23 @@ class VideoReplyReplyController extends ReplyController
             },
           ),
         )
-        .then((replyInfo) {
+        .then((replyInfo) async {
           if (replyInfo is ReplyInfo) {
             savedReplies.remove(key);
 
             count.value += 1;
-            loadingState
-              ..value.dataOrNull?.insert(index! + 1, replyInfo)
-              ..refresh();
+            final visible = await screenComments(applyShielding([replyInfo]));
+            if (visible.isEmpty) {
+              if (enableCommAntifraud) {
+                onCheckReply(replyInfo, isManual: false);
+              }
+              return;
+            }
+            final replies = loadingState.value.dataOrNull;
+            if (replies != null) {
+              replies.insert((index! + 1).clamp(0, replies.length), replyInfo);
+            }
+            loadingState.refresh();
             if (enableCommAntifraud) {
               onCheckReply(replyInfo, isManual: false);
             }

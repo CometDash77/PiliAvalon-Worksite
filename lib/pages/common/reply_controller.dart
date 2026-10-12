@@ -1,7 +1,8 @@
-import 'dart:async';
-
 import 'package:PiliPlus/common/widgets/flutter/text_field/controller.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
+import 'dart:async';
+
+import 'package:PiliPlus/features/jev/jev_comment_screening.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show MainListReply, ReplyInfo, SubjectControl, Mode;
 import 'package:PiliPlus/grpc/bilibili/pagination.pb.dart';
@@ -60,14 +61,51 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
   }
 
   @override
-  FutureOr<void> handleListResponse(List<ReplyInfo> dataList) {
-    final visibleReplies = applyShielding(dataList);
+  Future<void> prepareListResponse(List<ReplyInfo> dataList) async {
+    await handleListResponse(dataList);
+    final visibleReplies = await screenComments(dataList);
     if (!identical(visibleReplies, dataList)) {
       dataList
         ..clear()
         ..addAll(visibleReplies);
     }
   }
+
+  @override
+  FutureOr<void> handleListResponse(List<ReplyInfo> dataList) {
+    final visible = applyShielding(dataList);
+    dataList
+      ..clear()
+      ..addAll(visible);
+  }
+
+  Future<List<ReplyInfo>> screenComments(List<ReplyInfo> replies) async {
+    final candidates = <ReplyInfo>[];
+    void collect(List<ReplyInfo> items) {
+      for (final reply in items) {
+        candidates.add(reply);
+        collect(reply.replies);
+      }
+    }
+
+    collect(replies);
+    final result = await commentScreening.filter(candidates);
+    final visible = Set<ReplyInfo>.identity()..addAll(result.replies);
+    List<ReplyInfo> rebuild(List<ReplyInfo> items) {
+      final survivors = items.where(visible.contains).toList();
+      for (final reply in survivors) {
+        final children = rebuild(reply.replies);
+        reply.replies
+          ..clear()
+          ..addAll(children);
+      }
+      return survivors;
+    }
+
+    return rebuild(replies);
+  }
+
+  JevCommentScreening get commentScreening => JevCommentScreening();
 
   @override
   bool customHandleResponse(bool isRefresh, Success<R> response) {
@@ -107,16 +145,7 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
 
     for (final reply in visibleReplies) {
       if (reply.replies.isEmpty) continue;
-      final visibleChildReplies = reply.replies.where((child) {
-        if (!CommentShieldMatcher.match(child, commentConfig).visible) {
-          return false;
-        }
-        if (!rulesEnabled) return true;
-        return ShieldingAdapters.isVisible(
-          ShieldingAdapters.fromReplyInfo(child),
-          ruleSet,
-        );
-      }).toList();
+      final visibleChildReplies = applyShielding(reply.replies);
       reply.replies
         ..clear()
         ..addAll(visibleChildReplies);
@@ -177,7 +206,11 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
     return (inputDisable, hint);
   }
 
-  void onReply(ReplyInfo? replyItem, {int? oid, int? replyType}) {
+  void onReply(
+    ReplyInfo? replyItem, {
+    int? oid,
+    int? replyType,
+  }) {
     if (loadingState.value case Error(:final errMsg, :final code)) {
       if (errMsg != null && (code == 12061 || code == 12002)) {
         SmartDialog.showToast(errMsg);
@@ -220,33 +253,47 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
             settings: RouteSettings(arguments: Get.arguments),
           ),
         )
-        .then((replyInfo) {
-          if (replyInfo is ReplyInfo) {
-            savedReplies.remove(key);
-            if (loadingState.value case Success(:final response)) {
-              if (response == null) {
-                loadingState.value = Success([replyInfo]);
-              } else {
-                if (oid != null) {
-                  response.insert(hasUpTop ? 1 : 0, replyInfo);
-                } else {
-                  replyItem!
-                    ..count += 1
-                    ..replies.add(replyInfo);
+        .then(
+          (replyInfo) async {
+            if (replyInfo is ReplyInfo) {
+              savedReplies.remove(key);
+              final visible = await screenComments(applyShielding([replyInfo]));
+              if (visible.isEmpty) {
+                count.value += 1;
+                if (oid == null) replyItem!.count += 1;
+                if (enableCommAntifraud) {
+                  onCheckReply(replyInfo, isManual: false);
                 }
-                loadingState.refresh();
+                return;
               }
-            } else {
-              loadingState.value = Success([replyInfo]);
-            }
-            count.value += 1;
+              if (loadingState.value case Success(:final response)) {
+                if (response == null) {
+                  loadingState.value = Success([replyInfo]);
+                } else {
+                  if (oid != null) {
+                    response.insert(
+                      hasUpTop && response.isNotEmpty ? 1 : 0,
+                      replyInfo,
+                    );
+                  } else {
+                    replyItem!
+                      ..count += 1
+                      ..replies.add(replyInfo);
+                  }
+                  loadingState.refresh();
+                }
+              } else {
+                loadingState.value = Success([replyInfo]);
+              }
+              count.value += 1;
 
-            // check reply
-            if (enableCommAntifraud) {
-              onCheckReply(replyInfo, isManual: false);
+              // check reply
+              if (enableCommAntifraud) {
+                onCheckReply(replyInfo, isManual: false);
+              }
             }
-          }
-        });
+          },
+        );
   }
 
   void onRemove(int index, ReplyInfo item, int? subIndex) {
@@ -270,7 +317,12 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
     );
   }
 
-  Future<void> onToggleTop(ReplyInfo item, int index, oid, int type) async {
+  Future<void> onToggleTop(
+    ReplyInfo item,
+    int index,
+    oid,
+    int type,
+  ) async {
     bool isUpTop = item.replyControl.isUpTop;
     final res = await ReplyHttp.replyTop(
       oid: oid,

@@ -2,8 +2,6 @@
 
 import 'package:PiliPlus/common/widgets/flutter/list_tile.dart' as custom;
 import 'package:PiliPlus/features/jev/jev.dart';
-import 'package:PiliPlus/features/jev/jev_rules.dart';
-import 'package:PiliPlus/pages/jev_settings/jev_rules_page.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:material_ui/material_ui.dart' hide ListTile;
 
@@ -50,6 +48,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
 
   late final JevModelCatalog _catalog = widget.catalog ?? JevModelCatalog();
   final TextEditingController _modelController = TextEditingController();
+  final TextEditingController _commentController = TextEditingController();
   int _generation = 0;
   int _catalogGeneration = 0;
   bool _catalogBusy = false;
@@ -82,6 +81,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   void dispose() {
     _keyController.dispose();
     _modelController.dispose();
+    _commentController.dispose();
     super.dispose();
   }
 
@@ -115,6 +115,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     setState(() {
       _settings = JevSettingsStore.snapshot;
       _profile = profile;
+      _commentController.text = _settings.commentCriteria;
       final provider = _settings.provider;
       if (provider != null) {
         _modelController.text = _settings.modelFor(provider);
@@ -345,18 +346,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         ),
         children: [
           ..._buildSwitchSection(),
-          custom.ListTile(
-            leading: const Icon(Icons.rule_outlined),
-            title: const Text('判断规则'),
-            subtitle: const Text('分别管理视频、评论、直播间的问题、隐藏答案和执行阈值'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push<void>(
-              MaterialPageRoute(
-                builder: (_) =>
-                    JevRulesPage(store: JevRuleStore(box: _store.box)),
-              ),
-            ),
-          ),
+          const Divider(height: 1),
+          ..._buildCommentSection(),
           const Divider(height: 1),
           ..._buildProfileSection(),
           const Divider(height: 1),
@@ -385,7 +376,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     ),
     const Padding(
       padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Text('生效入口（各自的开关）'),
+      child: Text('推荐面（各自的开关）'),
     ),
     for (final surface in JevSurface.values)
       SwitchListTile(
@@ -398,6 +389,66 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
                   _saveSettings(_settings.withSurface(surface, value: value))
             : null,
       ),
+  ];
+
+  Future<void> _saveCommentCriteria({bool restorePreset = false}) async {
+    final criteria = restorePreset
+        ? JevSettings.defaultCommentCriteria
+        : _commentController.text;
+    if (await _saveSettings(_settings.copyWith(commentCriteria: criteria))) {
+      if (!mounted) return;
+      _commentController.text = criteria;
+      _toast(restorePreset ? '已恢复评论预设' : '评论标准已保存');
+    }
+  }
+
+  List<Widget> _buildCommentSection() => [
+    SwitchListTile(
+      key: const ValueKey('jev-comment-enabled'),
+      title: const Text('Jev 评论过滤'),
+      subtitle: const Text('主评论、楼中楼、对话及首页可见评论判断共用此标准；默认关闭'),
+      value: _settings.commentEnabled,
+      onChanged: _settings.enabled
+          ? (value) => _saveSettings(_settings.copyWith(commentEnabled: value))
+          : null,
+    ),
+    Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: TextField(
+        key: const ValueKey('jev-comment-criteria'),
+        controller: _commentController,
+        minLines: 3,
+        maxLines: 6,
+        maxLength: 4000,
+        decoration: const InputDecoration(
+          labelText: '评论过滤标准（可自定义）',
+          helperText: '保存后生效；留空不调用 Jev。上下文不足、不确定或请求失败时保留评论。',
+          helperMaxLines: 2,
+          border: OutlineInputBorder(),
+        ),
+      ),
+    ),
+    Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Wrap(
+        children: [
+          TextButton(
+            key: const ValueKey('jev-comment-save'),
+            onPressed: _saveCommentCriteria,
+            child: const Text('保存评论标准'),
+          ),
+          TextButton(
+            key: const ValueKey('jev-comment-restore'),
+            onPressed: () => _saveCommentCriteria(restorePreset: true),
+            child: const Text('恢复评论预设'),
+          ),
+        ],
+      ),
+    ),
+    const Padding(
+      padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: Text('启用后仅向已确认提供方发送评论正文和此标准，不发送作者、评论 ID 或账号信息。'),
+    ),
   ];
 
   List<Widget> _buildProviderSection(Color errorColor) => [
@@ -423,7 +474,10 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     if (_selection.isBlockedByMismatch)
       custom.ListTile(
         leading: Icon(Icons.warning_amber_outlined, color: errorColor),
-        title: Text('格式提示与已选提供方不一致', style: TextStyle(color: errorColor)),
+        title: Text(
+          '格式提示与已选提供方不一致',
+          style: TextStyle(color: errorColor),
+        ),
         subtitle: const Text('格式识别不决定提供方。确认后才会按已选提供方验证，绝不会把该 Key 发给另一个提供方。'),
         trailing: TextButton(
           onPressed: _acknowledgeMismatch,
@@ -451,7 +505,10 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Wrap(
           children: [
-            TextButton(onPressed: _saveModel, child: const Text('保存模型')),
+            TextButton(
+              onPressed: _saveModel,
+              child: const Text('保存模型'),
+            ),
             TextButton(
               onPressed: () => _saveModel(restoreDefault: true),
               child: const Text('恢复默认'),
@@ -494,7 +551,10 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     if (_keyStoreStatus == JevKeyStoreStatus.unavailable)
       custom.ListTile(
         leading: Icon(Icons.lock_outline, color: errorColor),
-        title: Text('系统安全存储不可用，Jev 保持关闭', style: TextStyle(color: errorColor)),
+        title: Text(
+          '系统安全存储不可用，Jev 保持关闭',
+          style: TextStyle(color: errorColor),
+        ),
         subtitle: const Text('无法安全保存密钥时不会使用任何凭据，也不会退回明文存储。'),
       ),
     Padding(
@@ -655,11 +715,16 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         ),
       const Padding(
         padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
-        child: Text('最多保留 20 个主题：满额时先淘汰最近反馈最早的一个，6 个月没有新反馈的主题自动删除。'),
+        child: Text(
+          '最多保留 20 个主题：满额时先淘汰最近反馈最早的一个，6 个月没有新反馈的主题自动删除。',
+        ),
       ),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: TextButton(onPressed: _clearProfile, child: const Text('清空偏好档')),
+        child: TextButton(
+          onPressed: _clearProfile,
+          child: const Text('清空偏好档'),
+        ),
       ),
     ],
   ];
@@ -685,16 +750,12 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   Widget _buildPrivacySection() => const ExpansionTile(
     leading: Icon(Icons.privacy_tip_outlined),
     title: Text('隐私说明'),
-    subtitle: Text('只发送最小内容上下文、启用规则与所需负反馈摘要'),
+    subtitle: Text('只发送最小候选内容、启用规则与所需负反馈摘要；评论过滤发送正文与自定义标准'),
     childrenPadding: EdgeInsets.fromLTRB(16, 0, 16, 12),
     children: [
-      Text(
-        '发送：启用规则中的问题、答案含义与选项；视频标题及已有短简介/标签，评论正文及必要回复上下文，直播推荐卡标题/分区。启用内置规则时发送最多 20 个未过期负主题及大致次数。',
-      ),
+      Text('发送：候选标题，以及候选数据自带时的短简介或分类/标签；最多 20 个未过期负主题及大致次数。'),
       SizedBox(height: 8),
       Text('不发送：完整浏览/观看历史、账号标识、cookie、原始点踩记录、UP 主、视频 ID、链接、长篇元数据。'),
-      SizedBox(height: 8),
-      Text('不额外抓取：视频字幕、作者历史、直播房间消息。评论规则仅在视频详情评论列表生效。规则保存在本机，编辑保存不会发起模型请求。'),
       SizedBox(height: 8),
       Text('低置信、超时、限流、缺答、密钥缺失或无效、provider 报错、安全存储不可用时，候选一律保持可见。'),
     ],
