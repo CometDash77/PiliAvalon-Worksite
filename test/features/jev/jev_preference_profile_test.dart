@@ -7,32 +7,60 @@ void main() {
   final now = DateTime(2026, 10, 6, 12);
 
   group('summarize', () {
-    test('strips bracketed decoration and noise from the card title', () {
+    test('strips bracketed decoration and noise from the reason', () {
       expect(
-        const JevDislikeSignal.card(title: '【4K修复】某纪录片的真相').summarize(),
+        const JevDislikeSignal.card(
+          title: '某纪录片 第一集',
+          displayedReason: '【4K修复】某纪录片的真相',
+        ).summarize(),
         '某纪录片的真相',
       );
       expect(
-        const JevDislikeSignal.card(title: '(上) 某主题 解析').summarize(),
+        const JevDislikeSignal.card(
+          title: '某纪录片 第一集',
+          displayedReason: '(上) 某主题 解析',
+        ).summarize(),
         '某主题 解析',
       );
     });
 
-    test('the title wins and the reasons are fallbacks', () {
+    test('the tapped reason beats the displayed reason', () {
       expect(
         const JevDislikeSignal.card(
-          title: '',
+          title: '某纪录片 第一集',
           displayedReason: '因为你看过',
           selectedReason: '已看过',
         ).summarize(),
-        '因为你看过',
+        '已看过',
       );
       expect(
         const JevDislikeSignal.card(
-          title: '   ',
-          selectedReason: '已看过',
+          title: '某纪录片 第一集',
+          displayedReason: '因为你看过',
         ).summarize(),
-        '已看过',
+        '因为你看过',
+      );
+    });
+
+    test('the card title is never a theme, however topical it looks', () {
+      // Issue #119: a title is a description of one video, so a truncated
+      // fragment of it must never enter the profile.
+      expect(
+        const JevDislikeSignal.card(title: '某纪录片 第一集').summarize(),
+        isNull,
+      );
+      expect(
+        const JevDislikeSignal.card(title: '某纪录片的真相 深度解析').summarize(),
+        isNull,
+      );
+      // A usable reason always wins over any title.
+      expect(
+        const JevDislikeSignal.card(
+          title: '某纪录片 第一集',
+          selectedReason: '!!!',
+          displayedReason: '不想看 游戏区',
+        ).summarize(),
+        '不想看 游戏区',
       );
     });
 
@@ -40,24 +68,38 @@ void main() {
       expect(const JevDislikeSignal.card(title: '!!!').summarize(), isNull);
       expect(const JevDislikeSignal.card(title: 'A').summarize(), isNull);
       expect(const JevDislikeSignal.card(title: '').summarize(), isNull);
+      expect(
+        const JevDislikeSignal.card(
+          title: '某纪录片 第一集',
+          displayedReason: '!!!',
+        ).summarize(),
+        isNull,
+      );
     });
 
     test('links and video ids never survive into a theme', () {
       expect(
         const JevDislikeSignal.card(
-          title: 'https://www.bilibili.com/video/BV1xx411c7mD 某主题解析',
+          title: '某标题碎片',
+          displayedReason: 'https://www.bilibili.com/video/BV1xx411c7mD 某主题解析',
         ).summarize(),
         '某主题解析',
       );
       expect(
-        const JevDislikeSignal.card(title: 'av170001 某主题').summarize(),
+        const JevDislikeSignal.card(
+          title: '某标题碎片',
+          displayedReason: 'av170001 某主题',
+        ).summarize(),
         '某主题',
       );
     });
 
     test('a theme is capped at the contract length', () {
       const long = '一二三四五六七八九十一二三四五六七八九十';
-      final theme = const JevDislikeSignal.card(title: long).summarize();
+      final theme = const JevDislikeSignal.card(
+        title: '某标题碎片',
+        displayedReason: long,
+      ).summarize();
       expect(theme, long.substring(0, JevLimits.maxThemeChars));
     });
   });

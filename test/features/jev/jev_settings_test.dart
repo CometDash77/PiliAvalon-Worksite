@@ -65,6 +65,16 @@ void main() {
     );
   });
 
+  test('an unwired surface never screens, whatever the stored set says', () {
+    const settings = JevSettings(
+      enabled: true,
+      surfaces: <JevSurface>{JevSurface.homeWeb, JevSurface.live},
+    );
+    expect(JevSurface.live.screeningWired, isFalse);
+    expect(settings.isSurfaceEnabled(JevSurface.homeWeb), isTrue);
+    expect(settings.isSurfaceEnabled(JevSurface.live), isFalse);
+  });
+
   test('clearing the provider deletes the provider keys', () async {
     final box = _MemoryBox();
     final store = JevSettingsStore(box: box);
