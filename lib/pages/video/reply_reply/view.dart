@@ -37,6 +37,8 @@ class VideoReplyReplyPanel extends CommonSlidePage {
     this.dialog,
     this.firstFloor,
     required this.isVideoDetail,
+    this.screenVideoComments = false,
+    this.parentBody,
     required this.replyType,
     this.isNested = false,
     this.upMid,
@@ -47,6 +49,8 @@ class VideoReplyReplyPanel extends CommonSlidePage {
   final int? dialog;
   final ReplyInfo? firstFloor;
   final bool isVideoDetail;
+  final bool screenVideoComments;
+  final String? parentBody;
   final int replyType;
   final bool isNested;
   final Int64? upMid;
@@ -130,6 +134,8 @@ class _VideoReplyReplyPanelState extends State<VideoReplyReplyPanel>
         rpid: widget.rpid,
         dialog: widget.dialog,
         replyType: widget.replyType,
+        isVideoDetail: widget.screenVideoComments,
+        parentBody: widget.parentBody ?? widget.firstFloor?.content.message,
       ),
       tag: _tag,
     );
@@ -251,17 +257,15 @@ class _VideoReplyReplyPanelState extends State<VideoReplyReplyPanel>
         child: Row(
           mainAxisAlignment: .spaceBetween,
           children: [
-            Obx(
-              () {
-                final count = _controller.count.value;
-                return count != -1
-                    ? Text(
-                        '相关回复共${NumUtils.numFormat(count)}条',
-                        style: const TextStyle(fontSize: 13),
-                      )
-                    : const SizedBox.shrink();
-              },
-            ),
+            Obx(() {
+              final count = _controller.count.value;
+              return count != -1
+                  ? Text(
+                      '相关回复共${NumUtils.numFormat(count)}条',
+                      style: const TextStyle(fontSize: 13),
+                    )
+                  : const SizedBox.shrink();
+            }),
             TextButton.icon(
               style: Style.buttonStyle,
               onPressed: _controller.queryBySort,
@@ -304,10 +308,7 @@ class _VideoReplyReplyPanelState extends State<VideoReplyReplyPanel>
               child: Text(
                 _controller.isEnd ? '没有更多了' : '加载中...',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: colorScheme.outline,
-                ),
+                style: TextStyle(fontSize: 12, color: colorScheme.outline),
               ),
             );
           }
@@ -350,6 +351,8 @@ class _VideoReplyReplyPanelState extends State<VideoReplyReplyPanel>
           dialog: replyItem.dialog.toInt(),
           replyType: widget.replyType,
           isVideoDetail: true,
+          screenVideoComments: widget.screenVideoComments,
+          parentBody: firstFloor?.content.message ?? widget.parentBody,
           isNested: widget.isNested,
         ),
       ),

@@ -1,4 +1,5 @@
 import 'package:PiliPlus/common/widgets/pair.dart';
+import 'package:PiliPlus/features/jev/jev_final_screen.dart';
 import 'package:PiliPlus/features/shielding/live_shielding.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/http/live.dart';
@@ -86,8 +87,17 @@ class LiveController extends CommonListController with AccountMixin {
   }
 
   @override
-  void handleListResponse(List dataList) {
-    final removed = LiveShielding.removeBlocked(dataList, _ruleSetProvider());
+  Future<void> handleListResponse(List dataList) async {
+    final before = dataList.length;
+    LiveShielding.removeBlocked(dataList, _ruleSetProvider());
+    final visible = await JevFinalScreen.live<dynamic>().screen(dataList);
+    if (isClosed) return;
+    if (!identical(visible, dataList)) {
+      dataList
+        ..clear()
+        ..addAll(visible);
+    }
+    final removed = before - dataList.length;
     hiddenCardCount += removed;
     autoPagingPaused = removed > 0 && removed == _lastRawPageSize;
   }
@@ -138,10 +148,7 @@ class LiveController extends CommonListController with AccountMixin {
         if (res.hasMore == 0) {
           isEnd = true;
         }
-        topState.value = Pair(
-          first: res.followItem,
-          second: res.areaItem,
-        );
+        topState.value = Pair(first: res.followItem, second: res.areaItem);
       } else if (res is LiveSecondData) {
         count = res.count;
         newTags = res.newTags;
@@ -169,6 +176,7 @@ class LiveController extends CommonListController with AccountMixin {
 
   @override
   Future<void> onRefresh() {
+    if (isLoading || isClosed) return Future.value();
     count = null;
     page = 1;
     isEnd = false;

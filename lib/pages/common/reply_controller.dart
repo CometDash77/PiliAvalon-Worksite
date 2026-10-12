@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:PiliPlus/common/widgets/flutter/text_field/controller.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
@@ -58,7 +60,7 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
   }
 
   @override
-  void handleListResponse(List<ReplyInfo> dataList) {
+  FutureOr<void> handleListResponse(List<ReplyInfo> dataList) {
     final visibleReplies = applyShielding(dataList);
     if (!identical(visibleReplies, dataList)) {
       dataList
@@ -129,6 +131,7 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
 
   @override
   Future<void> onRefresh() {
+    if (isLoading || isClosed) return Future.value();
     cursorNext = null;
     subjectControl = null;
     paginationReply = null;
@@ -174,11 +177,7 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
     return (inputDisable, hint);
   }
 
-  void onReply(
-    ReplyInfo? replyItem, {
-    int? oid,
-    int? replyType,
-  }) {
+  void onReply(ReplyInfo? replyItem, {int? oid, int? replyType}) {
     if (loadingState.value case Error(:final errMsg, :final code)) {
       if (errMsg != null && (code == 12061 || code == 12002)) {
         SmartDialog.showToast(errMsg);
@@ -221,35 +220,33 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
             settings: RouteSettings(arguments: Get.arguments),
           ),
         )
-        .then(
-          (replyInfo) {
-            if (replyInfo is ReplyInfo) {
-              savedReplies.remove(key);
-              if (loadingState.value case Success(:final response)) {
-                if (response == null) {
-                  loadingState.value = Success([replyInfo]);
-                } else {
-                  if (oid != null) {
-                    response.insert(hasUpTop ? 1 : 0, replyInfo);
-                  } else {
-                    replyItem!
-                      ..count += 1
-                      ..replies.add(replyInfo);
-                  }
-                  loadingState.refresh();
-                }
-              } else {
+        .then((replyInfo) {
+          if (replyInfo is ReplyInfo) {
+            savedReplies.remove(key);
+            if (loadingState.value case Success(:final response)) {
+              if (response == null) {
                 loadingState.value = Success([replyInfo]);
+              } else {
+                if (oid != null) {
+                  response.insert(hasUpTop ? 1 : 0, replyInfo);
+                } else {
+                  replyItem!
+                    ..count += 1
+                    ..replies.add(replyInfo);
+                }
+                loadingState.refresh();
               }
-              count.value += 1;
-
-              // check reply
-              if (enableCommAntifraud) {
-                onCheckReply(replyInfo, isManual: false);
-              }
+            } else {
+              loadingState.value = Success([replyInfo]);
             }
-          },
-        );
+            count.value += 1;
+
+            // check reply
+            if (enableCommAntifraud) {
+              onCheckReply(replyInfo, isManual: false);
+            }
+          }
+        });
   }
 
   void onRemove(int index, ReplyInfo item, int? subIndex) {
@@ -273,12 +270,7 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
     );
   }
 
-  Future<void> onToggleTop(
-    ReplyInfo item,
-    int index,
-    oid,
-    int type,
-  ) async {
+  Future<void> onToggleTop(ReplyInfo item, int index, oid, int type) async {
     bool isUpTop = item.replyControl.isUpTop;
     final res = await ReplyHttp.replyTop(
       oid: oid,

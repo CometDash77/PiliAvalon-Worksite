@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/pages/common/common_controller.dart';
 import 'package:get/get.dart';
@@ -11,7 +13,7 @@ abstract class CommonListController<R, T> extends CommonController<R, T> {
   Rx<LoadingState<List<T>?>> loadingState =
       LoadingState<List<T>?>.loading().obs;
 
-  void handleListResponse(List<T> dataList) {}
+  FutureOr<void> handleListResponse(List<T> dataList) {}
 
   List<T>? getDataList(R response) {
     return response as List<T>?;
@@ -24,6 +26,7 @@ abstract class CommonListController<R, T> extends CommonController<R, T> {
     if (isLoading || (!isRefresh && isEnd)) return;
     isLoading = true;
     final LoadingState<R> res = await customGetData();
+    if (isClosed) return;
     if (res case Success(:final response)) {
       if (!customHandleResponse(isRefresh, res)) {
         final dataList = getDataList(response);
@@ -37,7 +40,8 @@ abstract class CommonListController<R, T> extends CommonController<R, T> {
           isLoading = false;
           return;
         }
-        handleListResponse(dataList);
+        await handleListResponse(dataList);
+        if (isClosed) return;
         if (isRefresh) {
           checkIsEnd(dataList.length);
           loadingState.value = Success(dataList);
@@ -58,6 +62,7 @@ abstract class CommonListController<R, T> extends CommonController<R, T> {
 
   @override
   Future<void> onRefresh() {
+    if (isLoading || isClosed) return Future.value();
     page = 1;
     isEnd = false;
     return super.onRefresh();
@@ -65,6 +70,7 @@ abstract class CommonListController<R, T> extends CommonController<R, T> {
 
   @override
   Future<void> onReload() {
+    if (isLoading || isClosed) return Future.value();
     loadingState.value = LoadingState<List<T>?>.loading();
     return super.onReload();
   }
