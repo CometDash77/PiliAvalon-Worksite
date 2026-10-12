@@ -2,6 +2,8 @@
 
 import 'package:PiliPlus/common/widgets/flutter/list_tile.dart' as custom;
 import 'package:PiliPlus/features/jev/jev.dart';
+import 'package:PiliPlus/features/jev/jev_rules.dart';
+import 'package:PiliPlus/pages/jev_settings/jev_rules_page.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:material_ui/material_ui.dart' hide ListTile;
 
@@ -346,6 +348,18 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         ),
         children: [
           ..._buildSwitchSection(),
+          custom.ListTile(
+            leading: const Icon(Icons.rule_outlined),
+            title: const Text('判断规则'),
+            subtitle: const Text('分别管理视频、评论、直播间的问题、隐藏答案和执行阈值'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(
+                builder: (_) =>
+                    JevRulesPage(store: JevRuleStore(box: _store.box)),
+              ),
+            ),
+          ),
           const Divider(height: 1),
           ..._buildCommentSection(),
           const Divider(height: 1),
@@ -376,7 +390,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     ),
     const Padding(
       padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Text('推荐面（各自的开关）'),
+      child: Text('生效入口（各自的开关）'),
     ),
     for (final surface in JevSurface.values)
       SwitchListTile(
@@ -757,9 +771,11 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     subtitle: Text('只发送最小候选内容、启用规则与所需负反馈摘要；评论过滤发送正文与自定义标准'),
     childrenPadding: EdgeInsets.fromLTRB(16, 0, 16, 12),
     children: [
-      Text('发送：候选标题，以及候选数据自带时的短简介或分类/标签；最多 20 个未过期负主题及大致次数。'),
+      Text('发送：启用规则中的问题、答案含义与选项；视频标题及已有短简介/标签，评论正文及必要回复上下文，直播推荐卡标题/分区。启用内置规则时发送最多 20 个未过期负主题及大致次数。'),
       SizedBox(height: 8),
       Text('不发送：完整浏览/观看历史、账号标识、cookie、原始点踩记录、UP 主、视频 ID、链接、长篇元数据。'),
+      SizedBox(height: 8),
+      Text('不额外抓取：视频字幕、作者历史、直播房间消息。评论规则仅在视频详情评论列表生效。规则保存在本机，编辑保存不会发起模型请求。'),
       SizedBox(height: 8),
       Text('低置信、超时、限流、缺答、密钥缺失或无效、provider 报错、安全存储不可用时，候选一律保持可见。'),
     ],
