@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:PiliPlus/features/jev/jev_final_screen.dart';
 import 'package:PiliPlus/features/jev/jev_evaluator.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
@@ -154,7 +156,7 @@ class VideoReplyReplyController extends ReplyController
   }
 
   @override
-  void handleListResponse(List<ReplyInfo> dataList) {
+  FutureOr<void> handleListResponse(List<ReplyInfo> dataList) {
     if (id != null) {
       setIndexById(Int64(id!), dataList);
       id = null;
