@@ -380,18 +380,17 @@ void main() {
       final box = MemoryBox();
       JevFilterLog.instance = JevFilterLog(box: box);
       final capture = CapturingTransport(
-        reply: (index) =>
-            index.isEven
-                ? answers({
-                  'candidate_1': 0.95,
-                  'candidate_2': 0.1,
-                  'candidate_3': 0.1,
-                })
-                : answers({
-                  'candidate_1': 0.1,
-                  'candidate_2': 0.1,
-                  'candidate_3': 0.1,
-                }),
+        reply: (index) => index == 0
+            ? answers({
+              'candidate_1': 0.95,
+              'candidate_2': 0.1,
+              'candidate_3': 0.1,
+            })
+            : answers({
+              'candidate_1': 0.96,
+              'candidate_2': 0.1,
+              'candidate_3': 0.1,
+            }),
       );
       final screen = JevFinalScreen.hotVideo(
         surface: JevSurface.hot,
@@ -406,10 +405,10 @@ void main() {
       expect(result.map((e) => e.title), ['x2', 'x3', 'x5', 'x6']);
       final entries = JevFilterLog(box: box).load();
       expect(entries.map((e) => e.title), ['x4', 'x1']);
-      expect(
-        entries.every((e) => e.noul == 0.95 && e.threshold == 0.95),
-        isTrue,
-      );
+      // 判定数值与所属批次一一对应:x4 取批 1 自己的 0.96,不串用批 0 的 0.95。
+      expect(entries[0].noul, 0.96);
+      expect(entries[1].noul, 0.95);
+      expect(entries.every((e) => e.threshold == 0.95), isTrue);
     });
 
     test('判定缓存命中的筛除记录无数值(不编造)', () async {
