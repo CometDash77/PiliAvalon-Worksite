@@ -174,6 +174,8 @@ test/pages/setting/models/*
 !test/features/zen_mode/**
 !test/pages/jev_settings/
 !test/pages/jev_settings/**
+!test/features/llm/
+!test/features/llm/**
 
 # Local agent/worksite artifacts. These are retained locally when needed but
 # should not be part of the public application source tree.
