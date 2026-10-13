@@ -6,6 +6,9 @@ import 'package:PiliPlus/features/jev/jev_settings.dart';
 /// 被屏蔽条目的种类:视频面(推荐/热门/PGC/音乐/直播)或评论面。
 enum JevScreenLogKind { video, comment }
 
+/// 记录来源线:Jev(专用模型)或通用 LLM 线(issue #131)。
+enum JevScreenLogLine { jev, llm }
+
 /// 一条被屏蔽记录:只有展示层已有的标题/摘要/标签,不含 id、链接或账号信息。
 class JevScreenLogEntry {
   const JevScreenLogEntry({
@@ -13,8 +16,13 @@ class JevScreenLogEntry {
     required this.kind,
     required this.surface,
     required this.title,
+    this.line = JevScreenLogLine.jev,
     this.snippet,
     this.ruleId,
+    this.modelId,
+    this.reason,
+    this.elapsedMs,
+    this.failure,
   });
 
   factory JevScreenLogEntry.fromJson(Map json) => JevScreenLogEntry(
@@ -25,8 +33,16 @@ class JevScreenLogEntry {
     ),
     surface: json['surface'] is String ? json['surface'] as String : '',
     title: json['title'] is String ? json['title'] as String : '',
+    line: JevScreenLogLine.values.firstWhere(
+      (l) => l.name == json['line'],
+      orElse: () => JevScreenLogLine.jev,
+    ),
     snippet: json['snippet'] is String ? json['snippet'] as String : null,
     ruleId: json['ruleId'] is String ? json['ruleId'] as String : null,
+    modelId: json['modelId'] is String ? json['modelId'] as String : null,
+    reason: json['reason'] is String ? json['reason'] as String : null,
+    elapsedMs: json['elapsedMs'] is int ? json['elapsedMs'] as int : null,
+    failure: json['failure'] is String ? json['failure'] as String : null,
   );
 
   /// epoch 毫秒。
@@ -34,10 +50,13 @@ class JevScreenLogEntry {
 
   final JevScreenLogKind kind;
 
+  /// 记录来源线;旧记录(无该字段)按 Jev 线读取。
+  final JevScreenLogLine line;
+
   /// [JevSurface.id],页面显示时映射回 label。
   final String surface;
 
-  /// 视频标题或评论正文。
+  /// 视频标题或评论正文;通用线整轮失败的行为空串。
   final String title;
 
   /// 评论:父评论正文;视频:分区/标签摘要。
@@ -46,13 +65,30 @@ class JevScreenLogEntry {
   /// 触发隐藏的判断规则标识;旧记录与视频面记录为 null。
   final String? ruleId;
 
+  /// 通用线提供方的模型标识;Jev 线记录为 null。
+  final String? modelId;
+
+  /// 通用线命中理由(verdict reason,超长截断);Jev 线为 null。
+  final String? reason;
+
+  /// 通用线该轮判定耗时(毫秒)。
+  final int? elapsedMs;
+
+  /// 通用线整轮失败类别:timeout/upstream/parse/drift;成功命中行为 null。
+  final String? failure;
+
   Map<String, Object?> toJson() => <String, Object?>{
     'time': time,
     'kind': kind.name,
     'surface': surface,
     'title': title,
+    if (line != JevScreenLogLine.jev) 'line': line.name,
     if (snippet != null) 'snippet': snippet,
     if (ruleId != null) 'ruleId': ruleId,
+    if (modelId != null) 'modelId': modelId,
+    if (reason != null) 'reason': reason,
+    if (elapsedMs != null) 'elapsedMs': elapsedMs,
+    if (failure != null) 'failure': failure,
   };
 }
 
@@ -110,8 +146,13 @@ class JevScreenLog {
             kind: e.kind,
             surface: e.surface,
             title: _clip(e.title),
+            line: e.line,
             snippet: e.snippet == null ? null : _clip(e.snippet!),
             ruleId: e.ruleId,
+            modelId: e.modelId,
+            reason: e.reason == null ? null : _clip(e.reason!),
+            elapsedMs: e.elapsedMs,
+            failure: e.failure,
           ),
         )
         .toList();
@@ -138,6 +179,13 @@ class JevScreenLog {
       // 清理失败不影响筛选。
     }
   }
+
+  /// 全部条目序列化为 JSON 文本(日志导出用)。字段与页面可见信息一致:
+  /// 时间/种类/来源线/入口/标题/摘要/规则/模型/理由/耗时/失败类别,
+  /// 不含密钥、认证头、Cookie 或任何账号标识。
+  static String exportJson(List<JevScreenLogEntry> entries) => jsonEncode([
+    for (final e in entries) e.toJson(),
+  ]);
 
   static String _clip(String text) =>
       text.length <= maxTextLength ? text : text.substring(0, maxTextLength);

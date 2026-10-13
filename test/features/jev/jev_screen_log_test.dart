@@ -1,8 +1,11 @@
 
+import 'dart:convert';
+
 import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/features/jev/jev_comment_screening.dart';
 import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/jev/jev_screen_log.dart';
+import 'package:PiliPlus/features/llm/llm.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart';
 import 'package:PiliPlus/models/model_hot_video_item.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
@@ -153,6 +156,21 @@ JevScreenLogEntry entry(String title, {JevScreenLogKind kind = JevScreenLogKind.
       surface: 'hot',
       title: title,
     );
+
+class _FakeVideoScreening extends LlmVideoScreening {
+  _FakeVideoScreening(this.outcome);
+
+  final LlmVideoScreenOutcome outcome;
+
+  @override
+  Future<bool> isEnabled() async => true;
+
+  @override
+  Future<LlmVideoScreenOutcome> screen(
+    List<LlmVideoCandidate> candidates, {
+    Duration? timeout,
+  }) async => outcome;
+}
 
 void main() {
   setUp(() {
@@ -369,6 +387,210 @@ void main() {
 
       expect(identical(result, items), isTrue);
       expect(JevScreenLog(box: box).load(), isEmpty);
+    });
+  });
+
+  group('通用线日志与导出', () {
+    test('llm 行字段往返:line/ruleId/modelId/reason/failure/elapsedMs', () async {
+      final log = JevScreenLog(box: MemoryBox());
+      await log.record([
+        const JevScreenLogEntry(
+          time: 1,
+          kind: JevScreenLogKind.video,
+          surface: 'hot',
+          title: '某视频',
+          line: JevScreenLogLine.llm,
+          snippet: '简介',
+          ruleId: 'v1',
+          modelId: 'm1',
+          reason: '剧透',
+          elapsedMs: 123,
+        ),
+        const JevScreenLogEntry(
+          time: 2,
+          kind: JevScreenLogKind.comment,
+          surface: 'comment',
+          title: '',
+          line: JevScreenLogLine.llm,
+          modelId: 'm1',
+          failure: 'timeout',
+          elapsedMs: 456,
+        ),
+      ]);
+
+      final loaded = log.load();
+
+      expect(loaded.map((e) => e.time), [2, 1]);
+      expect(loaded.every((e) => e.line == JevScreenLogLine.llm), isTrue);
+      final hit = loaded.singleWhere((e) => e.title == '某视频');
+      expect(hit.ruleId, 'v1');
+      expect(hit.modelId, 'm1');
+      expect(hit.reason, '剧透');
+      expect(hit.snippet, '简介');
+      expect(hit.elapsedMs, 123);
+      final failed = loaded.singleWhere((e) => e.title.isEmpty);
+      expect(failed.failure, 'timeout');
+      expect(failed.ruleId, isNull);
+      expect(failed.reason, isNull);
+    });
+
+    test('toJson 键白名单:jev 行无 line,llm 行仅输出非空可空字段', () {
+      const jevRow = JevScreenLogEntry(
+        time: 1,
+        kind: JevScreenLogKind.video,
+        surface: 'hot',
+        title: 't',
+      );
+      const llmRow = JevScreenLogEntry(
+        time: 2,
+        kind: JevScreenLogKind.video,
+        surface: 'hot',
+        title: 'x',
+        line: JevScreenLogLine.llm,
+        ruleId: 'v1',
+        modelId: 'm1',
+        reason: '剧透',
+        elapsedMs: 9,
+      );
+
+      const allowed = {
+        'time', 'kind', 'surface', 'title', 'line', 'snippet', 'ruleId',
+        'modelId', 'reason', 'elapsedMs', 'failure',
+      };
+      expect(jevRow.toJson().containsKey('line'), isFalse);
+      expect(jevRow.toJson().keys.every(allowed.contains), isTrue);
+      expect(llmRow.toJson()['line'], 'llm');
+      expect(llmRow.toJson().keys.every(allowed.contains), isTrue);
+    });
+
+    test('exportJson 脱敏:仅含页面可见字段,无密钥/认证标识', () {
+      const rows = [
+        JevScreenLogEntry(
+          time: 1,
+          kind: JevScreenLogKind.video,
+          surface: 'hot',
+          title: '视频标题',
+        ),
+        JevScreenLogEntry(
+          time: 2,
+          kind: JevScreenLogKind.comment,
+          surface: 'comment',
+          title: '',
+          line: JevScreenLogLine.llm,
+          modelId: 'm1',
+          failure: 'timeout',
+          elapsedMs: 8,
+        ),
+      ];
+
+      final raw = JevScreenLog.exportJson(rows);
+      final decoded = jsonDecode(raw) as List<dynamic>;
+
+      expect(decoded, hasLength(2));
+      const allowed = {
+        'time', 'kind', 'surface', 'title', 'line', 'snippet', 'ruleId',
+        'modelId', 'reason', 'elapsedMs', 'failure',
+      };
+      for (final row in decoded) {
+        expect((row as Map).keys.every(allowed.contains), isTrue);
+      }
+      expect(
+        decoded.whereType<Map>().any(
+              (m) => m['line'] == 'llm' && m['modelId'] == 'm1',
+            ),
+        isTrue,
+      );
+      expect(
+        decoded.whereType<Map>().every((m) => !m.containsKey('line')),
+        isFalse,
+      );
+      for (final banned in [
+        'sk-',
+        'apiKey',
+        'token',
+        'Authorization',
+        'Bearer',
+      ]) {
+        expect(raw.contains(banned), isFalse, reason: banned);
+      }
+    });
+
+    test('通用线:hidden 行记 line=llm 与 ruleId/modelId/reason', () async {
+      final box = MemoryBox();
+      JevScreenLog.instance = JevScreenLog(box: box);
+      final capture = CapturingTransport(
+        reply: (index) => answers({'candidate_1': 0.1, 'candidate_2': 0.1}),
+      );
+      final screen = JevFinalScreen<HotVideoItemModel>(
+        surface: JevSurface.hot,
+        toCandidate: (item) =>
+            JevCandidate(title: item.title, tags: [item.tname ?? '']),
+        evaluator: Harness(surfaces: {JevSurface.hot}).evaluator(capture),
+        videoScreening: _FakeVideoScreening(
+          const LlmVideoScreenOutcome(
+            hidden: [true, false],
+            ruleIds: {0: 'v1'},
+            reasons: {0: '剧透'},
+            modelId: 'm1',
+            elapsedMs: 88,
+          ),
+        ),
+      );
+
+      final result = await screen.screen([hot('a'), hot('b', bvid: 'BV2')]);
+      await pumpEventQueue();
+
+      expect(result.map((e) => e.title), ['b']);
+      final entries = JevScreenLog(box: box).load();
+      expect(entries, hasLength(1));
+      final row = entries.single;
+      expect(row.line, JevScreenLogLine.llm);
+      expect(row.kind, JevScreenLogKind.video);
+      expect(row.surface, JevSurface.hot.id);
+      expect(row.title, 'a');
+      expect(row.snippet, '游戏');
+      expect(row.ruleId, 'v1');
+      expect(row.modelId, 'm1');
+      expect(row.reason, '剧透');
+      expect(row.elapsedMs, 88);
+      expect(row.failure, isNull);
+    });
+
+    test('通用线整轮失败:只记失败行,不携带条目内容', () async {
+      final box = MemoryBox();
+      JevScreenLog.instance = JevScreenLog(box: box);
+      final capture = CapturingTransport(
+        reply: (index) => answers({'candidate_1': 0.1, 'candidate_2': 0.1}),
+      );
+      final screen = JevFinalScreen<HotVideoItemModel>(
+        surface: JevSurface.hot,
+        toCandidate: (item) => JevCandidate(title: item.title),
+        evaluator: Harness(surfaces: {JevSurface.hot}).evaluator(capture),
+        videoScreening: _FakeVideoScreening(
+          const LlmVideoScreenOutcome(
+            hidden: [false, false],
+            modelId: 'm1',
+            failure: 'timeout',
+            elapsedMs: 300,
+          ),
+        ),
+      );
+
+      final result = await screen.screen([hot('a'), hot('b', bvid: 'BV2')]);
+      await pumpEventQueue();
+
+      expect(result.map((e) => e.title), ['a', 'b']);
+      final entries = JevScreenLog(box: box).load();
+      expect(entries, hasLength(1));
+      final row = entries.single;
+      expect(row.line, JevScreenLogLine.llm);
+      expect(row.title, '');
+      expect(row.snippet, isNull);
+      expect(row.ruleId, isNull);
+      expect(row.reason, isNull);
+      expect(row.modelId, 'm1');
+      expect(row.failure, 'timeout');
+      expect(row.elapsedMs, 300);
     });
   });
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:PiliPlus/features/jev/jev.dart';
+import 'package:PiliPlus/features/llm/llm.dart';
 import 'package:PiliPlus/pages/jev_settings/view.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart' hide ListTile;
@@ -59,10 +60,59 @@ class _FakeCatalog extends JevModelCatalog {
   }) => response.future;
 }
 
+class _FakeLlmCredentials implements LlmCredentialStore {
+  JevKeyStoreStatus keyStoreStatus = JevKeyStoreStatus.available;
+  final Map<LlmProtocol, String> stored = <LlmProtocol, String>{};
+  int writeCount = 0;
+  int deleteCount = 0;
+
+  @override
+  Future<JevKeyStoreStatus> status(LlmProtocol protocol) async =>
+      keyStoreStatus;
+
+  @override
+  Future<String?> read(LlmProtocol protocol) async => stored[protocol];
+
+  @override
+  Future<void> write(LlmProtocol protocol, String apiKey) async {
+    writeCount++;
+    stored[protocol] = apiKey;
+  }
+
+  @override
+  Future<void> delete(LlmProtocol protocol) async {
+    deleteCount++;
+    stored.remove(protocol);
+  }
+}
+
+class _FakeLlmCatalog extends LlmModelCatalog {
+  final response = Completer<LlmModelCatalogResult>();
+  @override
+  Future<LlmModelCatalogResult> load({
+    required LlmProviderConfig config,
+    required String apiKey,
+  }) => response.future;
+}
+
+class _FakeLlmProbe extends LlmHttpProbe {
+  _FakeLlmProbe(this.result);
+
+  final LlmProbeResult result;
+
+  @override
+  Future<LlmProbeResult> call({
+    required LlmProviderConfig config,
+    required String apiKey,
+    String? model,
+  }) async => result;
+}
+
 void main() {
   setUp(() {
     JevSettingsStore.resetCache();
     JevPreferenceStore.resetCache();
+    LlmSettingsStore.resetCache();
   });
 
   Future<void> pumpPage(
@@ -72,8 +122,13 @@ void main() {
     required JevKeyValidator validator,
     required List<String> messages,
     JevModelCatalog? catalog,
+    LlmSettingsStore? llmStore,
+    LlmCredentialStore? llmCredentials,
+    LlmModelCatalog? llmCatalog,
+    LlmHttpProbe? llmProbe,
+    double height = 3200,
   }) async {
-    tester.view.physicalSize = const Size(1400, 3200);
+    tester.view.physicalSize = Size(1400, height);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
@@ -84,6 +139,10 @@ void main() {
           validator: validator,
           catalog: catalog,
           onMessage: messages.add,
+          llmStore: llmStore,
+          llmCredentials: llmCredentials,
+          llmCatalog: llmCatalog,
+          llmProbe: llmProbe,
         ),
       ),
     );
@@ -317,7 +376,7 @@ void main() {
       expect(tile.value, isFalse);
     }
 
-    await tester.tap(find.text('启用 Jev 智能筛选'));
+    await tester.tap(find.text('启用 LLM 语义筛选'));
     await tester.pumpAndSettle();
     final enabled = tester
         .widgetList<SwitchListTile>(find.byType(SwitchListTile))
@@ -588,6 +647,191 @@ void main() {
 
     expect(find.textContaining('拒绝了请求格式'), findsOneWidget);
     expect(find.textContaining('上游：'), findsNothing);
+  });
+
+  testWidgets(
+    'generic line saves protocol, address, model, key, and confirms via probe',
+    (tester) async {
+      final llmBox = _MemoryBox();
+      final llmStore = LlmSettingsStore(box: llmBox);
+      final llmCredentials = _FakeLlmCredentials();
+      final messages = <String>[];
+
+      await pumpPage(
+        tester,
+        store: JevSettingsStore(box: _MemoryBox()),
+        credentials: _FakeCredentialStore(),
+        validator: JevKeyValidator(),
+        messages: messages,
+        llmStore: llmStore,
+        llmCredentials: llmCredentials,
+        llmProbe: _FakeLlmProbe(const LlmProbeResult(LlmProbeOutcome.ok)),
+        height: 6400,
+      );
+
+      await tester.tap(find.text('OpenAI Compatible'));
+      await tester.pumpAndSettle();
+      expect(
+        llmBox.values[LlmSettingsStore.protocolKey],
+        'openai_compatible',
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('llm-base-url')),
+        'https://api.example.com/v1',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, '保存地址'));
+      await tester.pumpAndSettle();
+      expect((await llmStore.load()).baseUrl, 'https://api.example.com/v1');
+      expect(messages.last, '通用服务地址已保存');
+
+      await tester.enterText(
+        find.byKey(const ValueKey('llm-model')),
+        'llm-model-x',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, '保存通用模型'));
+      await tester.pumpAndSettle();
+      expect((await llmStore.load()).model, 'llm-model-x');
+      expect(messages.last, '通用模型已保存');
+
+      await tester.enterText(
+        find.byKey(const ValueKey('llm-api-key')),
+        'sk-llm-secret',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, '保存通用密钥'));
+      await tester.pumpAndSettle();
+      expect(llmCredentials.writeCount, 1);
+      expect(
+        llmCredentials.stored[LlmProtocol.openAICompatible],
+        'sk-llm-secret',
+      );
+      expect(llmBox.values.toString().contains('sk-llm-secret'), isFalse);
+      expect(find.text('通用模型密钥已按协议保存'), findsOneWidget);
+      expect(messages.last, '通用模型密钥已按协议保存');
+
+      await tester.tap(find.widgetWithText(TextButton, '测试连接'));
+      await tester.pumpAndSettle();
+      expect((await llmStore.load()).confirmed, isTrue);
+      expect(LlmSettingsStore.snapshot.confirmed, isTrue);
+      expect(find.text('通用线已生效：配置已通过测试连接确认'), findsOneWidget);
+      expect(messages.last, '测试通过，通用线已生效');
+    },
+  );
+
+  testWidgets(
+    'generic catalog fills the draft and the selection saves after clicking save',
+    (tester) async {
+      final llmStore = LlmSettingsStore(box: _MemoryBox());
+      final catalog = _FakeLlmCatalog();
+
+      await pumpPage(
+        tester,
+        store: JevSettingsStore(box: _MemoryBox()),
+        credentials: _FakeCredentialStore(),
+        validator: JevKeyValidator(),
+        messages: <String>[],
+        llmStore: llmStore,
+        llmCredentials: _FakeLlmCredentials(),
+        llmCatalog: catalog,
+        height: 6400,
+      );
+
+      await tester.tap(find.text('OpenAI Compatible'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, '获取通用模型目录'));
+      await tester.pump();
+      expect(find.text('获取中…'), findsOneWidget);
+      catalog.response.complete(const LlmModelCatalogResult(['llm-candidate']));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('llm-candidate'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('llm-model')))
+            .controller!
+            .text,
+        'llm-candidate',
+      );
+      await tester.tap(find.widgetWithText(TextButton, '保存通用模型'));
+      await tester.pumpAndSettle();
+      expect((await llmStore.load()).model, 'llm-candidate');
+    },
+  );
+
+  testWidgets(
+    'an http address stays blocked until the user confirms it explicitly',
+    (tester) async {
+      final llmStore = LlmSettingsStore(box: _MemoryBox());
+      final messages = <String>[];
+
+      await pumpPage(
+        tester,
+        store: JevSettingsStore(box: _MemoryBox()),
+        credentials: _FakeCredentialStore(),
+        validator: JevKeyValidator(),
+        messages: messages,
+        llmStore: llmStore,
+        llmCredentials: _FakeLlmCredentials(),
+        height: 6400,
+      );
+
+      await tester.tap(find.text('OpenAI Compatible'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('llm-base-url')),
+        'http://127.0.0.1:8080',
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('HTTP 地址不加密，请求会明文经过网络'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(TextButton, '保存地址'));
+      await tester.pumpAndSettle();
+      expect(
+        messages.last,
+        'HTTP 地址不安全，需在设置中显式确认后才能使用',
+      );
+      expect((await llmStore.load()).baseUrl, isEmpty);
+
+      await tester.tap(find.widgetWithText(TextButton, '确认使用 HTTP'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, '保存地址'));
+      await tester.pumpAndSettle();
+      expect((await llmStore.load()).baseUrl, 'http://127.0.0.1:8080');
+      expect((await llmStore.load()).httpInsecureConfirmed, isTrue);
+    },
+  );
+
+  testWidgets('settings exposes generic video rule editing (issue #136)', (
+    tester,
+  ) async {
+    final box = _MemoryBox();
+    final store = JevSettingsStore(box: box);
+    await pumpPage(
+      tester,
+      store: store,
+      credentials: _FakeCredentialStore(),
+      validator: JevKeyValidator(),
+      messages: [],
+    );
+    final tile = find.text('视频屏蔽规则');
+    await tester.ensureVisible(tile);
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    // 进入通用线视频规则页并完成一次创建。
+    expect(find.text('添加规则'), findsOneWidget);
+    await tester.tap(find.text('添加规则'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('rule-text')),
+      '屏蔽标题含有剧透的视频',
+    );
+    await tester.tap(find.text('保存规则'));
+    await tester.pumpAndSettle();
+    final saved = await LlmVideoRuleStore(box: store.box).load();
+    expect(saved.rules.single.text, '屏蔽标题含有剧透的视频');
   });
   // 评论过滤标准区块已在 issue #122 中随双轨合并移除：独立开关与标准文本
   // 不复存在，评论面只消费「判断规则」页的评论规则。

@@ -1,8 +1,12 @@
 import 'package:PiliPlus/common/widgets/flutter/text_field/controller.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
+
 import 'dart:async';
 
 import 'package:PiliPlus/features/jev/jev_comment_screening.dart';
+import 'package:PiliPlus/features/jev/jev_contract.dart';
+import 'package:PiliPlus/features/llm/llm_contract.dart';
+import 'package:PiliPlus/features/llm/llm_screening.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show MainListReply, ReplyInfo, SubjectControl, Mode;
 import 'package:PiliPlus/grpc/bilibili/pagination.pb.dart';
@@ -104,8 +108,44 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
     }
 
     collect(replies, null);
-    final result = await commentScreening.filter(candidates, parents: parents);
-    final visible = Set<ReplyInfo>.identity()..addAll(result.replies);
+    final watch = Stopwatch()..start();
+    LlmCommentScreening? generic;
+    bool dualLine = false;
+    try {
+      generic = genericCommentScreening;
+      dualLine = await generic.isEnabled();
+    } catch (_) {
+      generic = null; // 通用线任何故障按未启用处理，Jev 线不受影响
+    }
+    // 双线共享 8s 页预算（#113）：Jev 先行，至多拿一半。
+    final result = await commentScreening.filter(
+      candidates,
+      parents: parents,
+      timeout: dualLine ? JevLimits.dualShare : null,
+    );
+    // 幸存者上下文与 result.replies 平行重建，供通用线复用。
+    final survivors = Set<ReplyInfo>.identity()..addAll(result.replies);
+    final survivorParents = <String?>[
+      for (var i = 0; i < candidates.length; i++)
+        if (survivors.contains(candidates[i])) parents[i],
+    ];
+    var finalReplies = result.replies;
+    if (dualLine && generic != null) {
+      final remaining = LlmLimits.requestTimeout - watch.elapsed;
+      if (remaining > Duration.zero && finalReplies.isNotEmpty) {
+        try {
+          final genericResult = await generic.filter(
+            finalReplies,
+            parents: survivorParents,
+            timeout: remaining,
+          );
+          finalReplies = genericResult.replies;
+        } catch (_) {
+          // 通用线失败 fail-open：保留 Jev 结果。
+        }
+      }
+    }
+    final visible = Set<ReplyInfo>.identity()..addAll(finalReplies);
     List<ReplyInfo> rebuild(List<ReplyInfo> items) {
       final survivors = items.where(visible.contains).toList();
       for (final reply in survivors) {
@@ -121,6 +161,9 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
   }
 
   JevCommentScreening get commentScreening => JevCommentScreening();
+
+  /// 通用 LLM 评论线（#113 双线的第二线）；测试整体注入。
+  LlmCommentScreening get genericCommentScreening => LlmCommentScreening();
 
   @override
   bool customHandleResponse(bool isRefresh, Success<R> response) {

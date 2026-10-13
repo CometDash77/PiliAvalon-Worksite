@@ -236,12 +236,13 @@ class JevEvaluator {
   final JevRuleStore _rules;
   final JevVerdictCache _verdictCache;
 
-  /// Screens [candidates] for [surface]. The returned list is parallel to the
+  /// Screens [candidates] for [surface]. When [passTimeout] is set (dual-
   /// input; callers drop the hidden entries before render and before
   /// exposure recording.
   Future<JevScreening> screen(
     List<JevCandidate> candidates, {
     required JevSurface surface,
+    Duration? passTimeout,
   }) async {
     if (candidates.isEmpty) {
       return const JevScreening(
@@ -346,12 +347,14 @@ class JevEvaluator {
       final external = _verdictCache.inFlightFuture(generation!, identity);
       if (external != null) {
         final slot = i;
-        waiters.add(external.then((verdict) {
-          if (verdict != null) {
-            hidden[slot] = verdict;
-            answeredSlots++;
-          }
-        }));
+        waiters.add(
+          external.then((verdict) {
+            if (verdict != null) {
+              hidden[slot] = verdict;
+              answeredSlots++;
+            }
+          }),
+        );
         continue;
       }
       final existing = byIdentity[identity];
@@ -380,16 +383,19 @@ class JevEvaluator {
     }
 
     var requests = 0;
-    for (
-      var start = 0;
-      start < groups.length;
-      start += JevLimits.batchSize
-    ) {
+    final watch = passTimeout == null ? null : (Stopwatch()..start());
+    for (var start = 0; start < groups.length; start += JevLimits.batchSize) {
       final end = math.min(start + JevLimits.batchSize, groups.length);
       final chunk = groups.sublist(start, end);
+      final remaining = watch == null ? null : passTimeout! - watch.elapsed;
+      if (remaining != null && remaining <= Duration.zero) {
+        // Pass budget spent: fail everything left open, no more requests.
+        _completeChunk(groups.sublist(start));
+        break;
+      }
       requests++;
       try {
-        final data = await _transport(
+        final transportFuture = _transport(
           provider: provider,
           apiKey: apiKey,
           body: JevRequest.body(
@@ -423,6 +429,10 @@ class JevEvaluator {
             },
           ),
         );
+        final data = remaining == null
+            ? await transportFuture
+            // Late answers cannot alter the output (snapshot semantics).
+            : await transportFuture.timeout(remaining);
         if (data is! Map || data['answers'] is! Map) {
           _completeChunk(chunk);
           continue;
@@ -569,8 +579,7 @@ class JevEvaluator {
         answer!.noul!.isFinite &&
         answer.noul! <= 1 &&
         (rawBuiltin is Map &&
-            (rawBuiltin['type'] == null ||
-                rawBuiltin['type'] == 'noul')) &&
+            (rawBuiltin['type'] == null || rawBuiltin['type'] == 'noul')) &&
         !lowConfidence &&
         answer.noul! >= JevLimits.hideNoulThreshold) {
       return (
@@ -593,8 +602,7 @@ class JevEvaluator {
           !answer.noul!.isFinite ||
           answer.noul! > 1 ||
           !(rawBuiltin is Map &&
-              (rawBuiltin['type'] == null ||
-                  rawBuiltin['type'] == 'noul')) ||
+              (rawBuiltin['type'] == null || rawBuiltin['type'] == 'noul')) ||
           lowConfidence) {
         definite = false;
       }

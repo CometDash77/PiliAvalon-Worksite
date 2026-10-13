@@ -46,6 +46,7 @@ class _Evaluator extends JevEvaluator {
   Future<JevScreening> screen(
     List<JevCandidate> candidates, {
     required JevSurface surface,
+    Duration? passTimeout,
   }) async {
     if (waitFor != null) await waitFor!.future;
     calls.add((surface, candidates));
