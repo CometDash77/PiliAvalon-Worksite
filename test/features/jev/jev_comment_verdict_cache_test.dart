@@ -329,6 +329,7 @@ void main() {
     final entries = JevScreenLog.instance.load();
     expect(entries, hasLength(2));
     expect(entries.first.ruleId, isNull, reason: '缓存命中没有规则来源');
+    expect(calls, 1, reason: '第二次筛选命中缓存，不再请求上游');
   });
 
   test('上游载荷保持不含评论身份', () async {
