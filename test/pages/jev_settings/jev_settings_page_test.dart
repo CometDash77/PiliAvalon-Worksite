@@ -828,6 +828,8 @@ void main() {
     await tester.pumpAndSettle();
     // 进入通用线视频规则页并完成一次创建。
     expect(find.text('添加规则'), findsOneWidget);
+    await tester.tap(find.text('添加规则'));
+    await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('rule-text')),
       '屏蔽标题含有剧透的视频',

@@ -126,8 +126,9 @@ void main() {
       find.widgetWithText(FilledButton, '添加规则'),
     );
     expect(add.onPressed, isNull);
-    // 已满时仍可编辑与启停存量规则（_tap 命中列表末尾的 seed-19）。
-    await _tap(tester, '编辑');
+    // 已满时仍可编辑与启停存量规则；20 张卡超出视口，点首屏顶部的第一张。
+    await tester.tap(find.text('编辑').first);
+    await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('rule-text')),
       '改写后的预置规则',
@@ -136,7 +137,7 @@ void main() {
     final saved = await store.load();
     expect(saved.rules.length, LlmVideoRule.maxRulesPerSurface);
     expect(
-      saved.rules.singleWhere((r) => r.id == 'seed-19').text,
+      saved.rules.singleWhere((r) => r.id == 'seed-0').text,
       '改写后的预置规则',
     );
   });
