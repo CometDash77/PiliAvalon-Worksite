@@ -5,6 +5,7 @@ import 'package:PiliPlus/models/model_video.dart';
 import 'package:PiliPlus/models_new/music/bgm_recommend_list.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_index_result/list.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_rank/pgc_rank_item_model.dart';
+import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'decisions_schema.dart';
@@ -102,6 +103,9 @@ class _Harness {
     }
     settingsBox.values[JevSettingsStore.providerKey] = 'typesafe';
     settingsBox.values[JevSettingsStore.providerConfirmedKey] = true;
+    // 终审判定缓存是进程内静态区；功能测试关注实时判定，直接关闭以免
+    // 跨用例命中（#123）。
+    settingsBox.values[SettingBoxKey.jevVerdictCacheEnabled] = false;
   }
 
   final _MemoryBox settingsBox;
@@ -119,12 +123,14 @@ class _TestVideo extends BaseVideoItemModel {
   _TestVideo({String title = 'test video', bool isFollowed = false}) {
     this.title = title;
     cid = 1;
-    aid = 1;
+    aid = ++_testAidSeq;
     duration = 600;
     owner = _TestOwner();
     stat = _TestStat();
     this.isFollowed = isFollowed;
   }
+
+  static int _testAidSeq = 0;
 }
 
 class _TestOwner extends BaseOwner {}

@@ -47,8 +47,6 @@ class _FakeCredentials implements JevCredentialStore {
 }
 
 class _CapturingTransport {
-  _CapturingTransport({this.reply, this.gate});
-
   /// Optional per-call answer; a null return or a throw fails the batch.
   Object? Function(int callIndex)? reply;
 
@@ -83,7 +81,7 @@ Map<String, Object?> _answers(Map<String, Object?> values) =>
       'answers': <String, Object?>{
         for (final entry in values.entries)
           entry.key: entry.value is Map
-              ? (entry.value as Map).cast<String, Object?>()
+              ? Map<String, Object?>.from(entry.value as Map)
               : <String, Object?>{'noul': entry.value},
       },
     };
@@ -136,12 +134,15 @@ void main() {
 
   test('TTL 内二次终审：上游请求数为 0 且判定一致', () async {
     final rig = _Rig();
-    rig.capture.reply = (_) => _answers({
-      'candidate_1': 0.99,
-      'candidate_2': 0.10,
-      'candidate_3': 0.10,
-      'candidate_4': 0.10,
-    });
+    // Answers are keyed per batch (batchSize 3): the second chunk renumbers
+    // its slots, so BVTEST3 answers as batch-local candidate_1.
+    rig.capture.reply = (index) => index == 0
+        ? _answers({
+            'candidate_1': 0.99,
+            'candidate_2': 0.10,
+            'candidate_3': 0.10,
+          })
+        : _answers({'candidate_1': 0.10});
     final evaluator = rig.evaluator();
     final first = await screen(evaluator, videos(4));
     expect(first.status, JevScreenStatus.evaluated);
@@ -184,10 +185,10 @@ void main() {
     expect(JevVerdictCache.cachedEntryCount, 2);
     rig.capture.calls = 0;
     await screen(evaluator, videos(4));
-    expect(rig.capture.calls, 2); // BVTEST0/1 已淘汰：全量重发
+    expect(rig.capture.calls, 1); // BVTEST0/1 已淘汰：合并为一个请求重发
     rig.capture.calls = 0;
     await screen(evaluator, [videos(4)[2], videos(4)[3]]);
-    expect(rig.capture.calls, 0); // 最新两条仍在
+    expect(rig.capture.calls, 1); // 0/1 重发后成为最新，2/3 被挤出上限：照常发送
   });
 
   test('provider、模型、偏好档或规则集变化使整代失效', () async {
@@ -201,6 +202,7 @@ void main() {
 
     // 换 provider：整代作废，重新发送
     rig.settingsBox.values[JevSettingsStore.providerKey] = 'openrouter';
+    JevSettingsStore.resetCache(); // 生产在设置保存后失效快照，这里模拟同一时序
     rig.capture.reply = (_) => _answers({'candidate_1': 0.10});
     await screen(evaluator, videos(1));
     expect(rig.capture.calls, 1);
@@ -211,6 +213,7 @@ void main() {
     // 换模型 override：再换一代
     rig.settingsBox.values[JevSettingsStore.modelKey(JevProvider.openRouter)] =
         '~vendor/custom';
+    JevSettingsStore.resetCache();
     await screen(evaluator, videos(1));
     expect(rig.capture.calls, 1);
     rig.capture.calls = 0;
@@ -224,10 +227,13 @@ void main() {
             JevPreferenceTheme(
               theme: '剧透',
               count: 2,
-              lastFeedbackAt: DateTime(2024, 1, 1),
+              // The preference store settles against DateTime.now(); a fixed
+              // 2024 timestamp is dropped as expired and the state never changes.
+              lastFeedbackAt: DateTime.now().subtract(const Duration(days: 1)),
             ),
           ],
         ).encode();
+    JevPreferenceStore.resetCache(); // 偏好档保存后失效快照，与生产时序一致
     await screen(evaluator, videos(1));
     expect(rig.capture.calls, 1);
     rig.capture.calls = 0;
@@ -276,6 +282,7 @@ void main() {
     expect(recovered.status, JevScreenStatus.evaluated);
 
     // 解析失败（answers 非法）：同样不缓存
+    JevVerdictCache.resetCache(); // 新 rig 共享静态代区，上一段已写入判定
     rig = _Rig();
     rig.capture.reply = (_) => {'answers': 'nope'};
     evaluator = rig.evaluator();
@@ -285,6 +292,7 @@ void main() {
     expect((await screen(evaluator, videos(1))).requests, 1);
 
     // 低置信 keep：可见但不入缓存
+    JevVerdictCache.resetCache();
     rig = _Rig();
     rig.capture.reply = (_) => _answers({
       'candidate_1': {'noul': 0.10, 'confidence': 0.5},
@@ -300,17 +308,19 @@ void main() {
   test('关闭缓存时行为与现状等价', () async {
     final rig = _Rig();
     rig.settingsBox.values[SettingBoxKey.jevVerdictCacheEnabled] = false;
-    rig.capture.reply = (_) => _answers({
-      'candidate_1': 0.99,
-      'candidate_2': 0.10,
-      'candidate_3': 0.10,
-      'candidate_4': 0.10,
-      'candidate_5': 0.10,
-    });
+    // Second chunk renumbers slots: c4/c5 answer as candidate_1/candidate_2.
+    rig.capture.reply = (index) => index == 0
+        ? _answers({
+            'candidate_1': 0.99,
+            'candidate_2': 0.10,
+            'candidate_3': 0.10,
+          })
+        : _answers({'candidate_1': 0.10, 'candidate_2': 0.10});
     final evaluator = rig.evaluator();
     final first = await screen(evaluator, videos(5));
     expect(first.requests, 2); // ceil(5 / 3)
     expect(first.hidden, [true, false, false, false, false]);
+    rig.capture.calls = 0; // reply 按 transport 调用序分流，二次前归零
     final second = await screen(evaluator, videos(5));
     expect(second.requests, 2);
     expect(second.hidden, first.hidden);
@@ -394,7 +404,7 @@ void main() {
     ]);
     expect(first.requests, 1);
     rig.capture.calls = 0;
-    final second = await screen(evaluator, [candidate('大集同一title!')]);
+    final second = await screen(evaluator, [candidate('大 集 同一 title!')]);
     expect(second.requests, 0); // 标题规范化后同一身份
     final third = await screen(evaluator, [candidate('   ')]);
     expect(third.requests, 1); // 空标题照发
@@ -436,6 +446,69 @@ void main() {
     expect(capped.inFlightFuture('g2', 'a'), isNull);
 
     JevVerdictCache.resetCache();
+    expect(JevVerdictCache.cachedEntryCount, 0);
+  });
+
+  test('内置开关切换使整代失效（#123 AC4）', () async {
+    final rig = _Rig();
+    rig.capture.reply = (_) => _answers({'candidate_1': 0.10});
+    final evaluator = rig.evaluator();
+    final first = await screen(evaluator, videos(1));
+    expect(first.requests, 1);
+    rig.capture.calls = 0;
+    // 关闭 homeWeb 面（target=video）的内置终审：代键的 builtin 位翻转，
+    // 旧代整体作废，第二次终审照常发送。内置关闭时需保留一条规则，
+    // 否则 screen 直接 disabled 早退（不发请求）。
+    await JevRuleStore(box: rig.settingsBox).save(
+      const JevRuleConfig(
+        disabledBuiltins: {JevRuleTarget.video},
+        rules: [
+          JevRule(id: 'r1', target: JevRuleTarget.video, question: '是否剧透'),
+        ],
+      ),
+    );
+    rig.capture.reply = (_) => _answers({
+      'candidate_1_rule_1_context': {'type': 'noul', 'noul': 1.0},
+      'candidate_1_rule_1': {'type': 'noul', 'noul': 0.99},
+    });
+    final second = await screen(evaluator, videos(1));
+    expect(second.hidden, [true]);
+    expect(second.requests, 1);
+    rig.capture.calls = 0;
+    // 新代内第三次终审照常命中。
+    expect((await screen(evaluator, videos(1))).requests, 0);
+  });
+
+  test('容量为最小值 1 时只保留最新判定（#123 AC6）', () {
+    final box = _MemoryBox();
+    box.values[SettingBoxKey.jevVerdictCacheMaxEntries] = 1;
+    final cache = JevVerdictCache(box: box);
+    cache.put('g', 'a', hide: true);
+    cache.put('g', 'b', hide: false);
+    expect(cache.lookup('g', 'a'), isNull); // 写后超限从旧到新淘汰
+    expect(cache.lookup('g', 'b'), isFalse);
+  });
+
+  test('落盘接缝：exportSnapshot/restoreSnapshot 往返保留判定（#123 Q1）', () {
+    final cache = JevVerdictCache(box: _MemoryBox());
+    cache.put('gen-a', 'id:bvid:1', hide: true);
+    cache.put('gen-a', 'id:bvid:2', hide: false);
+    final snapshot = JevVerdictCache.exportSnapshot();
+    JevVerdictCache.resetCache();
+    expect(JevVerdictCache.cachedEntryCount, 0);
+    JevVerdictCache.restoreSnapshot(snapshot);
+    // lookup is instance-scoped but the store is the static region shared
+    // with exportSnapshot/restoreSnapshot, so the same instance reads back.
+    expect(cache.lookup('gen-a', 'id:bvid:1'), isTrue);
+    expect(cache.lookup('gen-a', 'id:bvid:2'), isFalse);
+    expect(JevVerdictCache.cachedEntryCount, 2);
+    // 版本不符：保留现状；结构损坏：整体替换为空，不恢复脏数据。
+    JevVerdictCache.restoreSnapshot(<String, Object?>{'version': 2});
+    expect(JevVerdictCache.cachedEntryCount, 2);
+    JevVerdictCache.restoreSnapshot(<String, Object?>{
+      'version': 1,
+      'generations': <String, Object?>{'g': 'bad'},
+    });
     expect(JevVerdictCache.cachedEntryCount, 0);
   });
 }

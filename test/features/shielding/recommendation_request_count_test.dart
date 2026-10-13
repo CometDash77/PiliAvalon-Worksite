@@ -123,10 +123,10 @@ class _JevMemoryBox implements JevSettingsBox {
 
 class _JevFakeCredentials implements JevCredentialStore {
   @override
-  Future<String?> read() async => 'sk-gauge-key';
+  Future<JevKeyStoreStatus> status() async => JevKeyStoreStatus.available;
 
   @override
-  Future<JevKeyStoreStatus> status() async => JevKeyStoreStatus.available;
+  Future<String?> read() async => 'sk-gauge-key';
 
   @override
   Future<void> write(String apiKey) async {}

@@ -513,12 +513,33 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
 
   Future<void> _saveCacheConfig({bool? enabled}) async {
     final nextEnabled = enabled ?? _cacheEnabled;
-    final ttl =
-        int.tryParse(_cacheTtlController.text.trim()) ??
-        JevVerdictCache.ttlMinutesDefault;
-    final maxEntries =
-        int.tryParse(_cacheMaxController.text.trim()) ??
-        JevVerdictCache.maxEntriesDefault;
+    if (enabled != null) {
+      // Toggle path: only persist the switch; the text fields may still be
+      // empty mid-edit and must not block the toggle.
+      try {
+        await _store.box.put(
+          SettingBoxKey.jevVerdictCacheEnabled,
+          nextEnabled,
+        );
+      } catch (error) {
+        _toast('缓存设置保存失败：$error');
+        return;
+      }
+      if (!mounted) return;
+      setState(() => _cacheEnabled = nextEnabled);
+      return;
+    }
+    final ttlText = _cacheTtlController.text.trim();
+    final maxText = _cacheMaxController.text.trim();
+    final ttl = int.tryParse(ttlText);
+    final maxEntries = int.tryParse(maxText);
+    if (ttlText.isEmpty ||
+        ttl == null ||
+        maxText.isEmpty ||
+        maxEntries == null) {
+      _toast('缓存有效期与条目上限需要填正整数（1–10080 分钟 / 1–5000 条）');
+      return;
+    }
     final clampedTtl = ttl < JevVerdictCache.ttlMinutesMin
         ? JevVerdictCache.ttlMinutesMin
         : (ttl > JevVerdictCache.ttlMinutesMax

@@ -1,5 +1,6 @@
 import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/jev/jev.dart';
+import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class MemoryBox implements JevSettingsBox {
@@ -42,23 +43,26 @@ void main() {
     'Choice wire criteria and partial rule failures preserve OR decisions',
     () async {
       final box = MemoryBox();
+      // 两次 screen 断言 malformation 前后的实时行为（true→false），关闭
+      // 终审判定缓存以免第二次命中首次判定（#123）。
+      box.values[SettingBoxKey.jevVerdictCacheEnabled] = false;
       final settings = JevSettingsStore(box: box);
       await settings.save(
         const JevSettings(
           enabled: true,
           provider: JevProvider.typeSafe,
           providerConfirmed: true,
-          surfaces: {JevSurface.live},
+          surfaces: {JevSurface.homeWeb},
         ),
       );
       final store = JevRuleStore(box: box);
       await store.save(
         const JevRuleConfig(
-          disabledBuiltins: {JevRuleTarget.live},
+          disabledBuiltins: {JevRuleTarget.video},
           rules: [
             JevRule(
-              id: 'live',
-              target: JevRuleTarget.live,
+              id: 'home_web_choice',
+              target: JevRuleTarget.video,
               question: '内容类型？',
               type: JevRuleType.choice,
               options: [
@@ -69,7 +73,7 @@ void main() {
             ),
             JevRule(
               id: 'failed',
-              target: JevRuleTarget.live,
+              target: JevRuleTarget.video,
               question: '是否剧透？',
             ),
           ],
@@ -101,11 +105,11 @@ void main() {
         },
       );
       const input = [JevCandidate(title: '广告：优惠商品')];
-      expect((await evaluator.screen(input, surface: JevSurface.live)).hidden, [
+      expect((await evaluator.screen(input, surface: JevSurface.homeWeb)).hidden, [
         true,
       ]);
       malformed = true;
-      expect((await evaluator.screen(input, surface: JevSurface.live)).hidden, [
+      expect((await evaluator.screen(input, surface: JevSurface.homeWeb)).hidden, [
         false,
       ]);
     },
@@ -211,6 +215,9 @@ void main() {
 
   test('evaluator compiles custom questions, isolates targets and keeps missing context', () async {
     final box = MemoryBox();
+    // 该测试断言每次 screen 都真实发送（calls 计数与逐批 answers），关闭
+    // 终审判定缓存以免第二次 screen 命中首判定（#123）。
+    box.values[SettingBoxKey.jevVerdictCacheEnabled] = false;
     final settings = JevSettingsStore(box: box);
     await settings.save(
       const JevSettings(

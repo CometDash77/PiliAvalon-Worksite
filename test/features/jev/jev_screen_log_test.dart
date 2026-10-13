@@ -5,6 +5,7 @@ import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/jev/jev_screen_log.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart';
 import 'package:PiliPlus/models/model_hot_video_item.dart';
+import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -101,6 +102,9 @@ class Harness {
     }
     settingsBox.values[JevSettingsStore.providerKey] = 'typesafe';
     settingsBox.values[JevSettingsStore.providerConfirmedKey] = true;
+    // 终审判定缓存是进程内静态区；日志测试关注实时判定，直接关闭以免
+    // 跨用例命中（#123）。
+    settingsBox.values[SettingBoxKey.jevVerdictCacheEnabled] = false;
   }
 
   final MemoryBox settingsBox;

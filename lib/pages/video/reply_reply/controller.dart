@@ -108,22 +108,42 @@ class VideoReplyReplyController extends ReplyController
   @override
   Future<void> prepareListResponse(List<ReplyInfo> dataList) async {
     if (!_hasPendingFirstFloor) {
-      return super.prepareListResponse(dataList);
+      // Video-detail pages defer the target jump until after comment
+      // screening so it lands on the screened visible index; other pages
+      // keep the synchronous pre-shielding jump in handleListResponse.
+      final targetId = isVideoDetail ? id : null;
+      if (isVideoDetail) {
+        id = null;
+      }
+      await super.prepareListResponse(dataList);
+      if (isClosed) return;
+      if (targetId != null) {
+        setIndexById(Int64(targetId), dataList);
+      }
+      return;
     }
     final root = _screenedFirstFloor!;
-    await handleListResponse(dataList);
     // Children were detached from the root for first-floor screening; hand
-    // the merged comment pipeline their parent context explicitly.
+    // the merged comment pipeline their parent context explicitly. The
+    // target-jump is deferred until after comment screening so it lands on
+    // the final visible index.
+    final targetId = id;
+    id = null;
+    await handleListResponse(dataList);
     final visible = await screenComments(
       [...applyShielding([root]), ...dataList],
       parentBodies: {
         for (final child in dataList) child: parentBody ?? root.content.message,
       },
     );
+    if (isClosed) return;
     _screenedFirstFloor = visible.any((r) => identical(r, root)) ? root : null;
     dataList
       ..clear()
       ..addAll(visible.where((r) => !identical(r, root)));
+    if (targetId != null) {
+      setIndexById(Int64(targetId), dataList);
+    }
   }
 
   @override
@@ -137,12 +157,18 @@ class VideoReplyReplyController extends ReplyController
   }
 
   @override
-  FutureOr<void> handleListResponse(List<ReplyInfo> dataList) {
-    if (id != null) {
-      setIndexById(Int64(id!), dataList);
-      id = null;
+  Future<void> handleListResponse(List<ReplyInfo> dataList) async {
+    // Baseline contract: target lookup jumps on the raw list index here,
+    // before any filtering. Video-detail pages instead defer the jump until
+    // after comment screening (prepareListResponse captures id first, so
+    // this jump is suppressed there and the screened-index jump supersedes
+    // it); other pages and direct callers keep the synchronous raw jump.
+    final targetId = id;
+    id = null;
+    if (targetId != null) {
+      setIndexById(Int64(targetId), dataList);
     }
-    super.handleListResponse(dataList);
+    await super.handleListResponse(dataList);
   }
 
   ReplyInfo? applyFirstFloorShielding(ReplyInfo reply) {

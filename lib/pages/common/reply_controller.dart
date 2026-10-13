@@ -74,9 +74,13 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
   @override
   FutureOr<void> handleListResponse(List<ReplyInfo> dataList) {
     final visible = applyShielding(dataList);
-    dataList
-      ..clear()
-      ..addAll(visible);
+    // Shielding may hand back the input list itself (no hits); rebuilding in
+    // place would then wipe the very list we are about to refill.
+    if (!identical(visible, dataList)) {
+      dataList
+        ..clear()
+        ..addAll(visible);
+    }
   }
 
   Future<List<ReplyInfo>> screenComments(
