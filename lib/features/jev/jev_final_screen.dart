@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:PiliPlus/features/jev/jev_contract.dart';
 import 'package:PiliPlus/features/jev/jev_screen_log.dart';
 import 'package:PiliPlus/features/jev/jev_evaluator.dart';
+import 'package:PiliPlus/features/jev/jev_filter_log.dart';
 import 'package:PiliPlus/features/llm/llm_contract.dart';
 import 'package:PiliPlus/features/llm/llm_screening.dart';
 import 'package:PiliPlus/features/shielding/live_shielding.dart';
@@ -94,8 +95,10 @@ class JevFinalScreen<T> {
           ? JevScreenLogKind.comment
           : JevScreenLogKind.video;
       final blocked = <JevScreenLogEntry>[];
+      final filterBlocked = <JevFilterLogEntry>[];
       if (screening.status == JevScreenStatus.evaluated) {
         final hidden = screening.hidden;
+        final decisions = screening.decisions;
         final now = DateTime.now().millisecondsSinceEpoch;
         for (var k = 0; k < indices.length && k < hidden.length; k++) {
           if (hidden[k]) {
@@ -111,12 +114,36 @@ class JevFinalScreen<T> {
                 snippet: candidate.snippet ?? _tagSummary(candidate.tags),
               ),
             );
+            // #105:同一真实筛除写入判定详情日志;数值只在本次判定真实产生
+            // 时记录,判定缓存命中的槽位留空,由界面说明缺失,不编造。
+            final JevScreenDecision? decision =
+                k < decisions.length ? decisions[k] : null;
+            filterBlocked.add(
+              JevFilterLogEntry(
+                time: now,
+                surface: surface.id,
+                title: candidate.title,
+                snippet: candidate.snippet,
+                tags: candidate.tags,
+                noul: decision?.noul,
+                confidence: decision?.confidence,
+                threshold: decision?.threshold,
+                ruleId: decision?.ruleId,
+              ),
+            );
           }
         }
       }
       if (blocked.isNotEmpty) {
         try {
           unawaited(JevScreenLog.instance.record(blocked));
+        } catch (_) {
+          // 日志失败不影响筛选。
+        }
+      }
+      if (filterBlocked.isNotEmpty) {
+        try {
+          unawaited(JevFilterLog.instance.record(filterBlocked));
         } catch (_) {
           // 日志失败不影响筛选。
         }

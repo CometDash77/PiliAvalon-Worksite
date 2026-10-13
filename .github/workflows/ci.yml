@@ -53,7 +53,13 @@ jobs:
         run: git diff --exit-code pubspec.yaml pubspec.lock
 
       - name: Run Flutter regression suite
-        run: flutter test --no-pub
+        run: flutter test --no-pub 2>&1 | tee flutter-test.log; test ${PIPESTATUS[0]} -eq 0
+
+      - name: Surface failing test names
+        if: failure()
+        run: |
+          grep -E "::group::" flutter-test.log | head -10 | sed "s/^/::error::/" || true
+          tail -80 flutter-test.log | sed "s/^/::error::/" || true
 
       - name: Test Android launcher resolution
         run: python3 -m unittest discover -s tool -p android_runtime_smoke_launch_test.py

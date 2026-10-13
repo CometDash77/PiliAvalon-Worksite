@@ -1,0 +1,77 @@
+﻿Analyzing PiliAvalon-Worksite...                                
+
+   info - 'alpha' is deprecated and shouldn't be used. Use (*.a * 255.0).round().clamp(0, 255). Try replacing the use of the deprecated member with the replacement - lib\pages\dynamics\widgets\vote_decoration.dart:114:20 - deprecated_member_use
+   info - Unnecessary duplication of receiver. Try using a cascade to avoid the duplication - test\features\shielding\upstream_reply_selection_test.dart:65:7 - cascade_invocations
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:24:7 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:44:11 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:45:11 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:64:26 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:64:48 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:76:18 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:88:18 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:106:18 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:118:18 - prefer_interpolation_to_compose_strings
+   info - Unnecessary duplication of receiver. Try using a cascade to avoid the duplication - tool\bench\shield_matcher_bench.dart:130:3 - cascade_invocations
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:176:22 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:184:49 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:184:78 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:185:51 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:186:20 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:186:53 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:189:14 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:189:43 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:190:13 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:190:42 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:191:15 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:195:17 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:197:28 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:202:20 - prefer_interpolation_to_compose_strings
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\bench\shield_matcher_bench.dart:235:3 - avoid_print
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:236:5 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:238:9 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:240:9 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:242:9 - prefer_interpolation_to_compose_strings
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\bench\shield_matcher_bench.dart:245:3 - avoid_print
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:246:5 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:248:9 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:250:9 - prefer_interpolation_to_compose_strings
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\bench\shield_matcher_bench.dart:254:3 - avoid_print
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:255:5 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_bench.dart:257:9 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:50:13 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:158:23 - prefer_interpolation_to_compose_strings
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\bench\shield_matcher_equivalence.dart:189:11 - avoid_print
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:189:17 - prefer_interpolation_to_compose_strings
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\bench\shield_matcher_equivalence.dart:190:11 - avoid_print
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:190:17 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:190:58 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:190:74 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:190:97 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:190:125 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:190:149 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:190:174 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:190:207 - prefer_interpolation_to_compose_strings
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\bench\shield_matcher_equivalence.dart:191:11 - avoid_print
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:191:17 - prefer_interpolation_to_compose_strings
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\bench\shield_matcher_equivalence.dart:192:11 - avoid_print
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:192:17 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:208:19 - prefer_interpolation_to_compose_strings
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\bench\shield_matcher_equivalence.dart:223:3 - avoid_print
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:223:9 - prefer_interpolation_to_compose_strings
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\bench\shield_matcher_equivalence.dart:232:11 - avoid_print
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:232:17 - prefer_interpolation_to_compose_strings
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\bench\shield_matcher_equivalence.dart:233:11 - avoid_print
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:233:17 - prefer_interpolation_to_compose_strings
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\bench\shield_matcher_equivalence.dart:234:11 - avoid_print
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:234:17 - prefer_interpolation_to_compose_strings
+   info - Don't invoke 'print' in production code. Try using a logging framework - tool\bench\shield_matcher_equivalence.dart:240:3 - avoid_print
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:240:9 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values. Try using string interpolation to build the composite string - tool\bench\shield_matcher_equivalence.dart:240:51 - prefer_interpolation_to_compose_strings
+
+flutter.bat : 67 issues found. (ran in 34.3s)
+所在位置 行:5 字符: 1
++ & D:/flutter-sdk/flutter/bin/flutter.bat analyze --no-pub --no-fatal- ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (67 issues found. (ran in 34.3s):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
