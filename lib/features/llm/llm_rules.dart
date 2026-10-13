@@ -66,9 +66,14 @@ class LlmVideoRuleConfig {
 
 /// A single non-secret blob keeps generic-line video rule edits atomic.
 class LlmVideoRuleStore {
-  LlmVideoRuleStore({JevSettingsBox? box})
-    : _box = box ?? JevSettingsStore().box;
-  final JevSettingsBox _box;
+  LlmVideoRuleStore({JevSettingsBox? box}) : _boxOrNull = box;
+
+  // 构造期不触碰 JevSettingsStore/GStorage（#130）：解析推迟到首次读写。
+  final JevSettingsBox? _boxOrNull;
+  JevSettingsBox? _lazyBox;
+  JevSettingsStore? _store;
+  JevSettingsBox get _box =>
+      _lazyBox ??= _boxOrNull ?? (_store ??= JevSettingsStore()).box;
   static const key = 'piliavalon.llm.v1.video_rules.v1';
 
   Future<LlmVideoRuleConfig> load() async {

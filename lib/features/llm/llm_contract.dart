@@ -67,4 +67,12 @@ abstract final class LlmLimits {
 
   // Probe and upstream summaries never exceed this many runes (spec 1).
   static const int maxDetailRunes = 200;
+
+  // One screening call's completion cap (spec 3/4): the JSON verdict for a
+  // full batch of hits stays far below this bound.
+  static const int maxCompletionTokens = 1024;
+
+  // A hit reason longer than this is truncated for the log; the verdict
+  // itself stays valid (spec 4).
+  static const int maxReasonRunes = 200;
 }

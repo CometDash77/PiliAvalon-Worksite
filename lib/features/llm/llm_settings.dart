@@ -141,8 +141,14 @@ class LlmProviderConfig {
 // The API key never reaches this box (spec 1), which keeps it out of Hive
 // exports and backups.
 class LlmSettingsStore {
-  LlmSettingsStore({JevSettingsBox? box})
-    : _box = box ?? HiveJevSettingsBox(GStorage.setting);
+  LlmSettingsStore({JevSettingsBox? box}) : _boxOrNull = box;
+
+  // 构造期不触碰 GStorage（#130）：flutter test 等未初始化环境里 late 字段
+  // 会同步抛错；解析推迟到首次读写，失败由调用方 try/catch 兜住。
+  final JevSettingsBox? _boxOrNull;
+  JevSettingsBox? _lazyBox;
+  JevSettingsBox get _box =>
+      _lazyBox ??= _boxOrNull ?? HiveJevSettingsBox(GStorage.setting);
 
   static const String namespace = 'piliavalon.llm.v1';
   static const String protocolKey = 'piliavalon.llm.v1.protocol';
@@ -151,8 +157,6 @@ class LlmSettingsStore {
   static const String confirmedKey = 'piliavalon.llm.v1.confirmed';
   static const String insecureConfirmedKey =
       'piliavalon.llm.v1.http_insecure_confirmed';
-
-  final JevSettingsBox _box;
 
   static LlmProviderConfig? _cache;
 
