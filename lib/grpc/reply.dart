@@ -5,6 +5,7 @@ import 'package:PiliPlus/grpc/grpc_req.dart';
 import 'package:PiliPlus/grpc/url.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
+import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:fixnum/fixnum.dart';
 
@@ -49,6 +50,12 @@ abstract final class ReplyGrpc {
   static bool needRemoveGrpc(ReplyInfo reply) {
     final ruleSet = ShieldingRuntime.instance.ruleSet();
     final commentShieldingEnabled = ruleSet.isScopeEnabled(ShieldScope.comment);
+    // ponytail: mid==0 short-circuit keeps needRemoveGrpc storage-free in unit tests;
+    // network replies always carry real mids so UP blackMids semantics are unchanged.
+    if (reply.mid.toInt() != 0 &&
+        GlobalData().blackMids.contains(reply.mid.toInt())) {
+      return true;
+    }
     return (commentShieldingEnabled &&
             useLegacyTextFilter &&
             enableFilter &&

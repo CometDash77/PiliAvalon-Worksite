@@ -9,7 +9,7 @@ import 'package:PiliPlus/pages/channel_quiet_settings/view.dart';
 import 'package:PiliPlus/pages/comment_shield_settings/view.dart';
 import 'package:PiliPlus/pages/danmaku_block/view.dart';
 import 'package:PiliPlus/pages/dlna/view.dart';
-import 'package:PiliPlus/pages/download/view.dart';
+import 'package:PiliPlus/pages/download/download/view.dart';
 import 'package:PiliPlus/pages/dynamics/view.dart';
 import 'package:PiliPlus/pages/dynamics_create_vote/view.dart';
 import 'package:PiliPlus/pages/dynamics_detail/view.dart';
