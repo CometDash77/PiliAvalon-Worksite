@@ -13,7 +13,7 @@ enum JevProvider {
     id: 'openrouter',
     label: 'OpenRouter',
     endpoint: 'https://openrouter.ai/api/alpha/decisions',
-    model: 'typesafe/jev-latest',
+    model: '~typesafe/jev-latest',
   );
 
   const JevProvider({
@@ -32,14 +32,8 @@ enum JevProvider {
   /// Typed-decision endpoint of this provider.
   final String endpoint;
 
-  /// Pinned model identifier.
-  ///
-  /// `typesafe/jev-latest` is the OpenRouter-side model id (issue #101: the
-  /// previously pinned `typesafe/jev-1.13` does not exist upstream and turned
-  /// every OpenRouter validation into a rejected request) while the TypeSafe
-  /// direct call uses the documented `jev-latest` alias (issue #31/#59, gap
-  /// G-01). A model id echoed back by the provider is observed only and is never
-  /// persisted.
+  /// Provider default; a saved per-provider override takes precedence.
+  /// OpenRouter's documented latest alias includes the leading tilde.
   final String model;
 
   static JevProvider? tryFromId(String? id) {
@@ -54,20 +48,34 @@ enum JevProvider {
 ///
 /// Every surface carries its own switch; a surface is only screened when the
 /// master switch is on as well.
+///
+/// [screeningWired] separates the surfaces that actually run the final screen
+/// today from the ones that only exist in the settings list (issue #120). An
+/// unwired surface must never look switchable: the settings page renders it as
+/// a stated gap and [JevSettings.isSurfaceEnabled] keeps it off.
 enum JevSurface {
   homeWeb(id: 'home_web', label: '首页推荐（Web）'),
   homeApp(id: 'home_app', label: '首页推荐（App）'),
   related(id: 'related', label: '相关推荐'),
   hot(id: 'hot', label: '热门'),
   ranking(id: 'ranking', label: '排行榜'),
-  live(id: 'live', label: '直播推荐'),
+  live(id: 'live', label: '直播推荐', screeningWired: false),
   pgc(id: 'pgc', label: '番剧/影视推荐'),
-  music(id: 'music', label: '音乐推荐列表');
+  music(id: 'music', label: '音乐推荐列表'),
+  comment(id: 'video_comments', label: '视频详情评论');
 
-  const JevSurface({required this.id, required this.label});
+  const JevSurface({
+    required this.id,
+    required this.label,
+    this.screeningWired = true,
+  });
 
   final String id;
   final String label;
+
+  /// Whether this surface has a final-screen call site in the app. Wiring the
+  /// live page is issue #115, not this contract.
+  final bool screeningWired;
 
   static JevSurface? tryFromId(String? id) {
     for (final surface in values) {
@@ -130,21 +138,20 @@ abstract final class JevLimits {
 
 /// Request/response shape used by this implementation.
 ///
-/// The decision tickets fixed the envelope (`{state, model, questions}`) but not
-/// the individual field names (gaps G-03/G-04). Local decision: keep that
-/// envelope, key every question by a per-batch ordinal that carries no card
-/// identity, and describe each question with the atomic question text.
+/// Both providers require a map of typed questions, keyed by response id.
+/// See https://docs.typesafe.ai/api and OpenRouter's alpha Decisions reference.
+/// Per-batch ordinals carry no card identity. Candidate context lives in state,
+/// and instructions explicitly reference it: question keys alone are not
+/// supplied to the model during inference.
 abstract final class JevRequest {
   static const String stateField = 'state';
   static const String modelField = 'model';
   static const String questionsField = 'questions';
-  static const String questionIdField = 'id';
-  static const String questionTextField = 'question';
 
-  /// Per-candidate context carried inside its keyed question. Title is
+  /// Per-candidate context carried inside state.candidates. Title is
   /// mandatory; snippet and tags ride along only when the card already has
   /// them. Never an id, a link, an uploader, or any long metadata (issue #34).
-  static const String candidateField = 'candidate';
+  static const String candidatesField = 'candidates';
   static const String candidateTitleField = 'title';
   static const String candidateSnippetField = 'snippet';
   static const String candidateTagsField = 'tags';
@@ -153,19 +160,23 @@ abstract final class JevRequest {
   /// a title, or any other card identity.
   static String candidateKey(int index) => 'candidate_${index + 1}';
 
-  static Map<String, Object?> question(
-    String id, {
-    Map<String, Object?>? candidate,
+  static Map<String, Object?> question({
+    String? candidateKey,
   }) => <String, Object?>{
-    questionIdField: id,
-    questionTextField: JevQuestion.text,
-    candidateField: ?candidate,
+    'type': 'noul',
+    'instructions': candidateKey == null
+        ? JevQuestion.text
+        : '只评估 `state.candidates.$candidateKey` 中的推荐，依据 `state.themes` 中用户明确不喜欢的主题。${JevQuestion.text}',
+    'criteria': <String, String>{
+      'true': '推荐的核心内容与明确不喜欢的主题有足够强的语义匹配，应屏蔽。',
+      'false': '没有足够强的核心内容匹配，或信息不足，应保持可见。',
+    },
   };
 
   static Map<String, Object?> body({
     required String model,
     required Map<String, Object?> state,
-    required List<Map<String, Object?>> questions,
+    required Map<String, Map<String, Object?>> questions,
   }) => <String, Object?>{
     stateField: state,
     modelField: model,

@@ -78,6 +78,7 @@ abstract final class RecommendationSurfaces {
     return JevCandidate(
       title: title,
       snippet: entry.candidate.reason,
+      localKey: jevVideoLocalKey(entry.item),
       tags: [
         if (category != null && category.isNotEmpty) category,
         ...entry.candidate.tags,

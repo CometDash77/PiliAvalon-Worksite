@@ -534,13 +534,12 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
         }
 
         // 重新请求相关视频
-        if (videoDetailCtr.plPlayerController.showRelatedVideo) {
-          try {
-            Get.find<RelatedController>(tag: heroTag)
-              ..bvid = bvid
-              ..queryData();
-          } catch (_) {}
-        }
+        try {
+          Get.find<RelatedController>(tag: heroTag).syncIfNeeded(
+            bvid,
+            refresh: videoDetailCtr.effectiveShowRelatedVideo,
+          );
+        } catch (_) {}
 
         // 重新请求评论
         if (videoDetailCtr.showReply) {
@@ -676,7 +675,7 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
           return true;
         }
         if (playRepeat == PlayRepeat.autoPlayRelated &&
-            videoDetailCtr.plPlayerController.showRelatedVideo) {
+            videoDetailCtr.effectiveShowRelatedVideo) {
           return playRelated();
         }
         return false;
@@ -710,7 +709,7 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
         if (playRepeat == PlayRepeat.listCycle) {
           nextIndex = 0;
         } else if (playRepeat == PlayRepeat.autoPlayRelated &&
-            videoDetailCtr.plPlayerController.showRelatedVideo) {
+            videoDetailCtr.effectiveShowRelatedVideo) {
           return playRelated();
         } else {
           return false;

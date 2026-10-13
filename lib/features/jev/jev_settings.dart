@@ -1,16 +1,44 @@
 import 'package:PiliPlus/features/jev/jev_contract.dart';
 import 'package:PiliPlus/utils/storage.dart';
-import 'package:flutter/foundation.dart' show immutable, setEquals;
+import 'package:flutter/foundation.dart' show immutable, setEquals, mapEquals;
 
 /// Persisted, non-secret Jev configuration (issues #32/#35).
 @immutable
 class JevSettings {
   const JevSettings({
     this.enabled = false,
+    this.commentEnabled = false,
+    this.commentCriteria = defaultCommentCriteria,
     this.provider,
     this.surfaces = const <JevSurface>{},
     this.providerConfirmed = false,
+    this.modelOverrides = const <JevProvider, String>{},
   });
+
+  static const String defaultCommentCriteria =
+      '隐藏明显广告引流、直接辱骂或人身攻击、重复刷屏、明显无关灌水；'
+      '保留正常批评和不同意见、相关玩笑、简短但有意义的回复。'
+      '不能仅因语气尖锐、观点不同或内容简短就隐藏；信息不足时保留。';
+  final bool commentEnabled;
+  final String commentCriteria;
+
+  final Map<JevProvider, String> modelOverrides;
+
+  String modelFor(JevProvider provider) =>
+      modelOverrides[provider] ?? provider.model;
+
+  JevSettings withModel(JevProvider provider, String rawModel) {
+    final model = rawModel.trim();
+    if (model.isEmpty) throw ArgumentError('模型 ID 不能为空');
+    return copyWith(
+      modelOverrides: Map.unmodifiable({...modelOverrides, provider: model}),
+    );
+  }
+
+  JevSettings withDefaultModel(JevProvider provider) {
+    final next = {...modelOverrides}..remove(provider);
+    return copyWith(modelOverrides: Map.unmodifiable(next));
+  }
 
   /// Default state: Jev off, no provider chosen, no surface enabled.
   static const JevSettings disabled = JevSettings();
@@ -29,20 +57,28 @@ class JevSettings {
   /// (issue #38: a format hint neither selects nor switches a provider).
   final bool providerConfirmed;
 
-  /// A surface screens candidates only when the master switch is on too.
+  /// A surface screens candidates only when the master switch is on too, and
+  /// only when the app actually implements that surface (issue #120): a
+  /// surface with no call site stays off whatever the stored set says.
   bool isSurfaceEnabled(JevSurface surface) =>
-      enabled && surfaces.contains(surface);
+      enabled && surface.screeningWired && surfaces.contains(surface);
 
   JevSettings copyWith({
     bool? enabled,
+    bool? commentEnabled,
+    String? commentCriteria,
     JevProvider? provider,
     Set<JevSurface>? surfaces,
     bool? providerConfirmed,
+    Map<JevProvider, String>? modelOverrides,
   }) => JevSettings(
     enabled: enabled ?? this.enabled,
+    commentEnabled: commentEnabled ?? this.commentEnabled,
+    commentCriteria: commentCriteria ?? this.commentCriteria,
     provider: provider ?? this.provider,
     surfaces: surfaces ?? this.surfaces,
     providerConfirmed: providerConfirmed ?? this.providerConfirmed,
+    modelOverrides: modelOverrides ?? this.modelOverrides,
   );
 
   JevSettings withSurface(JevSurface surface, {required bool value}) {
@@ -58,23 +94,34 @@ class JevSettings {
   /// Drops the provider choice and the confirmation latch of the stored key.
   JevSettings withoutProvider() => JevSettings(
     enabled: enabled,
+    commentEnabled: commentEnabled,
+    commentCriteria: commentCriteria,
     surfaces: surfaces,
+    modelOverrides: modelOverrides,
   );
 
   @override
   bool operator ==(Object other) =>
       other is JevSettings &&
       other.enabled == enabled &&
+      other.commentEnabled == commentEnabled &&
+      other.commentCriteria == commentCriteria &&
       other.provider == provider &&
       other.providerConfirmed == providerConfirmed &&
-      setEquals(other.surfaces, surfaces);
+      setEquals(other.surfaces, surfaces) &&
+      mapEquals(other.modelOverrides, modelOverrides);
 
   @override
   int get hashCode => Object.hash(
     enabled,
+    commentEnabled,
+    commentCriteria,
     provider,
     providerConfirmed,
     Object.hashAllUnordered(surfaces),
+    Object.hashAllUnordered(
+      modelOverrides.entries.map((e) => Object.hash(e.key, e.value)),
+    ),
   );
 
   @override
@@ -113,8 +160,8 @@ class HiveJevSettingsBox implements JevSettingsBox {
 
 /// Reads and writes the non-secret Jev settings.
 ///
-/// Only the master switch, the provider id, the confirmation latch, and the
-/// per-surface switches are stored: the API key never reaches this box (issue
+/// Stores switches, comment criteria, model overrides, provider id and the
+/// confirmation latch: the API key never reaches this box (issue
 /// #32), which keeps it out of Hive exports and WebDAV backups.
 class JevSettingsStore {
   JevSettingsStore({JevSettingsBox? box})
@@ -130,9 +177,14 @@ class JevSettingsStore {
 
   static const String namespace = 'piliavalon.jev.v1';
   static const String enabledKey = '$namespace.enabled';
+  static const String commentEnabledKey = '$namespace.comment_enabled';
+  static const String commentCriteriaKey = '$namespace.comment_criteria';
   static const String providerKey = '$namespace.provider';
   static const String providerConfirmedKey = '$namespace.provider_confirmed';
   static const String surfacePrefix = '$namespace.surface.';
+
+  static String modelKey(JevProvider provider) =>
+      '$namespace.model.${provider.id}';
 
   static String surfaceKey(JevSurface surface) => '$surfacePrefix${surface.id}';
 
@@ -160,7 +212,17 @@ class JevSettingsStore {
     final provider = JevProvider.tryFromId(
       rawProvider is String ? rawProvider : null,
     );
+    final models = <JevProvider, String>{};
+    for (final entry in JevProvider.values) {
+      final raw = _box.get(modelKey(entry));
+      if (raw is String && raw.trim().isNotEmpty) models[entry] = raw.trim();
+    }
     final settings = JevSettings(
+      commentEnabled: _flag(_box.get(commentEnabledKey)),
+      commentCriteria: _box.get(commentCriteriaKey) is String
+          ? _box.get(commentCriteriaKey) as String
+          : JevSettings.defaultCommentCriteria,
+      modelOverrides: Map.unmodifiable(models),
       enabled: _flag(_box.get(enabledKey, defaultValue: false)),
       provider: provider,
       surfaces: surfaces,
@@ -174,6 +236,8 @@ class JevSettingsStore {
 
   Future<void> save(JevSettings settings) async {
     await _box.put(enabledKey, settings.enabled);
+    await _box.put(commentEnabledKey, settings.commentEnabled);
+    await _box.put(commentCriteriaKey, settings.commentCriteria);
     final provider = settings.provider;
     if (provider == null) {
       await _box.delete(providerKey);
@@ -181,6 +245,14 @@ class JevSettingsStore {
     } else {
       await _box.put(providerKey, provider.id);
       await _box.put(providerConfirmedKey, settings.providerConfirmed);
+    }
+    for (final entry in JevProvider.values) {
+      final model = settings.modelOverrides[entry];
+      if (model == null) {
+        await _box.delete(modelKey(entry));
+      } else {
+        await _box.put(modelKey(entry), model);
+      }
     }
     for (final surface in JevSurface.values) {
       await _box.put(surfaceKey(surface), settings.surfaces.contains(surface));

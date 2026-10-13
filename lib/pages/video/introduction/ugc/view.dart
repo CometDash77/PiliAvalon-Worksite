@@ -43,6 +43,7 @@ import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
+import 'package:PiliPlus/utils/zen_mode.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
@@ -129,7 +130,7 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                   clipBehavior: .none,
                   children: [
                     _buildInfo(videoDetail.stat, videoDetail.pubdate),
-                    if (introController.enableAi) _aiBtn,
+                    if (!ZenMode.isOn && introController.enableAi) _aiBtn,
                   ],
                 ),
                 if (introController.showArgueMsg)
@@ -171,8 +172,8 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                           ),
                         ),
                 ),
-                // 点赞收藏转发 布局样式2
-                if (!isHorizontal) ...[
+                // 点赞收藏转发 布局样式2 (R20 hides the action row in Zen)
+                if (!isHorizontal && !ZenMode.isOn) ...[
                   const SizedBox(height: 8),
                   actionGrid(
                     context,
@@ -302,6 +303,8 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
     ],
     NoTranslucentArea(
       child: Obx(() {
+        // R20 hides tags while Zen is on.
+        if (ZenMode.isOn) return const SizedBox.shrink();
         final videoTags = introController.videoTags.value;
         if (videoTags == null || videoTags.isEmpty) {
           return const SizedBox.shrink();
@@ -741,9 +744,9 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
               }),
             ),
           ),
-          followButton(context),
+          if (!ZenMode.isOn) followButton(context),
         ],
-        if (isHorizontal) ...[
+        if (isHorizontal && !ZenMode.isOn) ...[
           const SizedBox(width: 10),
           Expanded(
             child: actionGrid(
@@ -936,27 +939,33 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
   );
 
   Widget _buildInfo(VideoStat? stat, int? pubdate) {
+    // R19 retains the play count. R20 drops the danmaku count, publish date,
+    // anonymity icon and 在线人数. Read `ZenMode` here so the Obx wrapping
+    // this sliver subscribes to it and rebuilds on a Zen flip.
+    final zen = ZenMode.isOn;
     return Row(
       spacing: 10,
       children: [
         StatWidget(type: .play, value: stat?.view, color: colorScheme.outline),
-        StatWidget(
-          type: .danmaku,
-          value: stat?.danmaku,
-          color: colorScheme.outline,
-        ),
-        Text(
-          DateFormatUtils.format(pubdate),
-          style: TextStyle(fontSize: 12, color: colorScheme.outline),
-        ),
-        if (MineController.anonymity.value)
+        if (!zen)
+          StatWidget(
+            type: .danmaku,
+            value: stat?.danmaku,
+            color: colorScheme.outline,
+          ),
+        if (!zen)
+          Text(
+            DateFormatUtils.format(pubdate),
+            style: TextStyle(fontSize: 12, color: colorScheme.outline),
+          ),
+        if (!zen && MineController.anonymity.value)
           Icon(
             MdiIcons.incognito,
             size: 15,
             color: colorScheme.outline,
             semanticLabel: '无痕',
           ),
-        if (introController.isShowOnlineTotal)
+        if (!zen && introController.isShowOnlineTotal)
           Obx(
             () => Text(
               '${introController.total.value}人在看',

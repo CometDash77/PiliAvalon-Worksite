@@ -10,6 +10,7 @@ class JevValidationResult {
     required this.outcome,
     this.blockedBy = const <JevSelectionIssue>[],
     this.detail,
+    this.model,
   });
 
   /// The provider of the attempt, or the selected provider when nothing was
@@ -25,6 +26,7 @@ class JevValidationResult {
   /// Short upstream summary (status + message) from the probe, when the
   /// provider actually answered; null keeps the generic copy (issue #101).
   final String? detail;
+  final String? model;
 
   bool get attempted => outcome != null;
 
@@ -44,6 +46,7 @@ class JevKeyValidator {
   Future<JevValidationResult> validate({
     required JevSelectionState selection,
     required String apiKey,
+    String? model,
   }) async {
     final provider = selection.routableProvider;
     if (provider == null) {
@@ -53,10 +56,16 @@ class JevKeyValidator {
         blockedBy: selection.issues,
       );
     }
-    final result = await _probe(provider: provider, apiKey: apiKey);
+    final effectiveModel = model ?? provider.model;
+    final result = await _probe(
+      provider: provider,
+      apiKey: apiKey,
+      model: effectiveModel,
+    );
     return JevValidationResult(
       provider: provider,
       outcome: result.outcome,
+      model: effectiveModel,
       detail: result.detail,
     );
   }

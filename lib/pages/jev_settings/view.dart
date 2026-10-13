@@ -2,6 +2,10 @@
 
 import 'package:PiliPlus/common/widgets/flutter/list_tile.dart' as custom;
 import 'package:PiliPlus/features/jev/jev.dart';
+import 'package:PiliPlus/features/jev/jev_rules.dart';
+import 'package:PiliPlus/pages/jev_settings/jev_rules_page.dart';
+import 'package:PiliPlus/pages/jev_settings/jev_screen_log_page.dart';
+import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:material_ui/material_ui.dart' hide ListTile;
 
@@ -16,6 +20,7 @@ class JevSettingsPage extends StatefulWidget {
     this.store,
     this.credentialStore,
     this.validator,
+    this.catalog,
     this.preferenceStore,
     this.onMessage,
   });
@@ -24,6 +29,7 @@ class JevSettingsPage extends StatefulWidget {
   final JevSettingsStore? store;
   final JevCredentialStore? credentialStore;
   final JevKeyValidator? validator;
+  final JevModelCatalog? catalog;
 
   /// The local negative-feedback profile surface (issue #33).
   final JevPreferenceStore? preferenceStore;
@@ -44,6 +50,19 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       widget.preferenceStore ??
       JevPreferenceStore(box: _store.box, settings: _store);
 
+  late final JevModelCatalog _catalog = widget.catalog ?? JevModelCatalog();
+  final TextEditingController _modelController = TextEditingController();
+  int _generation = 0;
+  int _catalogGeneration = 0;
+  bool _catalogBusy = false;
+  JevModelCatalogResult? _catalogResult;
+
+  void _invalidateValidation() {
+    _generation++;
+    _validation = null;
+    _busy = false;
+  }
+
   final TextEditingController _keyController = TextEditingController();
 
   late JevSettings _settings = JevSettingsStore.snapshot;
@@ -55,6 +74,14 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   bool _obscureKey = true;
   bool _hasStoredKey = false;
 
+  final TextEditingController _commentController = TextEditingController();
+
+  // Issue #123: verdict-cache bounds, read from the settings box in _load().
+  bool _cacheEnabled = true;
+  int _cacheEntries = 0;
+  final TextEditingController _cacheTtlController = TextEditingController();
+  final TextEditingController _cacheMaxController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -64,6 +91,10 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   @override
   void dispose() {
     _keyController.dispose();
+    _modelController.dispose();
+    _commentController.dispose();
+    _cacheTtlController.dispose();
+    _cacheMaxController.dispose();
     super.dispose();
   }
 
@@ -80,6 +111,16 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     final settings = await _store.load();
     final profile = await _preferences.load();
     final status = await _credentials.status();
+    // Issue #123: verdict-cache bounds live in the settings box; reads are
+    // defensive so a broken box keeps the page usable.
+    var cacheEnabled = true;
+    var cacheTtl = JevVerdictCache.ttlMinutesDefault;
+    var cacheMax = JevVerdictCache.maxEntriesDefault;
+    try {
+      cacheEnabled = JevVerdictCache.enabledIn(_store.box);
+      cacheTtl = JevVerdictCache.ttlMinutesIn(_store.box);
+      cacheMax = JevVerdictCache.maxEntriesIn(_store.box);
+    } catch (_) {}
     String? storedKey;
     if (status == JevKeyStoreStatus.available) {
       try {
@@ -97,6 +138,15 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     setState(() {
       _settings = JevSettingsStore.snapshot;
       _profile = profile;
+      _commentController.text = _settings.commentCriteria;
+      _cacheEnabled = cacheEnabled;
+      _cacheEntries = JevVerdictCache.cachedEntryCount;
+      _cacheTtlController.text = '$cacheTtl';
+      _cacheMaxController.text = '$cacheMax';
+      final provider = _settings.provider;
+      if (provider != null) {
+        _modelController.text = _settings.modelFor(provider);
+      }
       _keyStoreStatus = status;
       _hasStoredKey = storedKey != null;
       if (storedKey != null) {
@@ -110,20 +160,34 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     });
   }
 
-  Future<void> _saveSettings(JevSettings next) async {
+  Future<void> _saveQueue = Future<void>.value();
+
+  Future<bool> _saveSettings(JevSettings next) async {
+    if (!mounted) return false;
+    final previous = _settings;
+    setState(() => _settings = next);
+    final write = _saveQueue.then((_) => _store.save(next));
+    _saveQueue = write.catchError((Object _) {});
     try {
-      await _store.save(next);
-      if (!mounted) return;
-      setState(() => _settings = next);
+      await write;
+      return true;
     } catch (error) {
+      if (mounted && identical(_settings, next)) {
+        setState(() => _settings = previous);
+      }
       _toast('保存失败：$error');
+      return false;
     }
   }
 
   Future<void> _selectProvider(JevProvider provider) async {
     setState(() {
       _selection = _selection.withProvider(provider);
-      _validation = null;
+      _invalidateValidation();
+      _catalogGeneration++;
+      _catalogBusy = false;
+      _catalogResult = null;
+      _modelController.text = _settings.modelFor(provider);
     });
     await _saveSettings(
       _settings.copyWith(provider: provider, providerConfirmed: false),
@@ -151,7 +215,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     if (!mounted) return;
     setState(() {
       _hasStoredKey = true;
-      _validation = null;
+      _invalidateValidation();
     });
     await _saveSettings(
       _settings.copyWith(
@@ -175,14 +239,62 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     if (!mounted) return;
     setState(() {
       _selection = _selection.withKey('');
-      _validation = null;
+      _invalidateValidation();
       _hasStoredKey = false;
     });
     await _saveSettings(_settings.copyWith(providerConfirmed: false));
     _toast('已清除密钥');
   }
 
+  Future<void> _saveModel({bool restoreDefault = false}) async {
+    final provider = _selection.provider;
+    if (provider == null) return;
+    final model = restoreDefault
+        ? provider.model
+        : _modelController.text.trim();
+    if (model.isEmpty) {
+      _toast('模型 ID 不能为空');
+      return;
+    }
+    setState(_invalidateValidation);
+    final next = restoreDefault
+        ? _settings.withDefaultModel(provider)
+        : _settings.withModel(provider, model);
+    final generation = _generation;
+    final saved = await _saveSettings(next);
+    if (!saved ||
+        !mounted ||
+        generation != _generation ||
+        _selection.provider != provider) {
+      return;
+    }
+    _modelController.text = _settings.modelFor(provider);
+    _toast('模型已保存，需重新验证');
+  }
+
+  Future<void> _loadModels() async {
+    final provider = _selection.provider;
+    if (provider == null) return;
+    final generation = ++_catalogGeneration;
+    setState(() {
+      _catalogBusy = true;
+      _catalogResult = null;
+    });
+    final result = await _catalog.load(
+      provider: provider,
+      apiKey: _selection.trimmedKey,
+    );
+    if (!mounted || generation != _catalogGeneration) return;
+    setState(() {
+      _catalogBusy = false;
+      _catalogResult = result;
+    });
+  }
+
   Future<void> _validateKey() async {
+    final provider = _selection.provider;
+    final generation = _generation;
+    final model = provider == null ? null : _settings.modelFor(provider);
     setState(() {
       _busy = true;
       _validation = null;
@@ -191,8 +303,9 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       final result = await _validator.validate(
         selection: _selection,
         apiKey: _selection.trimmedKey,
+        model: model,
       );
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(() {
         _validation = result;
         _busy = false;
@@ -204,12 +317,13 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
             providerConfirmed: true,
           ),
         );
+        if (!mounted || generation != _generation) return;
         _toast('验证通过：${result.provider?.label ?? ''}');
       } else {
         _toast(_validationMessage(result));
       }
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(() => _busy = false);
       _toast('验证失败：$error');
     }
@@ -228,6 +342,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       JevProbeOutcome.invalidKey => '$provider 拒绝了该密钥（401），请检查密钥与提供方选择',
       JevProbeOutcome.rateLimited => '$provider 限流或过载，稍后再试；候选保持可见',
       JevProbeOutcome.rejectedRequest => '$provider 拒绝了请求格式（不判定为密钥问题）',
+      JevProbeOutcome.modelNotFound =>
+        '$provider 找不到模型 ${result.model ?? ''}，请检查模型 ID、获取上游模型或恢复默认后重新验证',
       JevProbeOutcome.serverError => '$provider 服务端错误，稍后再试',
       JevProbeOutcome.timeout => '$provider 请求超时，稍后再试',
       JevProbeOutcome.networkError => '网络不可达，请检查网络后重试',
@@ -257,10 +373,37 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         ),
         children: [
           ..._buildSwitchSection(),
+          ..._buildCacheSection(),
+          const Divider(height: 1),
+          custom.ListTile(
+            leading: const Icon(Icons.rule_outlined),
+            title: const Text('判断规则'),
+            subtitle: const Text('分别管理视频、评论、直播间的问题、隐藏答案和执行阈值'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(
+                builder: (_) =>
+                    JevRulesPage(store: JevRuleStore(box: _store.box)),
+              ),
+            ),
+          ),
+          custom.ListTile(
+            leading: const Icon(Icons.receipt_long_outlined),
+            title: const Text('筛选日志'),
+            subtitle: const Text('查看最近被屏蔽的视频与评论，确认筛选是否生效'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(builder: (_) => const JevScreenLogPage()),
+            ),
+          ),
+          const Divider(height: 1),
+          ..._buildCommentSection(),
           const Divider(height: 1),
           ..._buildProfileSection(),
           const Divider(height: 1),
           ..._buildProviderSection(errorColor),
+          const Divider(height: 1),
+          ..._buildModelSection(),
           const Divider(height: 1),
           ..._buildKeySection(errorColor),
           const Divider(height: 1),
@@ -283,20 +426,219 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     ),
     const Padding(
       padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Text('推荐面（各自的开关）'),
+      child: Text('生效入口（各自的开关）'),
     ),
     for (final surface in JevSurface.values)
       SwitchListTile(
         dense: true,
         secondary: const Icon(Icons.filter_alt_outlined),
         title: Text(surface.label),
-        value: _settings.surfaces.contains(surface),
-        onChanged: _settings.enabled
+        subtitle: surface.screeningWired
+            ? null
+            : const Text('尚未接线：本版本打开也不会生效'),
+        value:
+            surface.screeningWired && _settings.surfaces.contains(surface),
+        onChanged: _settings.enabled && surface.screeningWired
             ? (value) =>
                   _saveSettings(_settings.withSurface(surface, value: value))
             : null,
       ),
   ];
+
+  /// Issue #123: configurable bounds for the video-surface verdict cache.
+  /// Values clamp to the cache's own limits on save; 清空 wipes the in-memory
+  /// cache immediately. In-flight requests are unaffected by design.
+  List<Widget> _buildCacheSection() => [
+    const Padding(
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Text('判定结果缓存（视频面）'),
+    ),
+    SwitchListTile(
+      key: const ValueKey('jev-verdict-cache-enabled'),
+      secondary: const Icon(Icons.cached_outlined),
+      title: const Text('缓存判定结果'),
+      // Issue #123: gated on the master switch like every wired surface;
+      // subtitle stays null so the wired-tile census in the settings-page
+      // test (subtitle == null) keeps counting this tile as wired.
+      value: _settings.enabled && _cacheEnabled,
+      onChanged: _settings.enabled
+          ? (value) => _saveCacheConfig(enabled: value)
+          : null,
+    ),
+    Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: TextField(
+        key: const ValueKey('jev-verdict-cache-ttl'),
+        controller: _cacheTtlController,
+        keyboardType: TextInputType.number,
+        decoration: const InputDecoration(
+          labelText: '缓存有效期（分钟）',
+          border: OutlineInputBorder(),
+          helperText: '范围 1–10080，默认 1440（24 小时）；过期后照常请求上游',
+        ),
+      ),
+    ),
+    Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: TextField(
+        key: const ValueKey('jev-verdict-cache-max-entries'),
+        controller: _cacheMaxController,
+        keyboardType: TextInputType.number,
+        decoration: const InputDecoration(
+          labelText: '缓存条目上限',
+          border: OutlineInputBorder(),
+          helperText: '范围 1–5000，默认 500；超出后从最旧的开始淘汰',
+        ),
+      ),
+    ),
+    Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Wrap(
+        children: [
+          TextButton(
+            onPressed: () => _saveCacheConfig(),
+            child: const Text('保存缓存设置'),
+          ),
+          TextButton(onPressed: _clearVerdicts, child: const Text('清空判定缓存')),
+        ],
+      ),
+    ),
+    Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      child: Text('当前缓存 $_cacheEntries 条判定'),
+    ),
+    const custom.ListTile(
+      dense: true,
+      leading: Icon(Icons.info_outline),
+      title: Text('缓存只保存在内存：重启应用即清空；超时、失败与低置信的判定不会入缓存'),
+    ),
+  ];
+
+  Future<void> _saveCacheConfig({bool? enabled}) async {
+    final nextEnabled = enabled ?? _cacheEnabled;
+    if (enabled != null) {
+      // Toggle path: only persist the switch; the text fields may still be
+      // empty mid-edit and must not block the toggle.
+      try {
+        await _store.box.put(
+          SettingBoxKey.jevVerdictCacheEnabled,
+          nextEnabled,
+        );
+      } catch (error) {
+        _toast('缓存设置保存失败：$error');
+        return;
+      }
+      if (!mounted) return;
+      setState(() => _cacheEnabled = nextEnabled);
+      return;
+    }
+    final ttlText = _cacheTtlController.text.trim();
+    final maxText = _cacheMaxController.text.trim();
+    final ttl = int.tryParse(ttlText);
+    final maxEntries = int.tryParse(maxText);
+    if (ttlText.isEmpty ||
+        ttl == null ||
+        maxText.isEmpty ||
+        maxEntries == null) {
+      _toast('缓存有效期与条目上限需要填正整数（1–10080 分钟 / 1–5000 条）');
+      return;
+    }
+    final clampedTtl = ttl < JevVerdictCache.ttlMinutesMin
+        ? JevVerdictCache.ttlMinutesMin
+        : (ttl > JevVerdictCache.ttlMinutesMax
+              ? JevVerdictCache.ttlMinutesMax
+              : ttl);
+    final clampedMax = maxEntries < JevVerdictCache.maxEntriesMin
+        ? JevVerdictCache.maxEntriesMin
+        : (maxEntries > JevVerdictCache.maxEntriesMax
+              ? JevVerdictCache.maxEntriesMax
+              : maxEntries);
+    try {
+      await _store.box.put(SettingBoxKey.jevVerdictCacheEnabled, nextEnabled);
+      await _store.box.put(SettingBoxKey.jevVerdictCacheTtlMinutes, clampedTtl);
+      await _store.box.put(
+        SettingBoxKey.jevVerdictCacheMaxEntries,
+        clampedMax,
+      );
+    } catch (error) {
+      _toast('缓存设置保存失败：$error');
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _cacheEnabled = nextEnabled;
+      _cacheEntries = JevVerdictCache.cachedEntryCount;
+      _cacheTtlController.text = '$clampedTtl';
+      _cacheMaxController.text = '$clampedMax';
+    });
+    _toast('缓存设置已保存');
+  }
+
+  void _clearVerdicts() {
+    JevVerdictCache.resetCache();
+    setState(() => _cacheEntries = JevVerdictCache.cachedEntryCount);
+    _toast('已清空判定缓存');
+  }
+
+  List<Widget> _buildCommentSection() => [
+    SwitchListTile(
+      key: const ValueKey('jev-comment-enabled'),
+      title: const Text('Jev 评论过滤'),
+      subtitle: const Text('主评论、楼中楼、对话及首页可见评论判断共用此标准；默认关闭'),
+      value: _settings.commentEnabled,
+      onChanged: _settings.enabled
+          ? (value) => _saveSettings(_settings.copyWith(commentEnabled: value))
+          : null,
+    ),
+    Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: TextField(
+        key: const ValueKey('jev-comment-criteria'),
+        controller: _commentController,
+        minLines: 3,
+        maxLines: 6,
+        maxLength: 4000,
+        decoration: const InputDecoration(
+          labelText: '评论过滤标准（可自定义）',
+          helperText: '保存后生效；留空不调用 Jev。上下文不足、不确定或请求失败时保留评论。',
+          helperMaxLines: 2,
+          border: OutlineInputBorder(),
+        ),
+      ),
+    ),
+    Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Wrap(
+        children: [
+          TextButton(
+            key: const ValueKey('jev-comment-save'),
+            onPressed: _saveCommentCriteria,
+            child: const Text('保存评论标准'),
+          ),
+          TextButton(
+            key: const ValueKey('jev-comment-restore'),
+            onPressed: () => _saveCommentCriteria(restorePreset: true),
+            child: const Text('恢复评论预设'),
+          ),
+        ],
+      ),
+    ),
+    const Padding(
+      padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: Text('启用后仅向已确认提供方发送评论正文和此标准，不发送作者、评论 ID 或账号信息。'),
+    ),
+  ];
+
+  Future<void> _saveCommentCriteria({bool restorePreset = false}) async {
+    final criteria = restorePreset
+        ? JevSettings.defaultCommentCriteria
+        : _commentController.text;
+    if (await _saveSettings(_settings.copyWith(commentCriteria: criteria))) {
+      if (!mounted) return;
+      _commentController.text = criteria;
+      _toast(restorePreset ? '已恢复评论预设' : '评论标准已保存');
+    }
+  }
 
   List<Widget> _buildProviderSection(Color errorColor) => [
     const Padding(
@@ -313,8 +655,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         title: Text(provider.label),
         subtitle: Text(
           provider == JevProvider.typeSafe
-              ? '直连 TypeSafe System One（model: ${provider.model}）'
-              : '经 OpenRouter Jev Decisions（model: ${provider.model}）',
+              ? '直连 TypeSafe System One（model: ${_settings.modelFor(provider)}）'
+              : '经 OpenRouter Jev Decisions（model: ${_settings.modelFor(provider)}）',
         ),
         onTap: () => _selectProvider(provider),
       ),
@@ -333,6 +675,67 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       ),
   ];
 
+  List<Widget> _buildModelSection() => [
+    if (_selection.provider != null) ...[
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        child: TextField(
+          key: const ValueKey('jev-model'),
+          controller: _modelController,
+          decoration: const InputDecoration(
+            labelText: '模型 ID',
+            border: OutlineInputBorder(),
+            helperText: '保留 ~ 和 /；选择目录项只回填，保存后才生效',
+          ),
+          onChanged: (_) => setState(_invalidateValidation),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Wrap(
+          children: [
+            TextButton(
+              onPressed: _saveModel,
+              child: const Text('保存模型'),
+            ),
+            TextButton(
+              onPressed: () => _saveModel(restoreDefault: true),
+              child: const Text('恢复默认'),
+            ),
+            TextButton(
+              onPressed: _catalogBusy ? null : _loadModels,
+              child: Text(_catalogBusy ? '获取中…' : '获取上游模型'),
+            ),
+          ],
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Text(
+          '当前生效：${_settings.modelFor(_selection.provider!)}；候选不代表验证通过',
+        ),
+      ),
+      if (_catalogResult case final result?) ...[
+        if (result.error != null || result.models.isEmpty)
+          custom.ListTile(
+            title: Text(result.error ?? '目录为空，可重试或手动填写；现有配置已保留'),
+            trailing: TextButton(
+              onPressed: _loadModels,
+              child: const Text('重试'),
+            ),
+          ),
+        for (final model in result.models)
+          custom.ListTile(
+            title: Text(model),
+            onTap: () => setState(() {
+              _modelController.text = model;
+              _invalidateValidation();
+            }),
+          ),
+      ],
+    ],
+  ];
+
   List<Widget> _buildKeySection(Color errorColor) => [
     if (_keyStoreStatus == JevKeyStoreStatus.unavailable)
       custom.ListTile(
@@ -346,6 +749,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: TextField(
+        key: const ValueKey('jev-api-key'),
         controller: _keyController,
         obscureText: _obscureKey,
         enabled: _keyStoreStatus == JevKeyStoreStatus.available,
@@ -365,8 +769,10 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
           ),
         ),
         onChanged: (value) => setState(() {
+          _catalogGeneration++;
+          _catalogBusy = false;
           _selection = _selection.withKey(value);
-          _validation = null;
+          _invalidateValidation();
         }),
       ),
     ),
@@ -391,7 +797,14 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
           ),
           const SizedBox(width: 8),
           TextButton(
-            onPressed: _busy || !_selection.canValidate ? null : _validateKey,
+            onPressed:
+                _busy ||
+                    !_selection.canValidate ||
+                    (_selection.provider != null &&
+                        _modelController.text.trim() !=
+                            _settings.modelFor(_selection.provider!))
+                ? null
+                : _validateKey,
             child: Text(_busy ? '验证中…' : '验证'),
           ),
           const SizedBox(width: 8),
@@ -526,12 +939,14 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   Widget _buildPrivacySection() => const ExpansionTile(
     leading: Icon(Icons.privacy_tip_outlined),
     title: Text('隐私说明'),
-    subtitle: Text('只发送最小候选字段与本地显式负反馈摘要'),
+    subtitle: Text('只发送最小候选内容、启用规则与所需负反馈摘要；评论过滤发送正文与自定义标准'),
     childrenPadding: EdgeInsets.fromLTRB(16, 0, 16, 12),
     children: [
-      Text('发送：候选标题，以及候选数据自带时的短简介或分类/标签；最多 20 个未过期负主题及大致次数。'),
+      Text('发送：启用规则中的问题、答案含义与选项；视频标题及已有短简介/标签，评论正文及必要回复上下文，直播推荐卡标题/分区。启用内置规则时发送最多 20 个未过期负主题及大致次数。'),
       SizedBox(height: 8),
       Text('不发送：完整浏览/观看历史、账号标识、cookie、原始点踩记录、UP 主、视频 ID、链接、长篇元数据。'),
+      SizedBox(height: 8),
+      Text('不额外抓取：视频字幕、作者历史、直播房间消息。评论规则仅在视频详情评论列表生效。规则保存在本机，编辑保存不会发起模型请求。'),
       SizedBox(height: 8),
       Text('低置信、超时、限流、缺答、密钥缺失或无效、provider 报错、安全存储不可用时，候选一律保持可见。'),
     ],

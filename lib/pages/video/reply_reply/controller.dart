@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:PiliPlus/features/jev/jev_final_screen.dart';
+import 'package:PiliPlus/features/jev/jev_evaluator.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo, DetailListReply, Mode;
 import 'package:PiliPlus/grpc/reply.dart';
@@ -23,6 +27,10 @@ class VideoReplyReplyController extends ReplyController
     required this.rpid,
     required this.dialog,
     required this.replyType,
+    this.isVideoDetail = false,
+    this.parentBody,
+    this.jevEvaluator,
+    this.initialRoot,
   });
   final int? dialog;
   int? id;
@@ -33,7 +41,13 @@ class VideoReplyReplyController extends ReplyController
   int replyType;
 
   bool hasRoot = false;
+  final bool isVideoDetail;
+  final String? parentBody;
+  final JevEvaluator? jevEvaluator;
+  final ReplyInfo? initialRoot;
   final firstFloor = Rxn<ReplyInfo>();
+  ReplyInfo? _screenedFirstFloor;
+  bool _hasPendingFirstFloor = false;
 
   final index = RxnInt();
 
@@ -76,21 +90,91 @@ class VideoReplyReplyController extends ReplyController
     // reply2Reply // isDialogue.not
     if (data is DetailListReply) {
       count.value = data.root.count.toInt();
-      if (isRefresh && !hasRoot) {
-        firstFloor.value ??= applyFirstFloorShielding(data.root);
-      }
     }
 
     return false;
   }
 
   @override
-  void handleListResponse(List<ReplyInfo> dataList) {
-    if (id != null) {
-      setIndexById(Int64(id!), dataList);
-      id = null;
+  Future<void> beforeListResponse(bool isRefresh, response) async {
+    if (isRefresh && (response is DetailListReply || initialRoot != null)) {
+      // Children are screened by the list pipeline. Screen only the root here.
+      final source = initialRoot ?? (response as DetailListReply).root;
+      _screenedFirstFloor = ReplyInfo.fromBuffer(source.writeToBuffer())
+        ..replies.clear();
+      _hasPendingFirstFloor = true;
     }
-    super.handleListResponse(dataList);
+  }
+
+  @override
+  Future<void> prepareListResponse(List<ReplyInfo> dataList) async {
+    if (!_hasPendingFirstFloor) {
+      return super.prepareListResponse(dataList);
+    }
+    final root = _screenedFirstFloor!;
+    // handleListResponse already runs the Jev final screen for video-detail
+    // children; the jump is deferred until after comment screening so it
+    // lands on the final visible index.
+    final targetId = id;
+    id = null;
+    await handleListResponse(dataList);
+    var rootCandidates = applyShielding([root]);
+    if (isVideoDetail) {
+      rootCandidates = await JevFinalScreen.comment(
+        evaluator: jevEvaluator,
+      ).screen(rootCandidates);
+      if (isClosed) return;
+    }
+    final visible = await screenComments([
+      ...rootCandidates,
+      ...dataList,
+    ]);
+    _screenedFirstFloor = visible.any((r) => identical(r, root)) ? root : null;
+    dataList
+      ..clear()
+      ..addAll(visible.where((r) => !identical(r, root)));
+    if (targetId != null) {
+      setIndexById(Int64(targetId), dataList);
+    }
+  }
+
+  @override
+  void afterListResponse(bool isRefresh, response) {
+    if (_hasPendingFirstFloor && isRefresh) {
+      _screenedFirstFloor?.replies.addAll(getDataList(response) ?? []);
+      firstFloor.value = _screenedFirstFloor;
+      _screenedFirstFloor = null;
+      _hasPendingFirstFloor = false;
+    }
+  }
+
+  @override
+  Future<void> handleListResponse(List<ReplyInfo> dataList) async {
+    // Non-video pages jump synchronously on the raw list: target lookup must
+    // run before shielding. Video-detail pages jump only after Jev screening
+    // completes, landing on the screened visible index.
+    final targetId = id;
+    id = null;
+    if (!isVideoDetail && targetId != null) {
+      setIndexById(Int64(targetId), dataList);
+    }
+    await super.handleListResponse(dataList);
+    if (isVideoDetail) {
+      final visible = await JevFinalScreen.comments(
+        dataList,
+        parentBody: parentBody ?? _screenedFirstFloor?.content.message,
+        evaluator: jevEvaluator,
+      );
+      if (isClosed) return;
+      if (!identical(visible, dataList)) {
+        dataList
+          ..clear()
+          ..addAll(visible);
+      }
+      if (targetId != null) {
+        setIndexById(Int64(targetId), dataList);
+      }
+    }
   }
 
   ReplyInfo? applyFirstFloorShielding(ReplyInfo reply) {
@@ -197,14 +281,23 @@ class VideoReplyReplyController extends ReplyController
             },
           ),
         )
-        .then((replyInfo) {
+        .then((replyInfo) async {
           if (replyInfo is ReplyInfo) {
             savedReplies.remove(key);
 
             count.value += 1;
-            loadingState
-              ..value.dataOrNull?.insert(index! + 1, replyInfo)
-              ..refresh();
+            final visible = await screenComments(applyShielding([replyInfo]));
+            if (visible.isEmpty) {
+              if (enableCommAntifraud) {
+                onCheckReply(replyInfo, isManual: false);
+              }
+              return;
+            }
+            final replies = loadingState.value.dataOrNull;
+            if (replies != null) {
+              replies.insert((index! + 1).clamp(0, replies.length), replyInfo);
+            }
+            loadingState.refresh();
             if (enableCommAntifraud) {
               onCheckReply(replyInfo, isManual: false);
             }

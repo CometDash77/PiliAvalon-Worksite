@@ -5,7 +5,10 @@ import 'package:PiliPlus/models/model_video.dart';
 import 'package:PiliPlus/models_new/music/bgm_recommend_list.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_index_result/list.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_rank/pgc_rank_item_model.dart';
+import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'decisions_schema.dart';
 
 // 评测器测试假件的轻量复刻（见 jev_evaluator_test.dart）。
 class _MemoryBox implements JevSettingsBox {
@@ -71,6 +74,9 @@ class _CapturingTransport {
       ({required provider, required apiKey, required body}) async {
         final index = calls++;
         bodies.add(body);
+        if (!acceptsDecisionsRequest(body)) {
+          throw StateError('HTTP 400: invalid Decisions request schema');
+        }
         final answer = reply?.call(index);
         if (answer == null) {
           throw StateError('transport failure');
@@ -97,6 +103,9 @@ class _Harness {
     }
     settingsBox.values[JevSettingsStore.providerKey] = 'typesafe';
     settingsBox.values[JevSettingsStore.providerConfirmedKey] = true;
+    // 终审判定缓存是进程内静态区；功能测试关注实时判定，直接关闭以免
+    // 跨用例命中（#123）。
+    settingsBox.values[SettingBoxKey.jevVerdictCacheEnabled] = false;
   }
 
   final _MemoryBox settingsBox;
@@ -114,12 +123,14 @@ class _TestVideo extends BaseVideoItemModel {
   _TestVideo({String title = 'test video', bool isFollowed = false}) {
     this.title = title;
     cid = 1;
-    aid = 1;
+    aid = ++_testAidSeq;
     duration = 600;
     owner = _TestOwner();
     stat = _TestStat();
     this.isFollowed = isFollowed;
   }
+
+  static int _testAidSeq = 0;
 }
 
 class _TestOwner extends BaseOwner {}
@@ -136,9 +147,11 @@ class _TestStat extends BaseStat {
 }
 
 HotVideoItemModel _hot(String title) => HotVideoItemModel.fromJson({
+  // bvid 按 title 派生：判定缓存身份取 localKey，恒同 bvid 会把不同
+  // 标题的假视频并成同组并跨用例命中（#123）。
   'aid': 1,
   'cid': 101,
-  'bvid': 'BV1',
+  'bvid': 'BV$title',
   'videos': 1,
   'tid': 17,
   'tname': '游戏',
@@ -196,9 +209,8 @@ void main() {
 
       expect(result.map((e) => e.title), ['a', 'c']);
       expect(capture.calls, 1);
-      final questions =
-          (capture.bodies.single['questions'] as List).cast<Map>();
-      expect(questions.map((question) => question['id']), [
+      final questions = capture.bodies.single['questions'] as Map;
+      expect(questions.keys, [
         'candidate_1',
         'candidate_2',
         'candidate_3',
@@ -244,8 +256,8 @@ void main() {
       await screen.screen([_hot('某标题')]);
 
       final context =
-          ((capture.bodies.single['questions'] as List).single
-                  as Map)['candidate']
+          ((capture.bodies.single['state'] as Map)['candidates']
+                  as Map)['candidate_1']
               as Map;
       expect(context, {
         'title': '某标题',
@@ -263,8 +275,8 @@ void main() {
         PgcRankItemModel.fromJson({'title': '某番剧'}),
       ]);
       var context =
-          ((capture.bodies.single['questions'] as List).single
-                  as Map)['candidate']
+          ((capture.bodies.single['state'] as Map)['candidates']
+                  as Map)['candidate_1']
               as Map;
       expect(context, {'title': '某番剧'});
 
@@ -278,8 +290,8 @@ void main() {
         PgcIndexItem.fromJson({'title': '某索引'}),
       ]);
       context =
-          ((capture.bodies.single['questions'] as List).single
-                  as Map)['candidate']
+          ((capture.bodies.single['state'] as Map)['candidates']
+                  as Map)['candidate_1']
               as Map;
       expect(context, {'title': '某索引'});
     });
@@ -300,8 +312,8 @@ void main() {
       ]);
 
       final context =
-          ((capture.bodies.single['questions'] as List).single
-                  as Map)['candidate']
+          ((capture.bodies.single['state'] as Map)['candidates']
+                  as Map)['candidate_1']
               as Map;
       expect(context, {
         'title': '某曲',
@@ -336,8 +348,8 @@ void main() {
 
       expect(result, hasLength(1));
       final context =
-          ((capture.bodies.single['questions'] as List).single
-                  as Map)['candidate']
+          ((capture.bodies.single['state'] as Map)['candidates']
+                  as Map)['candidate_1']
               as Map;
       expect(context, {
         'title': '某视频',
@@ -424,6 +436,8 @@ void main() {
         harness.preferenceBox.values[JevPreferenceStore.profileKey],
       );
       expect(profile.statePayload()['themes'], isNotEmpty);
+      // The tapped reason is what the profile keeps, not the card title.
+      expect(profile.themes.single.theme, '不想看此UP主');
     });
 
     test('底层异常被吞掉返回 false', () async {

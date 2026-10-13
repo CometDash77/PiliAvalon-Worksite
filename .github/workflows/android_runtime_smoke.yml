@@ -7,6 +7,11 @@ on:
         description: "Successful signed Build run containing the APK artifact"
         required: true
         type: string
+      harness_ref:
+        description: "Branch, tag, or commit containing the runtime smoke harness (defaults to the dispatched ref)"
+        required: false
+        default: ""
+        type: string
       apk_variant:
         description: "Signed APK variant to install on the x86_64 emulator"
         required: true
@@ -37,6 +42,7 @@ jobs:
     timeout-minutes: 45
     env:
       ARTIFACT_RUN_ID: ${{ inputs.artifact_run_id }}
+      HARNESS_REF: ${{ inputs.harness_ref || github.ref }}
       APK_VARIANT: ${{ inputs.apk_variant || 'x86_64' }}
       PACKAGE_NAME: ${{ github.event_name == 'workflow_dispatch' && inputs.package_name || 'com.example.piliplus' }}
       RUNTIME_SMOKE_SCENARIO: ${{ github.event_name == 'workflow_dispatch' && inputs.runtime_smoke_scenario || '' }}
@@ -44,6 +50,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.harness_ref || github.sha }}
+
+      - name: Record harness revision
+        run: |
+          mkdir -p runtime-smoke/evidence
+          git rev-parse HEAD | tee runtime-smoke/evidence/harness-sha.txt
+          echo "harness_ref=${HARNESS_REF}" > runtime-smoke/evidence/harness-ref.txt
 
       - name: Download selected signed APK artifact
         env:
@@ -56,7 +70,8 @@ jobs:
           esac
           mkdir -p runtime-smoke/apk runtime-smoke/evidence
           gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${ARTIFACT_RUN_ID}" > runtime-smoke/evidence/build-run.json
-          jq -e --arg sha "$GITHUB_SHA" '.head_sha == $sha and .conclusion == "success"' runtime-smoke/evidence/build-run.json
+          jq -e '.path == ".github/workflows/build.yml" and .conclusion == "success"' runtime-smoke/evidence/build-run.json
+          jq -r '.head_sha' runtime-smoke/evidence/build-run.json > runtime-smoke/evidence/build-sha.txt
           gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${ARTIFACT_RUN_ID}/artifacts" |
             jq -er --arg suffix "_${APK_VARIANT}.apk" '
               [.artifacts[] | select(.expired == false and (.name | endswith($suffix)))] |

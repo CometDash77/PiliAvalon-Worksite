@@ -1,6 +1,13 @@
+import 'dart:async';
+
 import 'package:PiliPlus/features/jev/jev_contract.dart';
+import 'package:PiliPlus/features/jev/jev_screen_log.dart';
 import 'package:PiliPlus/features/jev/jev_evaluator.dart';
+import 'package:PiliPlus/features/shielding/live_shielding.dart';
+import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
+    show ReplyInfo;
 import 'package:PiliPlus/models/model_hot_video_item.dart';
+import 'package:PiliPlus/models/model_video.dart';
 import 'package:PiliPlus/models_new/music/bgm_recommend_list.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_index_result/list.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_rank/pgc_rank_item_model.dart';
@@ -58,10 +65,32 @@ class JevFinalScreen<T> {
       final hidden = screening.hidden;
       var anyHidden = false;
       final keep = List<bool>.filled(items.length, true);
+      final kind = T == ReplyInfo
+          ? JevScreenLogKind.comment
+          : JevScreenLogKind.video;
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final blocked = <JevScreenLogEntry>[];
       for (var k = 0; k < indices.length && k < hidden.length; k++) {
         if (hidden[k]) {
           keep[indices[k]] = false;
           anyHidden = true;
+          final candidate = candidates[k];
+          blocked.add(
+            JevScreenLogEntry(
+              time: now,
+              kind: kind,
+              surface: surface.id,
+              title: candidate.title,
+              snippet: candidate.snippet ?? _tagSummary(candidate.tags),
+            ),
+          );
+        }
+      }
+      if (blocked.isNotEmpty) {
+        try {
+          unawaited(JevScreenLog.instance.record(blocked));
+        } catch (_) {
+          // 日志失败不影响筛选。
         }
       }
       if (!anyHidden) return items;
@@ -75,6 +104,80 @@ class JevFinalScreen<T> {
   }
 
   /// 热门/排行/相关/每周必看/入站必刷共用 HotVideoItemModel 同构映射。
+  static JevFinalScreen<T> live<T>({JevEvaluator? evaluator}) =>
+      JevFinalScreen<T>(
+        surface: JevSurface.live,
+        toCandidate: (item) {
+          final card = LiveShielding.cardOf(item);
+          if (card == null) return null;
+          return _fromTitle(
+            card.title,
+            tags: [
+              if (card.areaName?.trim().isNotEmpty == true)
+                card.areaName!.trim(),
+            ],
+          );
+        },
+        evaluator: evaluator,
+      );
+
+  /// Only body text and the already available parent body leave the device.
+  static JevFinalScreen<ReplyInfo> comment({
+    String? parentBody,
+    JevEvaluator? evaluator,
+  }) => JevFinalScreen<ReplyInfo>(
+    surface: JevSurface.comment,
+    toCandidate: (reply) {
+      final body = reply.content.message.trim();
+      if (body.isEmpty) return null;
+      final parent = parentBody?.trim();
+      return JevCandidate(
+        title: body,
+        snippet: parent == null || parent.isEmpty ? null : parent,
+      );
+    },
+    evaluator: evaluator,
+  );
+
+  /// Screens both main replies and their inline child previews in source order.
+  static Future<List<ReplyInfo>> comments(
+    List<ReplyInfo> replies, {
+    String? parentBody,
+    JevEvaluator? evaluator,
+  }) async {
+    final visible = await comment(
+      parentBody: parentBody,
+      evaluator: evaluator,
+    ).screen(replies);
+    // Batch child previews across parents, instead of one paid round per root.
+    final previews = <(ReplyInfo, String)>[
+      for (final parent in visible)
+        for (final child in parent.replies) (child, parent.content.message),
+    ];
+    if (previews.isEmpty) return visible;
+    final screened = await JevFinalScreen<(ReplyInfo, String)>(
+      surface: JevSurface.comment,
+      evaluator: evaluator,
+      toCandidate: (item) {
+        final body = item.$1.content.message.trim();
+        return body.isEmpty
+            ? null
+            : JevCandidate(title: body, snippet: item.$2);
+      },
+    ).screen(previews);
+    if (!identical(screened, previews)) {
+      final keep = Set<ReplyInfo>.identity()
+        ..addAll(screened.map((item) => item.$1));
+      for (final parent in visible) {
+        final children = parent.replies.where(keep.contains).toList();
+        parent.replies
+          ..clear()
+          ..addAll(children);
+      }
+    }
+    return visible;
+  }
+
   static JevFinalScreen<HotVideoItemModel> hotVideo({
     required JevSurface surface,
     JevEvaluator? evaluator,
@@ -83,6 +186,7 @@ class JevFinalScreen<T> {
     toCandidate: (item) => _fromTitle(
       item.title,
       tags: [if (item.tname?.trim().isNotEmpty == true) item.tname!.trim()],
+      localKey: jevVideoLocalKey(item),
     ),
     evaluator: evaluator,
   );
@@ -120,9 +224,22 @@ class JevFinalScreen<T> {
   static JevCandidate? _fromTitle(
     String? title, {
     List<String> tags = const [],
+    String? localKey,
   }) {
     final value = title?.trim();
     if (value == null || value.isEmpty) return null;
-    return JevCandidate(title: value, tags: tags);
+    return JevCandidate(title: value, tags: tags, localKey: localKey);
   }
+}
+
+String? _tagSummary(List<String> tags) => tags.isEmpty ? null : tags.join(' / ');
+
+/// 视频面卡片的本地缓存身份（issue #123）：bvid 优先，退回 aid；都没有就留
+/// 空，评测器回退到规范化标题。仅用于本地判定缓存，绝不进上游载荷（#34）。
+String? jevVideoLocalKey(BaseVideoItemModel item) {
+  final bvid = item.bvid?.trim();
+  if (bvid != null && bvid.isNotEmpty) return 'bvid:$bvid';
+  final aid = item.aid;
+  if (aid != null) return 'aid:$aid';
+  return null;
 }

@@ -36,13 +36,17 @@ bool effectiveShowTemporaryContent({
   required bool temporaryHide,
 }) => globalShow && !temporaryHide;
 
-/// Three-level effective visibility: global gate, persistent channel rule,
-/// and per-page temporary hide.
+/// Four-level effective visibility: global gate, persistent channel rule,
+/// per-page temporary hide, and Zen mode (spec #42 R22).
 ///
-/// Global off is a hard gate that cannot be overridden by persistent or
-/// temporary controls.
+/// Global off is a hard gate that cannot be overridden by persistent,
+/// temporary or Zen controls. Zen is a *separate* AND-term layered on top of
+/// the user's own gates — turning Zen OFF hands control straight back to
+/// whatever `globalShow` / `persistentRuleHide` / `temporaryHide` said before,
+/// because Zen never writes any of them.
 bool effectiveShowContent({
   required bool globalShow,
   required bool persistentRuleHide,
   required bool temporaryHide,
-}) => globalShow && !persistentRuleHide && !temporaryHide;
+  required bool zenMode,
+}) => globalShow && !persistentRuleHide && !temporaryHide && !zenMode;

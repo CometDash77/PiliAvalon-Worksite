@@ -28,18 +28,22 @@ class JevDislikeSignal {
   /// them.
   final String? selectedReason;
 
-  /// The short preference theme this tap contributes to, or null when none of
-  /// the three fields carries a usable topical phrase — then nothing is stored.
+  /// The short preference theme this tap contributes to, or null when the tap
+  /// carries no usable topical phrase — then nothing is stored at all.
   ///
-  /// Gap G-05 resolution: summarisation is deterministic and on-device. The card
-  /// title is the only topical field, so it wins; the displayed reason and the
-  /// tapped reason are non-topical fallbacks (they are UI categories such as
-  /// 「已看过」). See [JevPreferenceTheme.summarizeText] for the cleaning rules
-  /// that keep a theme a theme instead of a stored per-video row.
+  /// Gap G-05 resolution, revised by issue #119: the two reason fields are the
+  /// only theme sources, and the reason the user tapped outranks the reason the
+  /// card displayed. The card title is deliberately not a theme source any
+  /// more: it is a description of one video, so what it contributes is a
+  /// truncated fragment of that video's own name rather than a topic the user
+  /// expressed. "Nothing stored" beats "fragment stored" — a tap with no reason
+  /// at all leaves the profile untouched instead of poisoning it.
+  ///
+  /// See [JevPreferenceTheme.summarizeText] for the cleaning rules that keep a
+  /// theme a theme instead of a stored per-video row.
   String? summarize() =>
-      JevPreferenceTheme.summarizeText(title) ??
-      JevPreferenceTheme.summarizeText(displayedReason) ??
-      JevPreferenceTheme.summarizeText(selectedReason);
+      JevPreferenceTheme.summarizeText(selectedReason) ??
+      JevPreferenceTheme.summarizeText(displayedReason);
 }
 
 /// One locally summarised negative-preference theme — the only thing this

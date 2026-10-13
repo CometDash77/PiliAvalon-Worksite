@@ -56,6 +56,7 @@ import 'package:PiliPlus/utils/storage_utils.dart';
 import 'package:PiliPlus/utils/subtitle_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:PiliPlus/utils/video_utils.dart';
+import 'package:PiliPlus/utils/zen_mode.dart';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:canvas_danmaku/canvas_danmaku.dart';
 import 'package:collection/collection.dart';
@@ -425,7 +426,9 @@ class HeaderControlState extends State<HeaderControl>
                     : null,
               ),
               Obx(() {
-                if (!videoDetailCtr.showReply) return const SizedBox.shrink();
+                if (ZenMode.isOn || !videoDetailCtr.showReply) {
+                  return const SizedBox.shrink();
+                }
                 final tempHide = videoDetailCtr.tempHideReply.value;
                 return ListTile(
                   dense: true,
@@ -441,7 +444,8 @@ class HeaderControlState extends State<HeaderControl>
                 );
               }),
               Obx(() {
-                if (!plPlayerController.enableShowDanmaku.value) {
+                if (ZenMode.isOn ||
+                    !plPlayerController.enableShowDanmaku.value) {
                   return const SizedBox.shrink();
                 }
                 final tempHide = videoDetailCtr.tempHideDanmaku.value;
@@ -673,24 +677,26 @@ class HeaderControlState extends State<HeaderControl>
                 descPosType: .subtitle,
                 descStyle: subTitleStyle,
               ),
-              ListTile(
-                dense: true,
-                onTap: () {
-                  Get.back();
-                  showDanmakuPool();
-                },
-                leading: const Icon(CustomIcons.dm_on, size: 20),
-                title: const Text('弹幕列表', style: titleStyle),
-              ),
-              ListTile(
-                dense: true,
-                onTap: () {
-                  Get.back();
-                  showSetDanmaku();
-                },
-                leading: const Icon(CustomIcons.dm_settings, size: 20),
-                title: const Text('弹幕设置', style: titleStyle),
-              ),
+              if (!ZenMode.isOn) ...[
+                ListTile(
+                  dense: true,
+                  onTap: () {
+                    Get.back();
+                    showDanmakuPool();
+                  },
+                  leading: const Icon(CustomIcons.dm_on, size: 20),
+                  title: const Text('弹幕列表', style: titleStyle),
+                ),
+                ListTile(
+                  dense: true,
+                  onTap: () {
+                    Get.back();
+                    showSetDanmaku();
+                  },
+                  leading: const Icon(CustomIcons.dm_settings, size: 20),
+                  title: const Text('弹幕设置', style: titleStyle),
+                ),
+              ],
               ListTile(
                 dense: true,
                 onTap: () {
@@ -1809,54 +1815,64 @@ class HeaderControlState extends State<HeaderControl>
               ),
             ],
             if (!isPortrait || isFullScreen || PlatformUtils.isDesktop) ...[
-              SizedBox(
-                width: btnWidth,
-                height: btnHeight,
-                child: IconButton(
-                  tooltip: '发弹幕',
-                  style: btnStyle,
-                  onPressed: videoDetailCtr.showShootDanmakuSheet,
-                  icon: const Icon(
-                    Icons.comment_outlined,
-                    size: 19,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: btnWidth,
-                height: btnHeight,
-                child: Obx(() {
-                  final enableShowDanmaku =
-                      plPlayerController.enableShowDanmaku.value;
-                  return IconButton(
-                    tooltip: "${enableShowDanmaku ? '关闭' : '开启'}弹幕",
+              // R19 keeps the player's own controls except the danmaku
+              // toggle; R20 drops the send entry as well.
+              Obx(() {
+                if (ZenMode.isOn) return const SizedBox.shrink();
+                return SizedBox(
+                  width: btnWidth,
+                  height: btnHeight,
+                  child: IconButton(
+                    tooltip: '发弹幕',
                     style: btnStyle,
-                    onPressed: () {
-                      final newVal = !enableShowDanmaku;
-                      plPlayerController.enableShowDanmaku.value = newVal;
-                      if (!plPlayerController.tempPlayerConf) {
-                        setting.put(SettingBoxKey.enableShowDanmaku, newVal);
-                      }
-                    },
-                    icon: enableShowDanmaku
-                        ? const Icon(
-                            size: 20,
-                            CustomIcons.dm_on,
-                            color: Colors.white,
-                          )
-                        : const Icon(
-                            size: 20,
-                            CustomIcons.dm_off,
-                            color: Colors.white,
-                          ),
-                  );
-                }),
-              ),
+                    onPressed: videoDetailCtr.showShootDanmakuSheet,
+                    icon: const Icon(
+                      Icons.comment_outlined,
+                      size: 19,
+                      color: Colors.white,
+                    ),
+                  ),
+                );
+              }),
+              Obx(() {
+                if (ZenMode.isOn) return const SizedBox.shrink();
+                return SizedBox(
+                  width: btnWidth,
+                  height: btnHeight,
+                  child: Obx(() {
+                    final enableShowDanmaku =
+                        plPlayerController.enableShowDanmaku.value;
+                    return IconButton(
+                      tooltip: "${enableShowDanmaku ? '关闭' : '开启'}弹幕",
+                      style: btnStyle,
+                      onPressed: () {
+                        final newVal = !enableShowDanmaku;
+                        plPlayerController.enableShowDanmaku.value = newVal;
+                        if (!plPlayerController.tempPlayerConf) {
+                          setting.put(SettingBoxKey.enableShowDanmaku, newVal);
+                        }
+                      },
+                      icon: enableShowDanmaku
+                          ? const Icon(
+                              size: 20,
+                              CustomIcons.dm_on,
+                              color: Colors.white,
+                            )
+                          : const Icon(
+                              size: 20,
+                              CustomIcons.dm_off,
+                              color: Colors.white,
+                            ),
+                    );
+                  }),
+                );
+              }),
             ],
             Obx(() {
               final tempHide = videoDetailCtr.tempHideReply.value;
-              if (!videoDetailCtr.showReply) return const SizedBox.shrink();
+              if (ZenMode.isOn || !videoDetailCtr.showReply) {
+                return const SizedBox.shrink();
+              }
               return SizedBox(
                 width: btnWidth,
                 height: btnHeight,
@@ -1873,7 +1889,7 @@ class HeaderControlState extends State<HeaderControl>
               );
             }),
             Obx(() {
-              if (!plPlayerController.enableShowDanmaku.value) {
+              if (ZenMode.isOn || !plPlayerController.enableShowDanmaku.value) {
                 return const SizedBox.shrink();
               }
               final tempHide = videoDetailCtr.tempHideDanmaku.value;
@@ -1892,19 +1908,23 @@ class HeaderControlState extends State<HeaderControl>
                 ),
               );
             }),
-            SizedBox(
-              width: btnWidth,
-              height: btnHeight,
-              child: IconButton(
-                tooltip: '弹幕设置',
-                style: btnStyle,
-                onPressed: showSetDanmaku,
-                icon: const Icon(
-                  size: 20,
-                  CustomIcons.dm_settings,
-                  color: Colors.white,
-                ),
-              ),
+            Obx(
+              () => ZenMode.isOn
+                  ? const SizedBox.shrink()
+                  : SizedBox(
+                      width: btnWidth,
+                      height: btnHeight,
+                      child: IconButton(
+                        tooltip: '弹幕设置',
+                        style: btnStyle,
+                        onPressed: showSetDanmaku,
+                        icon: const Icon(
+                          size: 20,
+                          CustomIcons.dm_settings,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
             ),
             if (Platform.isAndroid ||
                 (PlatformUtils.isDesktop && !isFullScreen))
