@@ -215,8 +215,10 @@ abstract final class HomeFeedCommentGate {
         // Loading and semantic work share one bounded aid budget, rather than
         // adding a fresh full provider deadline after a slow comment request.
         final semantic = await screening.filter(
+          // 后台门控决策不写入筛选日志：日志只反映用户可见页面上的屏蔽。
           candidates,
           timeout: screening.passTimeout - elapsed.elapsed,
+          screenLog: false,
         );
         if (!semantic.cacheable) return null;
         if (semantic.replies.isNotEmpty) {

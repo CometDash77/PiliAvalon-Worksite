@@ -73,8 +73,10 @@ enum JevSurface {
   final String id;
   final String label;
 
-  /// Whether this surface has a final-screen call site in the app. Wiring the
-  /// live page is issue #115, not this contract.
+  /// Whether this surface has a wired call site in the app: recommendation
+  /// surfaces run through JevFinalScreen, the comment surface through
+  /// JevCommentScreening (issue #122). Wiring the live page is issue #115,
+  /// not this contract.
   final bool screeningWired;
 
   static JevSurface? tryFromId(String? id) {
@@ -121,6 +123,15 @@ abstract final class JevLimits {
 
   /// Hide gate for a Noul answer; anything below stays visible (issue #36).
   static const double hideNoulThreshold = 0.95;
+
+  /// A rule question (and a migrated criteria text) holds at most this many
+  /// characters.
+  static const int maxQuestionChars = 1000;
+
+  /// Context answers below this sufficiency probability keep the candidate
+  /// without judging it (issue #122 comment pipeline, mirroring the
+  /// video-surface evaluator gate).
+  static const double minSufficientContext = 0.95;
 
   /// When a provider reports a confidence, a low one keeps the candidate.
   static const double minReportedConfidence = 0.9;

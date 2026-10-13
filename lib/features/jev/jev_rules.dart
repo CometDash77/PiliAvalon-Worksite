@@ -69,7 +69,7 @@ class JevRule {
 
   String? validate() {
     if (id.trim().isEmpty) return '规则标识不能为空';
-    if (question.trim().isEmpty || question.length > 1000) {
+    if (question.trim().isEmpty || question.length > JevLimits.maxQuestionChars) {
       return '问题需要 1–1000 个字符';
     }
     if (!threshold.isFinite || threshold < .5 || threshold > 1) {
