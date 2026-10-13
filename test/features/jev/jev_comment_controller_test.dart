@@ -123,6 +123,11 @@ MainListReply _page(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  setUp(() {
+    // 判定缓存是进程级静态存储；各测试用同一 fixture rpid，逐用例清空防串扰。
+    JevVerdictCache.resetCache();
+  });
+
   test('real queryData -> screening -> Jev transport hides roots and nested replies', () async {
     final box = MemoryBox();
     final store = JevSettingsStore(box: box);

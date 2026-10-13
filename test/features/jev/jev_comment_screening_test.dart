@@ -11,6 +11,7 @@ import 'package:PiliPlus/features/jev/jev_comment_screening.dart';
 import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/jev/jev_screen_log.dart';
+import 'package:PiliPlus/features/jev/jev_verdict_cache.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart';
 
 import 'decisions_schema.dart';
@@ -146,6 +147,7 @@ void main() {
     await store.save(settings);
     await rulesStore.save(JevRuleConfig(rules: [commentRule()]));
     JevCommentCriteriaMigration.resetForTest();
+    JevVerdictCache.resetCache();
     JevScreenLog.instance = JevScreenLog(box: MemoryBox());
   });
 
@@ -291,6 +293,9 @@ void main() {
       {'noul': 1},
       null,
     ]) {
+      // 每轮清空判定缓存：candidate_1 每轮产生确定 hide 判定并入库，下一轮
+      // lookup 命中会缩水批次，让 mock 的按位置映射失真。
+      JevVerdictCache.resetCache();
       final input = [reply('hide'), reply('retain')];
       final result = await service(
         transport:
@@ -308,6 +313,7 @@ void main() {
 
   test('mid-band keep verdicts are not cached', () async {
     for (final value in [.5, .9, .06]) {
+      JevVerdictCache.resetCache();
       final input = [reply('hide'), reply('mid')];
       final result = await service(
         transport:
@@ -324,6 +330,7 @@ void main() {
     }
     // Band boundaries stay cacheable: certain keeps and certain hides.
     for (final value in [0.0, .05]) {
+      JevVerdictCache.resetCache();
       final input = [reply('a'), reply('b')];
       final result = await service(
         transport:
@@ -338,6 +345,7 @@ void main() {
       expect(result.cacheable, isTrue, reason: 'value ' + value.toString());
     }
     for (final value in [.95, 1.0]) {
+      JevVerdictCache.resetCache();
       final input = [reply('a'), reply('b')];
       final result = await service(
         transport:
