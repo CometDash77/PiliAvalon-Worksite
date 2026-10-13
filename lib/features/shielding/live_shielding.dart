@@ -105,15 +105,27 @@ abstract final class LiveShielding {
 
   /// Removes every card blocked by the live rules, in place, so the survivors
   /// keep the order the source page returned. Returns how many were removed.
-  static int removeBlocked<T>(List<T> items, ShieldRuleSet ruleSet) {
+  ///
+  /// [exemptRoomIds] (issue #115): followed hosts' room ids. A card whose
+  /// roomid is in the set is kept regardless of any live rule - followed
+  /// hosts are exempt from hard uid/room/title blocking as well.
+  static int removeBlocked<T>(
+    List<T> items,
+    ShieldRuleSet ruleSet, {
+    Set<int> exemptRoomIds = const <int>{},
+  }) {
     if (items.isEmpty) return 0;
     if (!ruleSet.globalEnabled) return 0;
     if (!ruleSet.isScopeEnabled(ShieldScope.live)) return 0;
     final before = items.length;
     items.removeWhere((item) {
       final candidate = candidateOf(item);
-      return candidate != null &&
-          !ShieldMatcher.match(candidate, ruleSet).visible;
+      if (candidate == null) return false;
+      final roomId = candidate.roomId;
+      if (roomId != null && exemptRoomIds.contains(int.tryParse(roomId))) {
+        return false;
+      }
+      return !ShieldMatcher.match(candidate, ruleSet).visible;
     });
     return before - items.length;
   }

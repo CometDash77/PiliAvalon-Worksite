@@ -47,37 +47,25 @@ enum JevProvider {
 /// Recommendation surfaces covered by Jev (issues #29/#43).
 ///
 /// Every surface carries its own switch; a surface is only screened when the
-/// master switch is on as well.
-///
-/// [screeningWired] separates the surfaces that actually run the final screen
-/// today from the ones that only exist in the settings list (issue #120). An
-/// unwired surface must never look switchable: the settings page renders it as
-/// a stated gap and [JevSettings.isSurfaceEnabled] keeps it off.
+/// master switch is on as well. Every surface has a wired call site:
+/// recommendation surfaces run through JevFinalScreen, the comment surface
+/// through JevCommentScreening (issue #122), and the live page through title
+/// filtering plus followed-host exemption (issue #115).
 enum JevSurface {
   homeWeb(id: 'home_web', label: '首页推荐（Web）'),
   homeApp(id: 'home_app', label: '首页推荐（App）'),
   related(id: 'related', label: '相关推荐'),
   hot(id: 'hot', label: '热门'),
   ranking(id: 'ranking', label: '排行榜'),
-  live(id: 'live', label: '直播推荐', screeningWired: false),
+  live(id: 'live', label: '直播推荐'),
   pgc(id: 'pgc', label: '番剧/影视推荐'),
   music(id: 'music', label: '音乐推荐列表'),
   comment(id: 'video_comments', label: '视频详情评论');
 
-  const JevSurface({
-    required this.id,
-    required this.label,
-    this.screeningWired = true,
-  });
+  const JevSurface({required this.id, required this.label});
 
   final String id;
   final String label;
-
-  /// Whether this surface has a wired call site in the app: recommendation
-  /// surfaces run through JevFinalScreen, the comment surface through
-  /// JevCommentScreening (issue #122). Wiring the live page is issue #115,
-  /// not this contract.
-  final bool screeningWired;
 
   static JevSurface? tryFromId(String? id) {
     for (final surface in values) {

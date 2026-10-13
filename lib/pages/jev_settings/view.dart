@@ -4,6 +4,7 @@ import 'package:PiliPlus/common/widgets/flutter/list_tile.dart' as custom;
 import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/pages/jev_settings/jev_filter_log_section.dart';
+import 'package:PiliPlus/pages/jev_settings/jev_live_filter_log_page.dart';
 import 'package:PiliPlus/pages/jev_settings/jev_rules_page.dart';
 import 'package:PiliPlus/pages/jev_settings/jev_screen_log_page.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
@@ -396,6 +397,17 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
               MaterialPageRoute(builder: (_) => const JevScreenLogPage()),
             ),
           ),
+          custom.ListTile(
+            leading: const Icon(Icons.live_tv_outlined),
+            title: const Text('直播筛除记录'),
+            subtitle: const Text('本机最近 500 条直播 Jev 筛除记录，可清空'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(
+                builder: (_) => JevLiveFilterLogPage(log: JevFilterLog.live),
+              ),
+            ),
+          ),
           JevFilterLogSection(log: _filterLog),
           const Divider(height: 1),
           ..._buildProfileSection(),
@@ -432,12 +444,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         dense: true,
         secondary: const Icon(Icons.filter_alt_outlined),
         title: Text(surface.label),
-        subtitle: surface.screeningWired
-            ? null
-            : const Text('尚未接线：本版本打开也不会生效'),
-        value:
-            surface.screeningWired && _settings.surfaces.contains(surface),
-        onChanged: _settings.enabled && surface.screeningWired
+        value: _settings.surfaces.contains(surface),
+        onChanged: _settings.enabled
             ? (value) =>
                   _saveSettings(_settings.withSurface(surface, value: value))
             : null,

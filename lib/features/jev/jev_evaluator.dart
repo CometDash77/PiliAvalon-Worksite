@@ -110,8 +110,9 @@ class JevScreenDecision {
   const JevScreenDecision({
     required this.noul,
     required this.confidence,
-    required this.threshold,
+    this.threshold,
     this.ruleId,
+    this.reason,
   });
 
   /// Provider noul score behind the decision, clamped to [0, 1]; null for
@@ -121,12 +122,18 @@ class JevScreenDecision {
   /// Confidence of a choice-type rule answer; null for noul gates.
   final double? confidence;
 
-  /// The threshold actually applied (built-in gate or the rule's own).
-  final double threshold;
+  /// The threshold actually applied (built-in gate or the rule's own); null
+  /// when no single threshold produced the hide (issue #115: a keep-rule
+  /// miss is a composite decision with no per-rule number).
+  final double? threshold;
 
   /// Identifier of the custom rule that removed the candidate; null when
-  /// the built-in noul gate fired.
+  /// the built-in noul gate fired or a composite gate fired.
   final String? ruleId;
+
+  /// Locally generated reason for a composite hide (issue #115); null when
+  /// the numbers above tell the whole story. Never a model call.
+  final String? reason;
 }
 
 /// Result of one screening pass: which candidates to hide, parallel to the
@@ -592,7 +599,13 @@ class JevEvaluator {
         definite = false;
       }
     }
+    var keepHit = false;
+    var keepAllSufficient = true;
+    var hasKeepRule = false;
     for (var r = 0; r < activeRules.length; r++) {
+      final rule = activeRules[r];
+      final keep = rule.action == JevRuleAction.keep;
+      if (keep) hasKeepRule = true;
       // Asking for No must never equate missing evidence with a confident No.
       final sufficient = rawAnswers['${_ruleKey(position, r)}_context'];
       final p = sufficient is Map ? sufficient['noul'] : null;
@@ -603,15 +616,35 @@ class JevEvaluator {
           p < .95 ||
           p > 1) {
         definite = false;
+        if (keep) keepAllSufficient = false;
         continue;
       }
-      if (activeRules[r].hides(rawAnswers[_ruleKey(position, r)])) {
-        return (
-          true,
-          true,
-          _ruleDecision(activeRules[r], rawAnswers[_ruleKey(position, r)]),
-        );
+      if (rule.hides(rawAnswers[_ruleKey(position, r)])) {
+        if (keep) {
+          // 保留命中只记录结论：后续排除规则仍可否决（排除优先）。
+          keepHit = true;
+        } else {
+          return (
+            true,
+            true,
+            _ruleDecision(rule, rawAnswers[_ruleKey(position, r)]),
+          );
+        }
       }
+    }
+    // Issue #115 保留语义：存在保留规则时，标题至少命中一条才展示。
+    // 所有保留规则都有足够上下文且无一命中 → 隐藏是已证实的结论；任一
+    // 保留规则上下文不足 → 证据缺失，保持可见（fail-open，不入缓存）。
+    if (hasKeepRule && !keepHit && keepAllSufficient) {
+      return (
+        true,
+        true,
+        const JevScreenDecision(
+          noul: null,
+          confidence: null,
+          reason: '未命中任何保留规则（存在保留规则时需命中至少一条才展示）',
+        ),
+      );
     }
     return (false, definite, null);
   }
