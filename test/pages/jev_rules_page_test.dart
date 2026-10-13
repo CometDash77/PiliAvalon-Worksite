@@ -141,4 +141,27 @@ void main() {
       expect((await store.load()).rules.single.question, '是否有广告？');
     },
   );
+  testWidgets('live rule editor offers keep action and saves it (issue #115)', (
+    tester,
+  ) async {
+    final store = JevRuleStore(box: _MemoryBox());
+    await _open(tester, store);
+    await _tap(tester, '直播间');
+    await _tap(tester, '添加规则');
+
+    // 直播编辑器出现动作选择，且默认排除。
+    expect(find.text('命中之后做什么'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey('rule-question')),
+      '是否想看这位主播？',
+    );
+    await _tap(tester, '保留（展示）');
+    await _tap(tester, '保存规则');
+
+    final saved = await store.load();
+    expect(saved.rules.single.action, JevRuleAction.keep);
+    expect(saved.rules.single.target, JevRuleTarget.live);
+    expect(find.textContaining('保留条件'), findsOneWidget);
+  });
+
 }

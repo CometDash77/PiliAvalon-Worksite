@@ -66,6 +66,35 @@ void main() {
   });
 
   group('LiveShielding.removeBlocked', () {
+    test('followed-room exemption keeps matched cards (issue #115)', () {
+      final items = <Object>[
+        _card(uid: 1001, roomid: 9527),
+        _card(uid: 2002, roomid: 1111),
+      ];
+
+      // 房间号规则命中 9527，但该房间已关注 → 豁免保留。
+      expect(
+        LiveShielding.removeBlocked(
+          items,
+          _rules([_roomRule('9527')]),
+          exemptRoomIds: {9527},
+        ),
+        0,
+      );
+      expect(items, hasLength(2));
+
+      // 未关注的 1111 仍被规则移除。
+      expect(
+        LiveShielding.removeBlocked(
+          items,
+          _rules([_roomRule('1111')]),
+          exemptRoomIds: {9527},
+        ),
+        1,
+      );
+      expect(_uidOf(items.single), 1001);
+    });
+
     test('blocks by host uid and keeps a same title card', () {
       final items = <Object>[_card(uid: 1001), _card(uid: 2002)];
 

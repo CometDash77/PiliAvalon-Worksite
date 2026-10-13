@@ -281,4 +281,41 @@ void main() {
     );
     expect(calls, 2);
   });
+
+  test('keep action is only valid for live rules (issue #115)', () {
+    final video = rule().copyWith(action: JevRuleAction.keep);
+    expect(video.validate(), contains('保留'));
+
+    final live = const JevRule(
+      id: 'keep-live',
+      target: JevRuleTarget.live,
+      question: '是否想看这位主播？',
+      action: JevRuleAction.keep,
+    );
+    expect(live.validate(), isNull);
+  });
+
+  test('rule action round-trips and defaults to hide for old records', () {
+    final keep = const JevRule(
+      id: 'keep-live',
+      target: JevRuleTarget.live,
+      question: '是否想看这位主播？',
+      action: JevRuleAction.keep,
+    );
+    final restored = JevRule.fromJson(keep.toJson());
+    expect(restored.action, JevRuleAction.keep);
+
+    // 旧记录没有 action 字段 → 默认 hide，行为不变。
+    final legacy = JevRule.fromJson({
+      ...keep.toJson()..remove('action'),
+    });
+    expect(legacy.action, JevRuleAction.hide);
+
+    // 损坏的 action 值同样退回 hide，不抛异常。
+    final broken = JevRule.fromJson({
+      ...keep.toJson(),
+      'action': 'explode',
+    });
+    expect(broken.action, JevRuleAction.hide);
+  });
 }

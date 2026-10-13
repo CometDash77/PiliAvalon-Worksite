@@ -102,6 +102,7 @@ class JevFinalScreen<T> {
               confidence: decision?.confidence,
               threshold: decision?.threshold,
               ruleId: decision?.ruleId,
+              reason: decision?.reason,
             ),
           );
         }
@@ -115,7 +116,11 @@ class JevFinalScreen<T> {
       }
       if (filterBlocked.isNotEmpty) {
         try {
-          unawaited(JevFilterLog.instance.record(filterBlocked));
+          // #115:直播筛除写独立的 500 条记录页,与通用最近 5 条互不覆盖。
+          unawaited(
+            (surface == JevSurface.live ? JevFilterLog.live : JevFilterLog.instance)
+                .record(filterBlocked),
+          );
         } catch (_) {
           // 日志失败不影响筛选。
         }
@@ -131,22 +136,31 @@ class JevFinalScreen<T> {
   }
 
   /// 热门/排行/相关/每周必看/入站必刷共用 HotVideoItemModel 同构映射。
-  static JevFinalScreen<T> live<T>({JevEvaluator? evaluator}) =>
-      JevFinalScreen<T>(
-        surface: JevSurface.live,
-        toCandidate: (item) {
-          final card = LiveShielding.cardOf(item);
-          if (card == null) return null;
-          return _fromTitle(
-            card.title,
-            tags: [
-              if (card.areaName?.trim().isNotEmpty == true)
-                card.areaName!.trim(),
-            ],
-          );
-        },
-        evaluator: evaluator,
+  /// [followedRoomIds]：已关注主播的房间号（issue #115）。命中的卡片
+  /// 不送审、原样保留——已关注主播豁免包括 Jev 在内的所有直播过滤；
+  /// 豁免卡片不产生筛除记录。
+  static JevFinalScreen<T> live<T>({
+    JevEvaluator? evaluator,
+    Set<int> followedRoomIds = const <int>{},
+  }) => JevFinalScreen<T>(
+    surface: JevSurface.live,
+    toCandidate: (item) {
+      final card = LiveShielding.cardOf(item);
+      if (card == null) return null;
+      final roomid = card.roomid;
+      if (roomid != null && roomid > 0 && followedRoomIds.contains(roomid)) {
+        return null; // 已关注：不送审，原样保留
+      }
+      return _fromTitle(
+        card.title,
+        tags: [
+          if (card.areaName?.trim().isNotEmpty == true)
+            card.areaName!.trim(),
+        ],
       );
+    },
+    evaluator: evaluator,
+  );
 
   static JevFinalScreen<HotVideoItemModel> hotVideo({
     required JevSurface surface,

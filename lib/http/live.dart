@@ -248,12 +248,15 @@ abstract final class LiveHttp {
     }
   }
 
-  static Future<LoadingState<LiveFollowData>> liveFollow(int page) async {
+  static Future<LoadingState<LiveFollowData>> liveFollow(
+    int page, {
+    int pageSize = 9,
+  }) async {
     final res = await Request().get(
       Api.liveFollow,
       queryParameters: {
         'page': page,
-        'page_size': 9,
+        'page_size': pageSize,
         'ignoreRecord': 1,
         'hit_ab': true,
       },
