@@ -3,6 +3,7 @@
 import 'package:PiliPlus/common/widgets/flutter/list_tile.dart' as custom;
 import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/features/jev/jev_rules.dart';
+import 'package:PiliPlus/features/llm/llm.dart';
 import 'package:PiliPlus/pages/jev_settings/jev_rules_page.dart';
 import 'package:PiliPlus/pages/jev_settings/jev_screen_log_page.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
@@ -21,6 +22,10 @@ class JevSettingsPage extends StatefulWidget {
     this.credentialStore,
     this.validator,
     this.catalog,
+    this.llmStore,
+    this.llmCredentials,
+    this.llmCatalog,
+    this.llmProbe,
     this.preferenceStore,
     this.onMessage,
   });
@@ -30,6 +35,12 @@ class JevSettingsPage extends StatefulWidget {
   final JevCredentialStore? credentialStore;
   final JevKeyValidator? validator;
   final JevModelCatalog? catalog;
+
+  // Issue #131: generic-line provider seams, injected by tests.
+  final LlmSettingsStore? llmStore;
+  final LlmCredentialStore? llmCredentials;
+  final LlmModelCatalog? llmCatalog;
+  final LlmHttpProbe? llmProbe;
 
   /// The local negative-feedback profile surface (issue #33).
   final JevPreferenceStore? preferenceStore;
@@ -51,6 +62,26 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       JevPreferenceStore(box: _store.box, settings: _store);
 
   late final JevModelCatalog _catalog = widget.catalog ?? JevModelCatalog();
+
+  // Issue #131: generic-line provider dependencies and draft state.
+  late final LlmSettingsStore _llmStore =
+      widget.llmStore ?? LlmSettingsStore();
+  late final LlmCredentialStore _llmCredentials =
+      widget.llmCredentials ?? SecureLlmCredentialStore();
+  late final LlmModelCatalog _llmCatalog =
+      widget.llmCatalog ?? LlmModelCatalog();
+  late final LlmHttpProbe _llmProbe = widget.llmProbe ?? LlmHttpProbe();
+  LlmProviderConfig _llmConfig = LlmProviderConfig.empty;
+  bool _llmHasStoredKey = false;
+  bool _llmCatalogBusy = false;
+  int _llmCatalogGeneration = 0;
+  LlmModelCatalogResult? _llmCatalogResult;
+  LlmProbeResult? _llmProbeResult;
+  bool _llmBusy = false;
+  bool _llmObscureKey = true;
+  final TextEditingController _llmBaseUrlController = TextEditingController();
+  final TextEditingController _llmModelController = TextEditingController();
+  final TextEditingController _llmKeyController = TextEditingController();
   final TextEditingController _modelController = TextEditingController();
   int _generation = 0;
   int _catalogGeneration = 0;
@@ -92,6 +123,9 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     _modelController.dispose();
     _cacheTtlController.dispose();
     _cacheMaxController.dispose();
+    _llmBaseUrlController.dispose();
+    _llmModelController.dispose();
+    _llmKeyController.dispose();
     super.dispose();
   }
 
@@ -126,6 +160,19 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         storedKey = null;
       }
     }
+    // Issue #131: the generic-line config is independent of the Jev settings;
+    // a broken box or credential store keeps the section at its defaults.
+    LlmProviderConfig llmConfig = LlmProviderConfig.empty;
+    String? llmStoredKey;
+    try {
+      llmConfig = await _llmStore.load();
+      final llmProtocol = llmConfig.protocol;
+      if (llmProtocol != null &&
+          await _llmCredentials.status(llmProtocol) ==
+              JevKeyStoreStatus.available) {
+        llmStoredKey = await _llmCredentials.read(llmProtocol);
+      }
+    } catch (_) {}
     if (!mounted) return;
     if (status == JevKeyStoreStatus.unavailable && settings.enabled) {
       // Issue #32: without a usable credential store Jev stays disabled.
@@ -147,6 +194,13 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       _hasStoredKey = storedKey != null;
       if (storedKey != null) {
         _keyController.text = storedKey;
+      }
+      _llmConfig = llmConfig;
+      _llmHasStoredKey = llmStoredKey != null;
+      _llmBaseUrlController.text = llmConfig.baseUrl;
+      _llmModelController.text = llmConfig.model;
+      if (llmStoredKey != null) {
+        _llmKeyController.text = llmStoredKey;
       }
       _selection = JevSelectionState(
         provider: _settings.provider,
@@ -360,7 +414,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     final errorColor = ColorScheme.of(context).error;
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      appBar: showAppBar ? AppBar(title: const Text('Jev 智能筛选')) : null,
+      appBar: showAppBar ? AppBar(title: const Text('LLM 语义筛选')) : null,
       body: ListView(
         padding: EdgeInsets.only(
           left: showAppBar ? padding.left : 0,
@@ -395,11 +449,19 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
           const Divider(height: 1),
           ..._buildProfileSection(),
           const Divider(height: 1),
+          // Issue #131: the renamed page keeps the Jev-only config as its own
+          // labeled group; the generic line gets a fresh section below.
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Text('Jev（专用模型）'),
+          ),
           ..._buildProviderSection(errorColor),
           const Divider(height: 1),
           ..._buildModelSection(),
           const Divider(height: 1),
           ..._buildKeySection(errorColor),
+          const Divider(height: 1),
+          ..._buildLlmSection(errorColor),
           const Divider(height: 1),
           ..._buildComplianceSection(),
           _buildPrivacySection(),
@@ -411,7 +473,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   List<Widget> _buildSwitchSection() => [
     SwitchListTile(
       secondary: const Icon(Icons.psychology_outlined),
-      title: const Text('启用 Jev 智能筛选'),
+      title: const Text('启用 LLM 语义筛选'),
       subtitle: const Text('在所有更便宜的过滤之后，对幸存候选做最后一次语义判断'),
       value: _settings.enabled,
       onChanged: _keyStoreStatus == JevKeyStoreStatus.unavailable
@@ -767,6 +829,377 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         title: Text(_validationMessage(_validation!)),
       ),
   ];
+
+  // Issue #131: the generic-line provider section (通用模型). Mirrors the Jev
+  // sections structurally: structural issues surface as tiles, secrets stay in
+  // the credential store, and the confirmed latch only flips after a probe
+  // succeeds — never on save.
+
+  List<Widget> _buildLlmSection(Color errorColor) => [
+    const Padding(
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Text('通用模型（OpenAI / Anthropic 兼容协议）'),
+    ),
+    for (final protocol in LlmProtocol.values)
+      custom.ListTile(
+        leading: Icon(
+          _llmConfig.protocol == protocol
+              ? Icons.radio_button_checked
+              : Icons.radio_button_unchecked,
+        ),
+        title: Text(protocol.label),
+        subtitle: Text(
+          protocol == LlmProtocol.openAICompatible
+              ? '兼容 OpenAI Chat Completions 接口'
+              : '兼容 Anthropic Messages 接口',
+        ),
+        onTap: () => _selectLlmProtocol(protocol),
+      ),
+    Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: TextField(
+        key: const ValueKey('llm-base-url'),
+        controller: _llmBaseUrlController,
+        decoration: const InputDecoration(
+          labelText: '服务地址 Base URL',
+          border: OutlineInputBorder(),
+          helperText: '例如 https://api.example.com/v1；改动后点「保存地址」',
+        ),
+        onChanged: (_) => setState(() {
+          _llmConfig = _llmConfig.copyWith(
+            baseUrl: _llmBaseUrlController.text.trim(),
+          );
+        }),
+      ),
+    ),
+    if (_llmBaseUrlController.text.trim().toLowerCase().startsWith('http://') &&
+        !_llmConfig.httpInsecureConfirmed)
+      custom.ListTile(
+        leading: Icon(Icons.warning_amber_outlined, color: errorColor),
+        title: Text(
+          'HTTP 地址不加密，请求会明文经过网络',
+          style: TextStyle(color: errorColor),
+        ),
+        subtitle: const Text('仅建议本机或内网地址使用；确认后才能保存该地址。'),
+        trailing: TextButton(
+          onPressed: _confirmLlmInsecure,
+          child: const Text('确认使用 HTTP'),
+        ),
+      ),
+    Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: TextButton(
+        onPressed: _saveLlmBaseUrl,
+        child: const Text('保存地址'),
+      ),
+    ),
+    Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: TextField(
+        key: const ValueKey('llm-api-key'),
+        controller: _llmKeyController,
+        obscureText: _llmObscureKey,
+        decoration: InputDecoration(
+          labelText: '通用模型 API Key（你自己的密钥）',
+          border: const OutlineInputBorder(),
+          helperMaxLines: 2,
+          helperText: '只保存在系统安全存储，按协议隔离；不进 Hive、备份或日志',
+          suffixIcon: IconButton(
+            tooltip: _llmObscureKey ? '显示' : '隐藏',
+            onPressed: () => setState(() => _llmObscureKey = !_llmObscureKey),
+            icon: Icon(
+              _llmObscureKey
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
+            ),
+          ),
+        ),
+      ),
+    ),
+    custom.ListTile(
+      leading: Icon(
+        _llmHasStoredKey ? Icons.check_circle_outline : Icons.help_outline,
+      ),
+      title: Text(_llmHasStoredKey ? '通用模型密钥已按协议保存' : '尚未保存通用模型密钥'),
+      subtitle: const Text('密钥按协议隔离存放：切换协议不会带走密钥，也不会读另一个协议的密钥'),
+    ),
+    Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Wrap(
+        children: [
+          TextButton(onPressed: _saveLlmKey, child: const Text('保存通用密钥')),
+          TextButton(onPressed: _deleteLlmKey, child: const Text('清除通用密钥')),
+        ],
+      ),
+    ),
+    Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: TextField(
+        key: const ValueKey('llm-model'),
+        controller: _llmModelController,
+        decoration: const InputDecoration(
+          labelText: '通用模型 ID',
+          border: OutlineInputBorder(),
+          helperText: '手动填写或从目录选择（选择只回填，保存后生效）',
+        ),
+      ),
+    ),
+    Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Wrap(
+        children: [
+          TextButton(onPressed: _saveLlmModel, child: const Text('保存通用模型')),
+          TextButton(
+            onPressed: _llmCatalogBusy ? null : _loadLlmModels,
+            child: Text(_llmCatalogBusy ? '获取中…' : '获取通用模型目录'),
+          ),
+          TextButton(
+            onPressed: _llmBusy ? null : _probeLlm,
+            child: Text(_llmBusy ? '测试中…' : '测试连接'),
+          ),
+        ],
+      ),
+    ),
+    if (_llmCatalogResult case final result?) ...[
+      if (result.error != null || result.models.isEmpty)
+        custom.ListTile(
+          title: Text(result.error ?? '目录为空，可重试或手动填写；现有配置已保留'),
+          trailing: TextButton(
+            onPressed: _loadLlmModels,
+            child: const Text('重试目录'),
+          ),
+        ),
+      for (final model in result.models)
+        custom.ListTile(
+          title: Text(model),
+          onTap: () => setState(() {
+            _llmModelController.text = model;
+          }),
+        ),
+    ],
+    if (_llmProbeResult case final probe?)
+      custom.ListTile(
+        dense: true,
+        leading: Icon(
+          probe.succeeded ? Icons.verified_outlined : Icons.error_outline,
+          color: probe.succeeded ? null : errorColor,
+        ),
+        title: Text(_llmProbeMessage(probe)),
+      ),
+    if (_llmTouched)
+      for (final issue in _llmConfig.issues)
+        custom.ListTile(
+          dense: true,
+          leading: Icon(Icons.error_outline, color: errorColor),
+          title: Text(issue.message, style: TextStyle(color: errorColor)),
+        ),
+    custom.ListTile(
+      dense: true,
+      leading: Icon(
+        _llmConfig.confirmed ? Icons.verified_outlined : Icons.info_outline,
+      ),
+      title: Text(
+        _llmConfig.confirmed
+            ? '通用线已生效：配置已通过测试连接确认'
+            : '通用线未生效：配置需通过「测试连接」确认',
+      ),
+      subtitle: const Text('保存配置只落盘，不等于可用；测试通过才把确认锁存进设置'),
+    ),
+  ];
+
+  bool get _llmTouched =>
+      _llmConfig.protocol != null ||
+      _llmConfig.baseUrl.isNotEmpty ||
+      _llmConfig.model.isNotEmpty;
+
+  Future<void> _selectLlmProtocol(LlmProtocol protocol) async {
+    setState(() {
+      _llmConfig = _llmConfig.copyWith(protocol: protocol);
+      _llmCatalogGeneration++;
+      _llmCatalogBusy = false;
+      _llmCatalogResult = null;
+      _llmProbeResult = null;
+    });
+    await _saveLlmConfig(_llmConfig);
+    await _reloadLlmKeyState();
+  }
+
+  Future<bool> _saveLlmConfig(LlmProviderConfig next) async {
+    if (!mounted) return false;
+    final previous = _llmConfig;
+    setState(() => _llmConfig = next);
+    try {
+      await _llmStore.save(next);
+      return true;
+    } catch (error) {
+      if (mounted) {
+        setState(() => _llmConfig = previous);
+      }
+      _toast('通用模型配置保存失败：$error');
+      return false;
+    }
+  }
+
+  Future<void> _reloadLlmKeyState() async {
+    final protocol = _llmConfig.protocol;
+    String? stored;
+    try {
+      if (protocol != null &&
+          await _llmCredentials.status(protocol) ==
+              JevKeyStoreStatus.available) {
+        stored = await _llmCredentials.read(protocol);
+      }
+    } catch (_) {
+      stored = null;
+    }
+    if (!mounted) return;
+    setState(() {
+      _llmHasStoredKey = stored != null;
+      _llmKeyController.text = stored ?? '';
+    });
+  }
+
+  Future<void> _saveLlmBaseUrl() async {
+    final url = _llmBaseUrlController.text.trim();
+    final next = _llmConfig.copyWith(baseUrl: url);
+    // Model choice is not required to store an address; everything else in
+    // the structural issue list blocks the save (including unconfirmed http).
+    final blocking = next.issues
+        .where((issue) => issue != LlmConfigIssue.missingModel)
+        .toList();
+    if (blocking.isNotEmpty) {
+      _toast(blocking.first.message);
+      return;
+    }
+    final saved = await _saveLlmConfig(next);
+    if (saved) _toast('通用服务地址已保存');
+  }
+
+  Future<void> _confirmLlmInsecure() async {
+    final saved = await _saveLlmConfig(
+      _llmConfig.copyWith(httpInsecureConfirmed: true),
+    );
+    if (saved) _toast('已确认使用 HTTP 地址，仍建议改用 https');
+  }
+
+  Future<void> _saveLlmKey() async {
+    final protocol = _llmConfig.protocol;
+    if (protocol == null) {
+      _toast('请先选择协议类型');
+      return;
+    }
+    final key = _llmKeyController.text.trim();
+    if (key.isEmpty) {
+      _toast('通用模型密钥不能为空');
+      return;
+    }
+    try {
+      await _llmCredentials.write(protocol, key);
+    } catch (error) {
+      _toast('通用密钥保存失败：$error');
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _llmHasStoredKey = true);
+    _toast('通用模型密钥已按协议保存');
+  }
+
+  Future<void> _deleteLlmKey() async {
+    final protocol = _llmConfig.protocol;
+    if (protocol != null) {
+      try {
+        await _llmCredentials.delete(protocol);
+      } catch (error) {
+        _toast('清除通用密钥失败：$error');
+        return;
+      }
+    }
+    _llmKeyController.clear();
+    if (!mounted) return;
+    setState(() => _llmHasStoredKey = false);
+    _toast('已清除通用密钥');
+  }
+
+  Future<void> _saveLlmModel() async {
+    final model = _llmModelController.text.trim();
+    if (model.isEmpty) {
+      _toast('通用模型 ID 不能为空');
+      return;
+    }
+    final saved = await _saveLlmConfig(_llmConfig.copyWith(model: model));
+    if (saved) _toast('通用模型已保存');
+  }
+
+  Future<String?> _readLlmKey() async {
+    final protocol = _llmConfig.protocol;
+    if (protocol == null) return null;
+    try {
+      return await _llmCredentials.read(protocol);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _loadLlmModels() async {
+    final generation = ++_llmCatalogGeneration;
+    setState(() {
+      _llmCatalogBusy = true;
+      _llmCatalogResult = null;
+    });
+    final apiKey = await _readLlmKey() ?? '';
+    final result = await _llmCatalog.load(config: _llmConfig, apiKey: apiKey);
+    if (!mounted || generation != _llmCatalogGeneration) return;
+    setState(() {
+      _llmCatalogBusy = false;
+      _llmCatalogResult = result;
+    });
+  }
+
+  Future<void> _probeLlm() async {
+    setState(() {
+      _llmBusy = true;
+      _llmProbeResult = null;
+    });
+    final apiKey = await _readLlmKey() ?? '';
+    final model = _llmModelController.text.trim();
+    final result = await _llmProbe.call(
+      config: _llmConfig,
+      apiKey: apiKey,
+      model: model.isEmpty ? null : model,
+    );
+    if (!mounted) return;
+    setState(() {
+      _llmBusy = false;
+      _llmProbeResult = result;
+    });
+    if (result.succeeded) {
+      // The confirmed latch only flips on a successful probe (spec 1):
+      // saving a config is not the same as confirming it works.
+      await _saveLlmConfig(_llmConfig.copyWith(confirmed: true));
+      if (!mounted) return;
+      _toast('测试通过，通用线已生效');
+    } else {
+      _toast(_llmProbeMessage(result));
+    }
+  }
+
+  String _llmProbeMessage(LlmProbeResult probe) {
+    if (probe.succeeded) return '测试通过：上游可连通';
+    final base = switch (probe.outcome) {
+      LlmProbeOutcome.invalidKey => '上游拒绝该密钥（401/403），请检查通用密钥',
+      LlmProbeOutcome.rateLimited => '上游限流或过载，稍后再试',
+      LlmProbeOutcome.rejectedRequest => '上游拒绝了请求格式（不判定为密钥问题）',
+      LlmProbeOutcome.modelNotFound => '上游找不到该模型，请检查通用模型 ID 或目录',
+      LlmProbeOutcome.serverError => '上游服务端错误，稍后再试',
+      LlmProbeOutcome.timeout => '请求超时，稍后再试',
+      LlmProbeOutcome.networkError => '网络不可达，请检查网络后重试',
+      LlmProbeOutcome.malformedResponse => '上游响应无法解析，稍后再试',
+      _ => '配置不完整，未发起请求',
+    };
+    final detail = probe.detail;
+    if (detail == null || detail.isEmpty) return base;
+    return '$base（上游：$detail）';
+  }
 
   String _themeAge(JevPreferenceTheme theme) {
     final days = DateTime.now().difference(theme.lastFeedbackAt).inDays;

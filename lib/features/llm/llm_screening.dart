@@ -121,6 +121,9 @@ class LlmCommentScreening {
     final watch = Stopwatch()..start();
     final hidden = List<bool>.filled(replies.length, false);
     final hiddenByRule = <int, String>{};
+    final hiddenReasons = <int, String>{};
+    String? modelId;
+    String? failure;
     var cacheable = true;
     var expired = false;
     var initialFingerprint = '';
@@ -133,6 +136,7 @@ class LlmCommentScreening {
         settings: _settings,
         credentials: _credentials,
       );
+      modelId = context.config.model;
       initialFingerprint = _fingerprint(context.config, views);
       // repeat_count keeps duplicated texts from being billed as new
       // candidates (Jev precedent).
@@ -213,6 +217,7 @@ class LlmCommentScreening {
               )
               .timeout(remaining);
           if (!outcome.ok) {
+            failure ??= 'upstream';
             cacheable = false;
             continue;
           }
@@ -221,6 +226,7 @@ class LlmCommentScreening {
             knownIds.keys.toSet(),
           );
           if (!verdict.valid) {
+            failure ??= 'parse';
             cacheable = false;
             continue;
           }
@@ -230,6 +236,7 @@ class LlmCommentScreening {
             final index = batch[b];
             hidden[index] = true;
             hiddenByRule[index] = hit.ruleId;
+            hiddenReasons[index] = hit.reason;
           }
           if (verdict.droppedHits) {
             cacheable = false;
@@ -240,12 +247,16 @@ class LlmCommentScreening {
               _cache.put(generation, identity, hide: hidden[batch[b]]);
             }
           }
-        } catch (_) {
+        } catch (e) {
           // Fail-open: this whole batch stays visible (Jev precedent).
+          failure ??= e is TimeoutException ? 'timeout' : 'upstream';
           cacheable = false;
         }
       }
-    } catch (_) {
+    } catch (e) {
+      if (e is! _LlmUnavailable) {
+        failure ??= e is TimeoutException ? 'timeout' : 'upstream';
+      }
       expired = true;
       cacheable = false;
     }
@@ -253,6 +264,12 @@ class LlmCommentScreening {
       final remaining = budget - watch.elapsed;
       if (remaining <= Duration.zero) {
         // The pass overran its budget: no verdict may be applied or cached.
+        failure ??= 'timeout';
+        _recordPassFailure(
+          modelId: modelId,
+          failure: failure,
+          elapsedMs: watch.elapsedMilliseconds,
+        );
         return LlmCommentResult(replies: replies, cacheable: false);
       }
       try {
@@ -264,6 +281,12 @@ class LlmCommentScreening {
         if (views.isNotEmpty &&
             initialFingerprint != _fingerprint(config, views)) {
           // Decisions compiled under a stale policy are void.
+          failure ??= 'drift';
+          _recordPassFailure(
+            modelId: modelId ?? config.model,
+            failure: failure,
+            elapsedMs: watch.elapsedMilliseconds,
+          );
           return LlmCommentResult(replies: replies, cacheable: false);
         }
       } catch (_) {
@@ -285,8 +308,12 @@ class LlmCommentScreening {
           kind: JevScreenLogKind.comment,
           surface: JevSurface.comment.id,
           title: replies[i].content.message.trim(),
+          line: JevScreenLogLine.llm,
           snippet: parent == null || parent.isEmpty ? null : parent,
           ruleId: hiddenByRule[i],
+          modelId: modelId,
+          reason: hiddenReasons[i],
+          elapsedMs: watch.elapsedMilliseconds,
         ),
       );
     }
@@ -296,8 +323,42 @@ class LlmCommentScreening {
       } catch (_) {
         // Log failures never affect screening.
       }
+    } else if (blocked.isEmpty && failure != null && screenLog) {
+      _recordPassFailure(
+        modelId: modelId,
+        failure: failure,
+        elapsedMs: watch.elapsedMilliseconds,
+      );
     }
     return LlmCommentResult(replies: visible, cacheable: cacheable);
+  }
+
+  /// Records one pass-level failure line (empty title, no entry content)
+  /// when the generic comment line produced no hidden entries but failed.
+  static void _recordPassFailure({
+    required String? modelId,
+    required String? failure,
+    required int elapsedMs,
+  }) {
+    if (failure == null) return;
+    try {
+      unawaited(
+        JevScreenLog.instance.record([
+          JevScreenLogEntry(
+            time: DateTime.now().millisecondsSinceEpoch,
+            kind: JevScreenLogKind.comment,
+            surface: JevSurface.comment.id,
+            title: '',
+            line: JevScreenLogLine.llm,
+            modelId: modelId,
+            failure: failure,
+            elapsedMs: elapsedMs,
+          ),
+        ]),
+      );
+    } catch (_) {
+      // Log failures never affect screening.
+    }
   }
 
   /// Generation = policy fingerprint: protocol + base URL + model +
@@ -340,9 +401,40 @@ class LlmVideoCandidate {
   final String? identity;
 }
 
+/// Result of one generic-line video pass: the parallel hidden[] list plus
+/// log-facing facts (per-hit rule/reason, model id, failure category,
+/// elapsed time). Hidden entries answered from the cache carry no
+/// rule/reason.
+class LlmVideoScreenOutcome {
+  const LlmVideoScreenOutcome({
+    required this.hidden,
+    this.ruleIds = const <int, String>{},
+    this.reasons = const <int, String>{},
+    this.modelId,
+    this.failure,
+    this.elapsedMs = 0,
+  });
+
+  final List<bool> hidden;
+
+  /// index → triggering rule id (live hits only; cache hits absent).
+  final Map<int, String> ruleIds;
+
+  /// index → verdict reason, already clipped upstream.
+  final Map<int, String> reasons;
+
+  final String? modelId;
+
+  /// Pass-level failure category: timeout/upstream/parse/drift; null when
+  /// the pass completed (even with per-item fail-opens recorded above).
+  final String? failure;
+
+  final int elapsedMs;
+}
+
 /// Generic-line VIDEO pipeline (spec 3): runs after the Jev evaluation on
 /// the unhit survivors. One request per candidate, no retries; a failed
-/// item fails open. Returns a parallel hidden[] list and never throws.
+/// item fails open. Returns an [LlmVideoScreenOutcome] and never throws.
 class LlmVideoScreening {
   LlmVideoScreening({
     LlmChatClient? client,
@@ -374,26 +466,51 @@ class LlmVideoScreening {
     }
   }
 
-  /// Screens [candidates]; returns a parallel hidden[] list. [timeout]
-  /// tightens, never extends, the 8s page budget. Never throws.
-  Future<List<bool>> screen(
+  /// Screens [candidates] and returns an [LlmVideoScreenOutcome]: the
+  /// parallel hidden[] list plus log-facing facts for the screen log
+  /// (#131). [timeout] tightens, never extends, the 8s page budget.
+  /// Never throws.
+  Future<LlmVideoScreenOutcome> screen(
     List<LlmVideoCandidate> candidates, {
     Duration? timeout,
   }) async {
     final hidden = List<bool>.filled(candidates.length, false);
-    if (candidates.isEmpty) return hidden;
+    if (candidates.isEmpty) {
+      return LlmVideoScreenOutcome(hidden: hidden);
+    }
     final budget = timeout == null || timeout >= LlmLimits.requestTimeout
         ? LlmLimits.requestTimeout
         : timeout;
-    if (budget <= Duration.zero) return hidden;
+    if (budget <= Duration.zero) {
+      return LlmVideoScreenOutcome(hidden: hidden);
+    }
     final watch = Stopwatch()..start();
+    LlmVideoScreenOutcome done(
+      List<bool> hidden, {
+      Map<int, String> ruleIds = const {},
+      Map<int, String> reasons = const {},
+      String? modelId,
+      String? failure,
+    }) => LlmVideoScreenOutcome(
+      hidden: hidden,
+      ruleIds: ruleIds,
+      reasons: reasons,
+      modelId: modelId,
+      failure: failure,
+      elapsedMs: watch.elapsedMilliseconds,
+    );
+    final ruleIds = <int, String>{};
+    final reasons = <int, String>{};
+    String? modelId;
+    String? failure;
     try {
       final rules = (await _rules.load()).activeFor();
-      if (rules.isEmpty) return hidden;
+      if (rules.isEmpty) return done(hidden);
       final context = await _resolve(
         settings: _settings,
         credentials: _credentials,
       );
+      modelId = context.config.model;
       final fingerprint = _fingerprint(context.config, rules);
       final knownIds = {for (final rule in rules) rule.id};
       final cacheOn = _cache.enabled;
@@ -416,7 +533,11 @@ class LlmVideoScreening {
         if (title.isEmpty) continue;
         if (watch.elapsed >= budget) {
           // Over budget: no further verdict may be applied or cached.
-          return List<bool>.filled(candidates.length, false);
+          return done(
+            List<bool>.filled(candidates.length, false),
+            modelId: modelId,
+            failure: failure ?? 'timeout',
+          );
         }
         try {
           final remaining = budget - watch.elapsed;
@@ -432,12 +553,20 @@ class LlmVideoScreening {
                 timeout: remaining,
               )
               .timeout(remaining);
-          if (!outcome.ok) continue;
+          if (!outcome.ok) {
+            failure ??= 'upstream';
+            continue;
+          }
           final verdict = LlmVerdictParser.parse(outcome.text, knownIds);
-          if (!verdict.valid) continue;
+          if (!verdict.valid) {
+            failure ??= 'parse';
+            continue;
+          }
           // rule ids are plain here: one candidate per request.
           if (verdict.hits.isNotEmpty) {
             hidden[i] = true;
+            ruleIds[i] = verdict.hits.first.ruleId;
+            reasons[i] = verdict.hits.first.reason;
           }
           if (!verdict.droppedHits && cacheOn) {
             final identity = _videoIdentity(candidate);
@@ -445,24 +574,46 @@ class LlmVideoScreening {
               _cache.put(fingerprint, identity, hide: hidden[i]);
             }
           }
-        } catch (_) {
+        } catch (e) {
           // Fail-open: this item stays visible.
+          failure ??= e is TimeoutException ? 'timeout' : 'upstream';
         }
       }
       // Mid-pass policy drift voids the whole pass (Jev precedent).
       final remaining = budget - watch.elapsed;
       if (remaining <= Duration.zero) {
-        return List<bool>.filled(candidates.length, false);
+        return done(
+          List<bool>.filled(candidates.length, false),
+          modelId: modelId,
+          failure: failure ?? 'timeout',
+        );
       }
       final config = await _settings.load().timeout(remaining);
       final rulesNow = (await _rules.load().timeout(remaining)).activeFor();
       if (rulesNow.isNotEmpty &&
           _fingerprint(config, rulesNow) != fingerprint) {
-        return List<bool>.filled(candidates.length, false);
+        return done(
+          List<bool>.filled(candidates.length, false),
+          modelId: modelId,
+          failure: failure ?? 'drift',
+        );
       }
-      return hidden;
-    } catch (_) {
-      return List<bool>.filled(candidates.length, false);
+      return done(
+        hidden,
+        ruleIds: ruleIds,
+        reasons: reasons,
+        modelId: modelId,
+        failure: failure,
+      );
+    } catch (e) {
+      if (e is _LlmUnavailable) {
+        // Line disabled mid-pass: a gate, not an operational failure.
+        return done(List<bool>.filled(candidates.length, false));
+      }
+      return done(
+        List<bool>.filled(candidates.length, false),
+        failure: failure ?? (e is TimeoutException ? 'timeout' : 'upstream'),
+      );
     }
   }
 

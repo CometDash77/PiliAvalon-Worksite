@@ -4,7 +4,9 @@ import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:PiliPlus/features/jev/jev_credential_store.dart'
     show JevKeyStoreStatus;
+import 'package:PiliPlus/features/jev/jev_contract.dart' show JevSurface;
 import 'package:PiliPlus/features/jev/jev_rules.dart';
+import 'package:PiliPlus/features/jev/jev_screen_log.dart';
 import 'package:PiliPlus/features/jev/jev_settings.dart' show JevSettingsBox;
 import 'package:PiliPlus/features/llm/llm.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart';
@@ -132,8 +134,30 @@ Map<String, Object?> _openaiOk(String content) => {
 String _userOf(_Call call) =>
     ((call.body['messages'] as List).last as Map)['content'] as String;
 
+class _LogBox implements JevSettingsBox {
+  final map = <String, Object?>{};
+
+  @override
+  Object? get(String key, {Object? defaultValue}) => map[key] ?? defaultValue;
+
+  @override
+  Future<void> put(String key, Object? value) async {
+    map[key] = value;
+  }
+
+  @override
+  Future<void> delete(String key) async {
+    map.remove(key);
+  }
+}
+
 void main() {
   setUp(LlmVerdictCache.resetCache);
+
+  tearDown(() {
+    // 默认构造会触碰 GStorage.setting(测试环境未初始化),注入空 box 隔离。
+    JevScreenLog.instance = JevScreenLog(box: _LogBox());
+  });
 
   test('no active comment rules: nothing is sent', () async {
     final box = _FakeBox();
@@ -390,5 +414,122 @@ void main() {
     );
     expect(result.replies.map((r) => r.content.message), ['a']);
     expect(result.cacheable, isFalse);
+  });
+
+  group('screen log (#131)', () {
+    test('a hidden reply records an llm line with rule/reason/model', () async {
+      final box = _LogBox();
+      JevScreenLog.instance = JevScreenLog(box: box);
+      final ready = await _readyBox();
+      final stub = _Stub(
+        (_, _, _) async => _openaiOk(
+          _llmJson([
+            {'rule_id': 'candidate_1:r1', 'reason': '垃圾'},
+          ]),
+        ),
+      );
+      final result = await _screening(ready, stub).filter([reply('a', id: 1)]);
+      await pumpEventQueue();
+
+      expect(result.replies, isEmpty);
+      final entries = JevScreenLog(box: box).load();
+      expect(entries, hasLength(1));
+      final row = entries.single;
+      expect(row.line, JevScreenLogLine.llm);
+      expect(row.kind, JevScreenLogKind.comment);
+      expect(row.surface, JevSurface.comment.id);
+      expect(row.title, 'a');
+      expect(row.ruleId, 'candidate_1:r1');
+      expect(row.reason, '垃圾');
+      expect(row.modelId, 'm1');
+      expect(row.failure, isNull);
+      expect(row.elapsedMs, greaterThanOrEqualTo(0));
+    });
+
+    test('an upstream failure records a bare failure line', () async {
+      final box = _LogBox();
+      JevScreenLog.instance = JevScreenLog(box: box);
+      final ready = await _readyBox();
+      final stub = _Stub((_, _, _) async => throw StateError('offline'));
+      final result = await _screening(ready, stub).filter([reply('a', id: 1)]);
+      await pumpEventQueue();
+
+      expect(result.replies.map((r) => r.content.message), ['a']);
+      final entries = JevScreenLog(box: box).load();
+      expect(entries, hasLength(1));
+      final row = entries.single;
+      expect(row.line, JevScreenLogLine.llm);
+      expect(row.title, '');
+      expect(row.snippet, isNull);
+      expect(row.ruleId, isNull);
+      expect(row.reason, isNull);
+      expect(row.modelId, 'm1');
+      expect(row.failure, 'upstream');
+    });
+
+    test('a mid-pass drift failure records a bare failure line', () async {
+      final box = _LogBox();
+      JevScreenLog.instance = JevScreenLog(box: box);
+      final ready = await _readyBox();
+      final stub = _Stub((_, _, _) async {
+        await LlmSettingsStore(box: ready).save(
+          const LlmProviderConfig(
+            protocol: LlmProtocol.openAICompatible,
+            baseUrl: 'https://api.example.com/v1',
+            model: 'm2',
+            confirmed: true,
+          ),
+        );
+        return _openaiOk(
+          _llmJson([
+            {'rule_id': 'candidate_1:r1', 'reason': '垃圾'},
+          ]),
+        );
+      });
+      final result = await _screening(ready, stub).filter([reply('a', id: 1)]);
+      await pumpEventQueue();
+
+      expect(result.replies.map((r) => r.content.message), ['a']);
+      final entries = JevScreenLog(box: box).load();
+      expect(entries, hasLength(1));
+      final row = entries.single;
+      expect(row.line, JevScreenLogLine.llm);
+      expect(row.title, '');
+      expect(row.failure, 'drift');
+      expect(row.modelId, 'm1');
+    });
+
+    test('an unconfigured provider is a gate, not a failure', () async {
+      final box = _LogBox();
+      JevScreenLog.instance = JevScreenLog(box: box);
+      final ready = _FakeBox();
+      await JevRuleStore(box: ready).save(
+        const JevRuleConfig(
+          rules: [
+            JevRule(id: 'r1', target: JevRuleTarget.comment, question: 'q'),
+          ],
+        ),
+      );
+      final stub = _Stub((_, _, _) async => _openaiOk(_llmJson([])));
+      final result = await _screening(ready, stub).filter([reply('a', id: 1)]);
+      await pumpEventQueue();
+
+      expect(result.replies.map((r) => r.content.message), ['a']);
+      expect(JevScreenLog(box: box).load(), isEmpty);
+    });
+
+    test('screenLog=false records nothing', () async {
+      final box = _LogBox();
+      JevScreenLog.instance = JevScreenLog(box: box);
+      final ready = await _readyBox();
+      final stub = _Stub((_, _, _) async => throw StateError('offline'));
+      await _screening(ready, stub).filter(
+        [reply('a', id: 1)],
+        screenLog: false,
+      );
+      await pumpEventQueue();
+
+      expect(JevScreenLog(box: box).load(), isEmpty);
+    });
   });
 }

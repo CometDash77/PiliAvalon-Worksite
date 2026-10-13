@@ -1,6 +1,7 @@
 import 'package:PiliPlus/common/widgets/flutter/list_tile.dart' as custom;
 import 'package:PiliPlus/features/jev/jev_contract.dart';
 import 'package:PiliPlus/features/jev/jev_screen_log.dart';
+import 'package:PiliPlus/utils/share_utils.dart';
 import 'package:material_ui/material_ui.dart' hide ListTile;
 
 String _surfaceLabel(String id) {
@@ -78,14 +79,22 @@ class _JevScreenLogPageState extends State<JevScreenLogPage> {
       ),
     for (final entry in items)
       custom.ListTile(
-        title: Text(entry.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+        title: Text(
+          entry.title.isEmpty ? '通用线失败' : entry.title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
         subtitle: Text(
           [
             '${_surfaceLabel(entry.surface)} · ${_fmtTime(entry.time)}',
             if (entry.snippet != null && entry.snippet!.isNotEmpty)
               '上下文:${entry.snippet!}',
+            if (entry.modelId != null) '模型:${entry.modelId!}',
+            if (entry.reason != null && entry.reason!.isNotEmpty)
+              '理由:${entry.reason!}',
+            if (entry.failure != null) '失败:${entry.failure!}',
           ].join('\n'),
-          maxLines: 3,
+          maxLines: 5,
           overflow: TextOverflow.ellipsis,
         ),
       ),
@@ -105,6 +114,13 @@ class _JevScreenLogPageState extends State<JevScreenLogPage> {
       appBar: AppBar(
         title: const Text('Jev 筛选日志'),
         actions: [
+          IconButton(
+            tooltip: '导出 JSON',
+            onPressed: _entries.isEmpty
+                ? null
+                : () => ShareUtils.shareText(JevScreenLog.exportJson(_entries)),
+            icon: const Icon(Icons.ios_share),
+          ),
           IconButton(
             tooltip: '清空',
             onPressed: _entries.isEmpty ? null : _confirmClear,

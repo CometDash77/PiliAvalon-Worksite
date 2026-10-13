@@ -142,10 +142,11 @@ class JevFinalScreen<T> {
           }
           if (survivors.isNotEmpty) {
             try {
-              final genericHidden = await generic.screen(
+              final genericOutcome = await generic.screen(
                 survivors,
                 timeout: remaining,
               );
+              final genericHidden = genericOutcome.hidden;
               final genericBlocked = <JevScreenLogEntry>[];
               for (var s = 0; s < survivorSlots.length; s++) {
                 if (genericHidden[s]) {
@@ -157,9 +158,14 @@ class JevFinalScreen<T> {
                       kind: kind,
                       surface: surface.id,
                       title: survivors[s].title,
+                      line: JevScreenLogLine.llm,
                       snippet:
                           survivors[s].snippet ??
                           _tagSummary(survivors[s].tags),
+                      ruleId: genericOutcome.ruleIds[s],
+                      modelId: genericOutcome.modelId,
+                      reason: genericOutcome.reasons[s],
+                      elapsedMs: genericOutcome.elapsedMs,
                     ),
                   );
                 }
@@ -167,6 +173,26 @@ class JevFinalScreen<T> {
               if (genericBlocked.isNotEmpty) {
                 try {
                   unawaited(JevScreenLog.instance.record(genericBlocked));
+                } catch (_) {
+                  // 日志失败不影响筛选。
+                }
+              } else if (genericOutcome.failure != null) {
+                // 通用线整轮失败:只记类别/模型/耗时,不携带任何条目内容。
+                try {
+                  unawaited(
+                    JevScreenLog.instance.record([
+                      JevScreenLogEntry(
+                        time: DateTime.now().millisecondsSinceEpoch,
+                        kind: kind,
+                        surface: surface.id,
+                        title: '',
+                        line: JevScreenLogLine.llm,
+                        modelId: genericOutcome.modelId,
+                        failure: genericOutcome.failure,
+                        elapsedMs: genericOutcome.elapsedMs,
+                      ),
+                    ]),
+                  );
                 } catch (_) {
                   // 日志失败不影响筛选。
                 }
