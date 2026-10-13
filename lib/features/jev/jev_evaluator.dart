@@ -99,6 +99,36 @@ enum JevScreenStatus {
   evaluated,
 }
 
+/// One hidden candidate's judgment numbers (issue #105): what the screen
+/// actually saw when it decided to remove this candidate. Persisted into
+/// the filter log so the settings page can show real values instead of
+/// invented ones. Slots hidden without a fresh judgment (verdict-cache or
+/// in-flight hit) carry no decision, and the log says so instead of
+/// guessing.
+@immutable
+class JevScreenDecision {
+  const JevScreenDecision({
+    required this.noul,
+    required this.confidence,
+    required this.threshold,
+    this.ruleId,
+  });
+
+  /// Provider noul score behind the decision, clamped to [0, 1]; null for
+  /// choice-rule hits.
+  final double? noul;
+
+  /// Confidence of a choice-type rule answer; null for noul gates.
+  final double? confidence;
+
+  /// The threshold actually applied (built-in gate or the rule's own).
+  final double threshold;
+
+  /// Identifier of the custom rule that removed the candidate; null when
+  /// the built-in noul gate fired.
+  final String? ruleId;
+}
+
 /// Result of one screening pass: which candidates to hide, parallel to the
 /// input order. Everything that is not a proven substantive match stays
 /// visible.
@@ -107,6 +137,7 @@ class JevScreening {
     required this.status,
     required this.hidden,
     this.requests = 0,
+    this.decisions = const <JevScreenDecision?>[],
   });
 
   final JevScreenStatus status;
@@ -118,6 +149,12 @@ class JevScreening {
   /// A repeat visit answered entirely from the verdict cache reports 0
   /// (issue #123).
   final int requests;
+
+  /// decisions[i] carries the judgment numbers behind hidden[i] (issue
+  /// #105); null whenever the slot was hidden without a fresh judgment
+  /// (verdict-cache or in-flight hit) or left visible. Parallel to the
+  /// input candidates.
+  final List<JevScreenDecision?> decisions;
 }
 
 /// Transport seam: one POST per batch to the selected provider. Any throw is
@@ -206,6 +243,7 @@ class JevEvaluator {
       );
     }
     final hidden = List<bool>.filled(candidates.length, false);
+    final decisions = List<JevScreenDecision?>.filled(candidates.length, null);
 
     final settings = await _settings.load();
     if (!settings.isSurfaceEnabled(surface)) {
@@ -401,7 +439,7 @@ class JevEvaluator {
             group.complete(null);
             continue;
           }
-          final (hide, definite) = _decide(
+          final (hide, definite, decision) = _decide(
             rawAnswers: rawAnswers,
             answers: answers,
             position: p,
@@ -411,6 +449,7 @@ class JevEvaluator {
           if (hide) {
             for (final slot in group.slots) {
               hidden[slot] = true;
+              decisions[slot] = decision;
             }
           }
           // Only definite decisions enter the cache and reach concurrent
@@ -447,6 +486,7 @@ class JevEvaluator {
           : JevScreenStatus.providerUnavailable,
       hidden: List<bool>.unmodifiable(hidden),
       requests: requests,
+      decisions: List<JevScreenDecision?>.unmodifiable(decisions),
     );
   }
 
@@ -499,10 +539,11 @@ class JevEvaluator {
     <Object?>[for (final rule in activeRules) rule.toJson()],
   ]);
 
-  /// One candidate's final verdict: (hide, definite). definite means the
-  /// answer is well-formed enough to cache (issue #123) and to hand to
-  /// concurrent waiters; hide always implies definite.
-  static (bool, bool) _decide({
+  /// One candidate's final verdict: (hide, definite, decision). definite
+  /// means the answer is well-formed enough to cache (issue #123) and to
+  /// hand to concurrent waiters; hide always implies definite. decision
+  /// carries the judgment numbers behind a hide (issue #105); null keeps.
+  static (bool, bool, JevScreenDecision?) _decide({
     required Map rawAnswers,
     required Map<String, JevAnswer>? answers,
     required int position,
@@ -525,7 +566,15 @@ class JevEvaluator {
                 rawBuiltin['type'] == 'noul')) &&
         !lowConfidence &&
         answer.noul! >= JevLimits.hideNoulThreshold) {
-      return (true, true);
+      return (
+        true,
+        true,
+        JevScreenDecision(
+          noul: answer.noul,
+          confidence: answer.confidence,
+          threshold: JevLimits.hideNoulThreshold,
+        ),
+      );
     }
     var definite = true;
     if (builtin) {
@@ -557,10 +606,34 @@ class JevEvaluator {
         continue;
       }
       if (activeRules[r].hides(rawAnswers[_ruleKey(position, r)])) {
-        return (true, true);
+        return (
+          true,
+          true,
+          _ruleDecision(activeRules[r], rawAnswers[_ruleKey(position, r)]),
+        );
       }
     }
-    return (false, definite);
+    return (false, definite, null);
+  }
+
+  /// Numbers behind a rule-hit hide (issue #105): the rule's own
+  /// execution threshold removed the candidate; the score is the rule
+  /// answer's noul (noul rules) or confidence (choice rules).
+  static JevScreenDecision _ruleDecision(JevRule rule, Object? raw) {
+    final map = raw is Map ? raw : const <String, Object?>{};
+    return JevScreenDecision(
+      noul: rule.type == JevRuleType.noul ? _unitScore(map['noul']) : null,
+      confidence: rule.type == JevRuleType.choice
+          ? _unitScore(map['confidence'])
+          : null,
+      threshold: rule.threshold,
+      ruleId: rule.id,
+    );
+  }
+
+  static double? _unitScore(Object? value) {
+    if (value is! num || !value.isFinite) return null;
+    return value.clamp(0.0, 1.0).toDouble();
   }
 
   static void _completeChunk(List<_JevSendGroup> chunk) {

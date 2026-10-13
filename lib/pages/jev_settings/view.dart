@@ -3,6 +3,7 @@
 import 'package:PiliPlus/common/widgets/flutter/list_tile.dart' as custom;
 import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/features/jev/jev_rules.dart';
+import 'package:PiliPlus/pages/jev_settings/jev_filter_log_section.dart';
 import 'package:PiliPlus/pages/jev_settings/jev_rules_page.dart';
 import 'package:PiliPlus/pages/jev_settings/jev_screen_log_page.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
@@ -49,6 +50,9 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   late final JevPreferenceStore _preferences =
       widget.preferenceStore ??
       JevPreferenceStore(box: _store.box, settings: _store);
+
+  // #105:筛选详情日志与设置共用本 box;测试注入的 store 自动生效。
+  late final JevFilterLog _filterLog = JevFilterLog(box: _store.box);
 
   late final JevModelCatalog _catalog = widget.catalog ?? JevModelCatalog();
   final TextEditingController _modelController = TextEditingController();
@@ -392,6 +396,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
               MaterialPageRoute(builder: (_) => const JevScreenLogPage()),
             ),
           ),
+          JevFilterLogSection(log: _filterLog),
           const Divider(height: 1),
           ..._buildProfileSection(),
           const Divider(height: 1),
