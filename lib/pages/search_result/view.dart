@@ -3,6 +3,7 @@ import 'package:PiliPlus/common/widgets/scroll_physics.dart' show tabBarView;
 import 'package:PiliPlus/common/widgets/view_safe_area.dart';
 import 'package:PiliPlus/models/common/search/search_type.dart';
 import 'package:PiliPlus/pages/search/controller.dart';
+import 'package:PiliPlus/pages/search_panel/all/view.dart';
 import 'package:PiliPlus/pages/search_panel/article/view.dart';
 import 'package:PiliPlus/pages/search_panel/live/view.dart';
 import 'package:PiliPlus/pages/search_panel/pgc/view.dart';
@@ -38,7 +39,7 @@ class _SearchResultPageState extends State<SearchResultPage>
     _tabController = TabController(
       vsync: this,
       initialIndex: Get.arguments?['initIndex'] ?? 0,
-      length: SearchType.values.length,
+      length: SearchType.actives.length,
     );
 
     if (_isFromSearch) {
@@ -105,7 +106,7 @@ class _SearchResultPageState extends State<SearchResultPage>
               splashFactory: NoSplash.splashFactory,
               padding: const EdgeInsets.only(top: 4, left: 8, right: 8),
               controller: _tabController,
-              tabs: SearchType.values
+              tabs: SearchType.actives
                   .map(
                     (item) => Obx(
                       () {
@@ -152,14 +153,14 @@ class _SearchResultPageState extends State<SearchResultPage>
             Expanded(
               child: tabBarView(
                 controller: _tabController,
-                children: SearchType.values
+                children: SearchType.actives
                     .map(
                       (item) => switch (item) {
-                        // SearchType.all => SearchAllPanel(
-                        //   tag: _tag,
-                        //   searchType: item,
-                        //   keyword: _searchResultController.keyword,
-                        // ),
+                        SearchType.all => SearchAllPanel(
+                          tag: _tag,
+                          searchType: item,
+                          keyword: _searchResultController.keyword,
+                        ),
                         SearchType.video => SearchVideoPanel(
                           tag: _tag,
                           searchType: item,
