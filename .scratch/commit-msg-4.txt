@@ -1,0 +1,24 @@
+test(bench): keep the frozen reference exhaustive on the production line (#73)
+
+product line 已给 ShieldRuleType 增加 roomId（直播屏蔽，#70 / map #69），只按 main 冻结的
+参照副本因此成了非穷举开关，编译直接失败：
+
+  tool/bench/_reference_shield_matcher.dart:107:13: Error: The type 'ShieldRuleType'
+  is not exhaustively matched by the switch cases since it doesn't match
+  'ShieldRuleType.roomId'
+
+该错误同时使 `flutter analyze --no-pub --no-fatal-infos` 以 error 退出，并让
+`dart run tool/bench/shield_matcher_equivalence.dart` 无法编译。
+
+处理：在该冻结副本的同一个值开关里补入与 production 改造前逐字相同的两行
+`case ShieldRuleType.roomId: yield ifNullEmpty(candidate.roomId);`，其余一字未动 —— 参照件描述的
+仍是「#52 之前的 matcher 行为」，只是行为基线从 main 线换到 production 线。
+
+差分夹按 ShieldRuleType.values 逐项穷举，因此补行后自动覆盖 roomId 规则：
+sweep 规则数 17,136 -> 18,144（多 1 type x 6 mode x 24 pattern x 7 scope = 1,008），
+比较次数不变且 0 不一致。
+
+验证（production 基线，本机）：
+- flutter analyze --no-pub --no-fatal-infos -> 14 issues / exit 0（0 error）
+- dart run tool/bench/shield_matcher_equivalence.dart -> sweep 18,144 / 100,024 comparisons / 0 mismatches
+- flutter test --no-pub -> 539 passed

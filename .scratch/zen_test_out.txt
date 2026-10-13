@@ -1,0 +1,6 @@
+﻿00:00 +0: loading D:/Documents/vibe/PiliAvalon-Worksite/test/features/zen_mode/home_zen_layout_test.dart
+00:00 +0: (setUpAll)
+00:00 +0: homeZenLayout truth table (spec R1-R4, R8; #97 normal-state toggle) zen on: only toggle survives, strip/body blank at any tab count
+00:00 +1: homeZenLayout truth table (spec R1-R4, R8; #97 normal-state toggle) zen off: toggle stays visible as second entry (#97), chrome restores
+00:00 +2: zen home top bar widgets toggle always visible; normal-state tap enters and exits zen (#97)
+00:00 +3: zen home top bar widgets tapping the toggle flips and persists the mode (R8)

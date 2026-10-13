@@ -1,0 +1,694 @@
+﻿00:00 +0: loading D:/Documents/vibe/PiliAvalon-Worksite/test/android_release_signing_test.dart
+00:00 +0: D:/Documents/vibe/PiliAvalon-Worksite/test/android_release_signing_test.dart: release signing cannot fall back to debug signing
+00:00 +1: D:/Documents/vibe/PiliAvalon-Worksite/test/android_release_signing_test.dart: workflow fails without signing secrets and uploads fingerprints
+00:01 +2: D:/Documents/vibe/PiliAvalon-Worksite/test/bootstrap/bootstrap_app_test.dart: shows a visible diagnostic screen when bootstrap fails
+00:02 +3: D:/Documents/vibe/PiliAvalon-Worksite/test/bootstrap/bootstrap_app_test.dart: shows a visible diagnostic screen when bootstrap fails
+00:02 +4: D:/Documents/vibe/PiliAvalon-Worksite/test/bootstrap/bootstrap_app_test.dart: shows a visible diagnostic screen when bootstrap fails
+00:02 +5: D:/Documents/vibe/PiliAvalon-Worksite/test/bootstrap/bootstrap_app_test.dart: shows a visible diagnostic screen when bootstrap fails
+00:02 +6: D:/Documents/vibe/PiliAvalon-Worksite/test/bootstrap/bootstrap_app_test.dart: shows a visible diagnostic screen when bootstrap fails
+00:02 +7: D:/Documents/vibe/PiliAvalon-Worksite/test/bootstrap/bootstrap_app_test.dart: shows a visible diagnostic screen when bootstrap fails
+00:02 +8: D:/Documents/vibe/PiliAvalon-Worksite/test/bootstrap/bootstrap_app_test.dart: shows a visible diagnostic screen when bootstrap fails
+Startup failed: Bad state: storage unavailable
+#0      main.<anonymous closure>.<anonymous closure> (file:///D:/Documents/vibe/PiliAvalon-Worksite/test/bootstrap/bootstrap_app_test.dart:11:33)
+#1      _BootstrapAppState._start (package:PiliPlus/main.dart:253:30)
+#2      _BootstrapAppState.initState (package:PiliPlus/main.dart:248:5)
+#3      StatefulElement._firstBuild (package:flutter/src/widgets/framework.dart:5963:55)
+#4      ComponentElement.mount (package:flutter/src/widgets/framework.dart:5806:5)
+#5      Element.inflateWidget (package:flutter/src/widgets/framework.dart:4600:20)
+#6      Element.updateChild (package:flutter/src/widgets/framework.dart:4066:20)
+#7      ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5854:16)
+#8      Element.rebuild (package:flutter/src/widgets/framework.dart:5542:7)
+#9      ProxyElement.update (package:flutter/src/widgets/framework.dart:6162:5)
+#10     _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#11     Element.updateChild (package:flutter/src/widgets/framework.dart:4050:15)
+#12     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5854:16)
+#13     StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5995:11)
+#14     Element.rebuild (package:flutter/src/widgets/framework.dart:5542:7)
+#15     StatefulElement.update (package:flutter/src/widgets/framework.dart:6020:5)
+#16     Element.updateChild (package:flutter/src/widgets/framework.dart:4050:15)
+#17     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5854:16)
+#18     Element.rebuild (package:flutter/src/widgets/framework.dart:5542:7)
+#19     ProxyElement.update (package:flutter/src/widgets/framework.dart:6162:5)
+#20     _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#21     Element.updateChild (package:flutter/src/widgets/framework.dart:4050:15)
+#22     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5854:16)
+#23     StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5995:11)
+#24     Element.rebuild (package:flutter/src/widgets/framework.dart:5542:7)
+#25     StatefulElement.update (package:flutter/src/widgets/framework.dart:6020:5)
+#26     Element.updateChild (package:flutter/src/widgets/framework.dart:4050:15)
+#27     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5854:16)
+#28     StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5995:11)
+#29     Element.rebuild (package:flutter/src/widgets/framework.dart:5542:7)
+#30     StatefulElement.update (package:flutter/src/widgets/framework.dart:6020:5)
+#31     Element.updateChild (package:flutter/src/widgets/framework.dart:4050:15)
+#32     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5854:16)
+#33     Element.rebuild (package:flutter/src/widgets/framework.dart:5542:7)
+#34     ProxyElement.update (package:flutter/src/widgets/framework.dart:6162:5)
+#35     Element.updateChild (package:flutter/src/widgets/framework.dart:4050:15)
+#36     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5854:16)
+#37     StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5995:11)
+#38     Element.rebuild (package:flutter/src/widgets/framework.dart:5542:7)
+#39     StatefulElement.update (package:flutter/src/widgets/framework.dart:6020:5)
+#40     Element.updateChild (package:flutter/src/widgets/framework.dart:4050:15)
+#41     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5854:16)
+#42     Element.rebuild (package:flutter/src/widgets/framework.dart:5542:7)
+#43     ProxyElement.update (package:flutter/src/widgets/framework.dart:6162:5)
+#44     Element.updateChild (package:flutter/src/widgets/framework.dart:4050:15)
+#45     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5854:16)
+#46     Element.rebuild (package:flutter/src/widgets/framework.dart:5542:7)
+#47     ProxyElement.update (package:flutter/src/widgets/framework.dart:6162:5)
+#48     Element.updateChild (package:flutter/src/widgets/framework.dart:4050:15)
+#49     _RawViewElement._updateChild (package:flutter/src/widgets/view.dart:488:16)
+#50     _RawViewElement.update (package:flutter/src/widgets/view.dart:575:5)
+#51     Element.updateChild (package:flutter/src/widgets/framework.dart:4050:15)
+#52     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5854:16)
+#53     Element.rebuild (package:flutter/src/widgets/framework.dart:5542:7)
+#54     StatelessElement.update (package:flutter/src/widgets/framework.dart:5908:5)
+#55     Element.updateChild (package:flutter/src/widgets/framework.dart:4050:15)
+#56     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5854:16)
+#57     StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5995:11)
+#58     Element.rebuild (package:flutter/src/widgets/framework.dart:5542:7)
+#59     StatefulElement.update (package:flutter/src/widgets/framework.dart:6020:5)
+#60     Element.updateChild (package:flutter/src/widgets/framework.dart:4050:15)
+#61     RootElement._rebuild (package:flutter/src/widgets/binding.dart:2091:16)
+#62     RootElement.update (package:flutter/src/widgets/binding.dart:2069:5)
+#63     RootElement.performRebuild (package:flutter/src/widgets/binding.dart:2083:7)
+#64     Element.rebuild (package:flutter/src/widgets/framework.dart:5542:7)
+#65     BuildScope._tryRebuild (package:flutter/src/widgets/framework.dart:2763:15)
+#66     BuildScope._flushDirtyElements (package:flutter/src/widgets/framework.dart:2820:11)
+#67     BuildOwner.buildScope (package:flutter/src/widgets/framework.dart:3124:18)
+#68     AutomatedTestWidgetsFlutterBinding.drawFrame (package:flutter_test/src/binding.dart:2432:19)
+#69     RendererBinding._handlePersistentFrameCallback (package:flutter/src/rendering/binding.dart:558:5)
+#70     SchedulerBinding._invokeFrameCallback (package:flutter/src/scheduler/binding.dart:1430:15)
+#71     SchedulerBinding.handleDrawFrame (package:flutter/src/scheduler/binding.dart:1345:9)
+#72     AutomatedTestWidgetsFlutterBinding.pump.<anonymous closure> (package:flutter_test/src/binding.dart:2261:9)
+#75     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#76     AutomatedTestWidgetsFlutterBinding.pump (package:flutter_test/src/binding.dart:2250:27)
+#77     WidgetTester.pumpWidget.<anonymous closure> (package:flutter_test/src/widget_tester.dart:598:22)
+#80     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#81     WidgetTester.pumpWidget (package:flutter_test/src/widget_tester.dart:595:27)
+#82     main.<anonymous closure> (file:///D:/Documents/vibe/PiliAvalon-Worksite/test/bootstrap/bootstrap_app_test.dart:9:18)
+#83     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:29)
+<asynchronous suspension>
+#84     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1953:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 5 frames from dart:async and package:stack_trace)
+00:03 +9: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_store_test.dart: ChannelQuietRule key creation UGC key creates stable string
+00:03 +10: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_store_test.dart: ChannelQuietRule key creation PGC key creates stable string
+00:03 +11: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_store_test.dart: ChannelQuietRule serialization round-trip UGC rule round-trips through JSON
+00:03 +12: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_store_test.dart: ChannelQuietRule serialization round-trip PGC rule round-trips through JSON
+00:03 +13: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_store_test.dart: ChannelQuietRule serialization round-trip fromJson handles missing optional fields gracefully
+00:03 +14: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_store_test.dart: ChannelQuietStore CRUD add stores created/updated times
+00:03 +15: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_store_test.dart: ChannelQuietStore CRUD update preserves created time and advances updated time
+00:03 +16: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_store_test.dart: ChannelQuietStore CRUD update returns null for unknown key
+00:03 +17: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_store_test.dart: ChannelQuietStore CRUD delete removes by key
+00:03 +18: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_store_test.dart: ChannelQuietStore CRUD delete returns false for unknown key
+00:03 +19: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_store_test.dart: ChannelQuietStore CRUD lookup returns right rule and null for unmatched
+00:03 +20: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_store_test.dart: ChannelQuietStore CRUD listAll returns empty list when no rules
+00:03 +21: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_store_test.dart: ChannelQuietStore persistence reload from stored JSON preserves rules
+00:03 +22: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_store_test.dart: ChannelQuietStore persistence load returns empty list when no stored data
+00:03 +23: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_store_test.dart: ChannelQuietStore persistence damaged JSON bypasses rules with empty state
+00:03 +24: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_store_test.dart: ChannelQuietStore persistence damaged JSON via snapshot also returns empty
+00:03 +25: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_store_test.dart: ChannelQuietStore persistence non-string payload returns empty state
+00:03 +26: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_store_test.dart: ChannelQuietStore persistence skips damaged entries in otherwise valid JSON array
+00:03 +27: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_store_test.dart: ChannelQuietStore persistence clear removes all data
+00:04 +28: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:04 +29: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:04 +30: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:04 +31: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:04 +32: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:04 +33: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:04 +34: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:04 +35: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:04 +36: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:04 +37: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:04 +38: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:04 +39: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:04 +40: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:04 +41: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:04 +42: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:04 +43: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +44: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +45: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +46: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +47: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +48: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +49: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +50: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +51: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +52: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +53: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +54: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +55: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +56: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +57: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +58: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +59: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +60: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +61: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +62: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows loading indicator before data loads
+00:05 +63: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage shows empty state when no rules exist
+00:05 +64: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage lists stored rules with title, subtitle, and switch
+00:05 +65: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage toggle sets both hide flags via switch
+00:05 +66: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage toggle sets both hide flags via switch
+00:05 +67: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage toggle sets both hide flags via switch
+00:05 +68: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage toggle sets both hide flags via switch
+00:05 +69: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage toggle sets both hide flags via switch
+00:05 +70: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage toggle sets both hide flags via switch
+00:05 +71: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage toggle sets both hide flags via switch
+00:05 +72: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage toggle sets both hide flags via switch
+00:05 +73: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage toggle sets both hide flags via switch
+00:05 +74: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage toggle sets both hide flags via switch
+00:05 +75: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage toggle sets both hide flags via switch
+00:05 +76: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage toggle sets both hide flags via switch
+00:05 +77: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage toggle sets both hide flags via switch
+00:06 +78: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage toggle ON sets both hide flags to true
+00:06 +79: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage edit dialog opens on tap and saves changes
+00:06 +80: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage edit dialog opens on tap and saves changes
+00:06 +81: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage edit dialog opens on tap and saves changes
+00:06 +82: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage edit dialog opens on tap and saves changes
+00:06 +83: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage edit dialog opens on tap and saves changes
+00:06 +84: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage edit dialog opens on tap and saves changes
+00:06 +85: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage edit dialog opens on tap and saves changes
+00:06 +86: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage edit dialog opens on tap and saves changes
+00:06 +87: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage edit dialog opens on tap and saves changes
+00:06 +88: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage edit dialog opens on tap and saves changes
+00:07 +89: D:/Documents/vibe/PiliAvalon-Worksite/test/features/channel_quiet/channel_quiet_settings_test.dart: ChannelQuietSettingsPage delete via long-press shows confirmation and removes rule
+00:07 +90: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:07 +91: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:07 +92: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:08 +93: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:08 +94: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:08 +95: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:08 +96: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:08 +97: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:08 +98: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:08 +99: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:08 +100: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:08 +101: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:10 +102: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions garb action appears and creates comment rule
+00:10 +103: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions garb action appears and creates comment rule
+00:10 +104: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions garb action appears and creates comment rule
+00:10 +105: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions garb action appears and creates comment rule
+00:10 +106: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions decoration actions are hidden when data is absent
+00:10 +107: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: (tearDownAll)
+00:11 +107: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig defaults mean no filtering
+00:11 +108: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig round trips JSON
+00:11 +109: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig damaged config payload falls back safely
+00:11 +110: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig invalid numeric values from persisted JSON are ignored
+00:11 +111: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig missing home feed comment gate flag defaults off
+00:11 +112: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig persisted min greater than max clears both char bounds
+00:11 +113: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig null fields round trip as null
+00:11 +114: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig all list fields round trip with empty lists
+00:11 +115: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig copyWith creates updated instance
+00:11 +116: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig equality is value-based
+00:11 +117: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingStore defaults to no-op config
+00:11 +118: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingStore save and load round trips
+00:11 +119: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingStore damaged payload falls back to default config
+00:11 +120: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingStore snapshot caches and updates after save
+00:11 +121: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingStore uses separate namespace key from ShieldSettingsStore
+00:12 +122: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: (setUpAll)
+00:12 +122: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate switch off leaves items unchanged and does not fetch comments
+00:12 +123: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate switch on keeps item when at least one checked comment is visible
+00:12 +124: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate switch on hides item when all checked comments are cleaned
+00:12 +125: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate comment request failure fails open
+00:12 +126: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate non-exhausted checked comments fail open
+00:12 +127: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate keeps candidates without a usable aid and asks nothing for them
+00:12 +128: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate a slow check does not hold later candidates back
+00:12 +129: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate never runs more than maxConcurrent checks at once
+00:12 +130: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate merges duplicate aids of one page into a single check
+00:12 +131: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate merges a check that is still in flight across pages
+00:12 +132: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate reuses a cached decision instead of asking again
+00:12 +133: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate a hidden decision is cached too
+00:12 +134: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate expires a cached decision after ttl
+00:12 +135: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate caps the decision cache and drops the oldest decisions
+00:13 +136: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate a changed comment config invalidates the cache
+00:13 +137: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate a newly added shield rule takes effect immediately
+00:13 +138: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate a changed ReplyGrpc filter switch invalidates the cache
+00:13 +139: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher level threshold hides lower-level users
+00:13 +140: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher level threshold hides lower-level users
+00:13 +141: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher level threshold hides lower-level users
+00:13 +142: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +143: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +144: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +145: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +146: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +147: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +148: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +149: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +150: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +151: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +152: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +153: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +154: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +155: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +156: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +157: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +158: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +159: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +160: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +161: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +162: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +163: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +164: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +165: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +166: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +167: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +168: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +169: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +170: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +171: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +172: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +173: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +174: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +175: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +176: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +177: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +178: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +179: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +180: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +181: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +182: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +183: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +184: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +185: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +186: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +187: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +188: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +189: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +190: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:13 +191: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate controlled scenario: one slow check does not serialize the page
+00:14 +192: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: (tearDownAll)
+00:14 +192: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shielding_test.dart: LiveShielding candidate mapping maps the live card onto a live scoped candidate
+00:14 +193: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shielding_test.dart: LiveShielding candidate mapping keeps non positive identities out of the candidate
+00:14 +194: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shielding_test.dart: LiveShielding candidate mapping resolves the card out of both grid shapes
+00:14 +195: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shielding_test.dart: LiveShielding candidate mapping offers only the identities the card carries
+00:14 +196: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shielding_test.dart: LiveShielding candidate mapping labels a target with the name it blocks
+00:14 +197: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shielding_test.dart: LiveShielding.removeBlocked blocks by host uid and keeps a same title card
+00:14 +198: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shielding_test.dart: LiveShielding.removeBlocked blocks by host name
+00:14 +199: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shielding_test.dart: LiveShielding.removeBlocked blocks by card title and by text area name
+00:14 +200: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shielding_test.dart: LiveShielding.removeBlocked matches an exact room id without confusing it with a host uid
+00:14 +201: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shielding_test.dart: LiveShielding.removeBlocked keeps live rules away from other scopes
+00:14 +202: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shielding_test.dart: LiveShielding.removeBlocked ignores disabled rules, disabled entries and global off
+00:15 +203: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shielding_test.dart: LiveShielding.removeBlocked keeps the survivor order of the source page
+00:15 +204: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shielding_test.dart: LiveShielding quick action saves a host rule that immediately hides the card
+00:15 +205: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shielding_test.dart: LiveShielding quick action saves a room rule that immediately hides the card
+00:15 +206: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shielding_test.dart: LiveShielding quick action reports a duplicate rule and still re-filters the page
+00:15 +207: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shielding_test.dart: LiveShielding quick action reports a persistence failure without asking for a re-filter
+00:15 +208: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shielding_test.dart: LiveShielding quick action reports a missing identity instead of saving a wrong rule
+00:15 +209: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +210: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +211: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +212: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +213: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +214: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +215: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +216: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +217: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +218: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +219: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +220: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +221: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +222: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +223: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +224: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +225: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +226: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +227: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +228: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +229: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +230: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:16 +231: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a room rule straight from the card entry
+00:17 +232: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton saves a live host rule from the same entry
+00:17 +233: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton keeps the entry idempotent and still re-filters
+00:17 +234: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton keeps the entry idempotent and still re-filters
+00:17 +235: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommendation_request_count_test.dart: 每页上游请求数（量具） 跨页重复率扫描：逐页清缓存 vs 缓存存活（当前 production）
+
+每页上游请求数（每页 20 条候选；第 2 页重复率见首列）
+| 第 2 页重复率 | 口径 | 第 1 页 标签/评论 | 第 2 页 标签/评论 | 第 2 页上游请求数(+1 取列表) |
+| --- | --- | --- | --- | --- |
+| 0% | A 逐页清缓存 | 20/20 | 20/20 | 41 |
+| 0% | B 缓存存活 | 20/20 | 20/20 | 41 |
+| 25% | A 逐页清缓存 | 20/20 | 20/20 | 41 |
+| 25% | B 缓存存活 | 20/20 | 15/15 | 31 |
+| 50% | A 逐页清缓存 | 20/20 | 20/20 | 41 |
+| 50% | B 缓存存活 | 20/20 | 10/10 | 21 |
+| 75% | A 逐页清缓存 | 20/20 | 20/20 | 41 |
+| 75% | B 缓存存活 | 20/20 | 5/5 | 11 |
+| 100% | A 逐页清缓存 | 20/20 | 20/20 | 41 |
+| 100% | B 缓存存活 | 20/20 | 0/0 | 1 |
+00:17 +236: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton reports a failed save and leaves the page alone
+00:17 +237: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton reports a failed save and leaves the page alone
+00:17 +238: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton reports a failed save and leaves the page alone
+00:18 +239: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton offers only the identities the card carries
+00:18 +240: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton offers only the identities the card carries
+00:18 +241: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommendation_tag_store_test.dart: RecommendationTagStore the cache key is bvid + cid
+00:18 +242: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommendation_tag_store_test.dart: RecommendationTagStore a cached success is served without touching the transport
+00:18 +243: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton hides itself when the card carries no identity
+00:18 +244: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommendation_tag_store_test.dart: RecommendationTagStore concurrent fetches of the same key are merged into one request
+00:18 +245: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton only surfaces the entry where the page supplies one
+00:18 +246: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/live_shield_button_test.dart: LiveShieldButton only surfaces the entry where the page supplies one
+00:18 +247: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommendation_tag_store_test.dart: RecommendationTagStore clear() empties the cache but not an in-flight request
+00:18 +248: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommendation_tag_store_test.dart: RecommendationTagStore failed and empty results are negative-cached, not stored as success
+00:18 +249: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommendation_tag_store_test.dart: RecommendationTagStore the negative cache holds a failure for 30s and then expires
+00:18 +250: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommendation_tag_store_test.dart: RecommendationTagStore a cached success expires after 30 minutes
+00:18 +251: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommendation_tag_store_test.dart: RecommendationTagStore the byte budget evicts the oldest entries first
+00:18 +252: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommendation_tag_store_test.dart: RecommendationTagStore a synchronously throwing fetcher negative-caches, not poisons, the key
+00:18 +253: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommendation_tag_store_test.dart: (tearDownAll)
+00:19 +253: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics default disabled switches do not filter low derived metrics
+00:19 +254: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics interaction rate blocks below threshold and allows boundary
+00:19 +255: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics triple rate blocks below threshold and allows boundary
+00:19 +256: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics content value blocks below threshold and allows boundary
+00:19 +257: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics zero and null denominators pass through
+00:19 +258: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics null numerators are treated as zero
+00:19 +259: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics followed items are exempt when followed exemption is enabled
+00:19 +260: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics followed items are filtered when followed exemption is disabled
+00:19 +261: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics recommendation scene switch disables derived metrics
+00:19 +262: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics web stat maps reply coin and favorite fields
+00:19 +263: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters maps web recommendation title, owner, category, tags, and reason
+00:19 +264: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters maps app recommendation args fields
+00:19 +265: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters parses app card_goto and suppresses the vertical-card reason
+00:19 +266: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters uses app card_goto to parse bangumi badge and owner label
+00:19 +267: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters web recommendation UP regex blocks owner name substring
+00:19 +268: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters app recommendation UP regex blocks args up_name substring
+00:19 +269: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters app recommendation UP name falls back to args uname
+00:19 +270: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters web recommendation UP name falls back to owner_name
+00:19 +271: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters reason keyword filters recommendation json reason only
+00:19 +272: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters maps comment content and member fields
+00:19 +273: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters maps decoration values from ReplyInfo pendant and garb fields
+00:19 +274: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters maps decoration values as empty when pendant and garb are missing
+00:19 +275: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters maps related video title owner and category fields
+00:19 +276: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters fromRelatedVideo accepts explicit video detail scope
+00:19 +277: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters filterList handles all-blocked list without requesting more data
+00:19 +278: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters filterList preserves original list when total switch is disabled
+00:19 +279: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters filterList applies comment-scoped rules to reply info lists
+00:19 +280: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters raw recommendation tags stay distinct from category
+00:19 +281: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters filterRecommendationVideos applies category rules to video lists
+00:19 +282: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters filterRecommendationVideos bypasses rules when recommendation is off
+00:19 +283: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters legacy recommendation filters obey recommendation scene switch
+00:19 +284: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters legacy title keyword path is disabled after merge into shielding
+00:19 +285: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters legacy numeric recommendation filters stay active
+00:19 +286: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters direct reply target lookup runs before comment shielding
+00:19 +287: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters web recommendation populates durationSeconds, playbackCount, danmakuCount from direct stat fields
+00:19 +288: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters web recommendation leaves durationSeconds null when duration is default -1
+00:19 +289: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters app recommendation populates durationSeconds, playbackCount, danmakuCount
+00:19 +290: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters web recommendation direct fields survive existing string-field mapping
+00:19 +291: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters duration range rule blocks web recommendation by durationSeconds
+00:19 +292: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters playbackCount range rule blocks web recommendation by stat view
+00:19 +293: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters playbackCount range rule blocks app recommendation by stat view from cover_left_text_1
+00:19 +294: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters danmakuCount range rule blocks app recommendation when danmakuCount is populated from cover_left_text_2
+00:19 +295: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters fromRelatedVideo populates durationSeconds, playbackCount, danmakuCount
+00:19 +296: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 detail-introduction candidate fields fromRelatedVideo populates description, pubdate, isUpowerExclusive
+00:19 +297: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 detail-introduction candidate fields fromRelatedVideo isUpowerExclusive is false for non-charging badge
+00:19 +298: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 detail-introduction candidate fields fromRelatedVideo isUpowerExclusive is null when badge is null
+00:19 +299: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 detail-introduction candidate fields fromRelatedVideo staffNames is empty when source has no staff
+00:19 +300: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 detail-introduction candidate fields fromRelatedVideo populates staffNames from source staff
+00:19 +301: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 detail-introduction candidate fields fromRecommendationJson populates description and pubdate from web model
+00:19 +302: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 detail-introduction candidate fields fromRecommendationJson populates description from app model item.desc
+00:19 +303: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 detail-introduction candidate fields fromRecommendationJson isUpowerExclusive from charging_pay
+00:19 +304: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 filterRelatedVideos independent switch filterRelatedVideos uses relatedVideoEnabled, not recommendationEnabled
+00:19 +305: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 filterRelatedVideos independent switch filterRelatedVideos blocks when relatedVideoEnabled is true
+00:19 +306: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 filterRelatedVideos independent switch filterRecommendationVideos still uses recommendationEnabled (unchanged)
+00:19 +307: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 filterRelatedVideos independent switch duration range blocks related video through video detail scope
+00:19 +308: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 filterRelatedVideos independent switch playbackCount range blocks related video through video detail scope
+00:19 +309: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 filterRelatedVideos independent switch danmakuCount range blocks related video through video detail scope
+00:19 +310: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 filterRelatedVideos independent switch relatedVideoEnabled false disables video detail range rules
+00:19 +311: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 filterRelatedVideos independent switch recommendationEnabled false does not disable filterRelatedVideos
+00:19 +312: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 new rule type matching descriptionKeyword blocks when description contains keyword
+00:19 +313: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 new rule type matching descriptionKeyword allows when description does not contain keyword
+00:19 +314: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 new rule type matching publishTime range blocks candidate within range
+00:19 +315: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 new rule type matching publishTime allows candidate outside range
+00:19 +316: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 new rule type matching isUpowerExclusive enum blocks charged videos
+00:19 +317: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 new rule type matching isUpowerExclusive enum allows non-charged videos
+00:19 +318: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 new rule type matching staffKeyword blocks when staffName matches
+00:19 +319: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 new rule type matching staffKeyword allows when no staffName matches
+00:20 +320: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher keyword contains block matches literal text contained in title
+00:20 +321: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher keyword exact does not match partial substring in title
+00:20 +322: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher keyword contains is case-insensitive substring, not regex
+00:20 +323: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher uid category and tag exact rules use equality instead of contains
+00:20 +324: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher matches comment body, uid, category, and tag fields
+00:20 +325: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher regex block records invalid regex without blocking other rules
+00:20 +326: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher token mode matches manual tokens without external services
+00:20 +327: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher generic keyword rules do not match UP names
+00:20 +328: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher user keyword regex blocks Chinese substring in recommendation author
+00:20 +329: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher user keyword token rules match split UP name tokens only
+00:20 +330: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher converted user keyword regex rules match UP name token boundaries
+00:20 +331: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher reason keyword rules match only recommendation reason
+00:20 +332: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher reason keyword token rules use reason tokens only
+00:20 +333: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher allow rule wins over same type block rule
+00:20 +334: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher disabled rules, scope mismatch, and global switch bypass matching
+00:20 +335: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher new explicit scopes match only exact same scope
+00:20 +336: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher both scope remains recommendation and comment only
+00:20 +337: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher global switch bypasses new scopes too
+00:20 +338: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode keyword contains matches 猫 in 可爱小猫合集
+00:20 +339: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode keyword exact does not match 猫 in 可爱小猫合集
+00:20 +340: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode empty pattern does not match non-empty candidates
+00:20 +341: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode keyword contains matches substring in title
+00:20 +342: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode keyword contains matches substring in body
+00:20 +343: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode keyword contains does not match when pattern is absent
+00:20 +344: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode uid contains matches substring in uid
+00:20 +345: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode category contains matches substring
+00:20 +346: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode tag contains matches substring
+00:20 +347: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode tag exact does not partially match
+00:20 +348: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode userKeyword contains matches substring in author name
+00:20 +349: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode reasonKeyword contains matches substring in reason
+00:20 +350: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher range match mode duration range 60..300 matches value 180
+00:20 +351: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher range match mode duration range 60..300 does not match value 30
+00:20 +352: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher range match mode range supports open bounds and exact numeric values
+00:20 +353: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher range match mode multiple range rules on one numeric field block either edge
+00:20 +354: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher range match mode invalid range records error and does not match
+00:20 +355: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher range match mode missing numeric field is no-match for range rule
+00:20 +356: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher range match mode playbackCount range matches numeric candidate field
+00:20 +357: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher enum match mode commentMemberSex enum matches normalized value
+00:20 +358: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher enum match mode commentMemberSex enum does not match different value
+00:20 +359: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher enum match mode missing enum field is no-match
+00:20 +360: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_matcher_cache_test.dart: ShieldMatcher verdict stability under reuse one rule set reused across candidates keeps per-candidate verdicts
+00:20 +361: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_matcher_cache_test.dart: ShieldMatcher verdict stability under reuse shared rule instances report the same blocker on every pass
+00:20 +362: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_matcher_cache_test.dart: ShieldMatcher verdict stability under reuse allow still overrides a block from a cached rule list
+00:20 +363: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_matcher_cache_test.dart: ShieldMatcher verdict stability under reuse disabled and out-of-scope rules stay excluded across passes
+00:20 +364: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_matcher_cache_test.dart: ShieldMatcher verdict stability under reuse a disabled rule set stays fully permissive across passes
+00:20 +365: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_matcher_cache_test.dart: ShieldMatcher error reporting under reuse invalid regex still reports one error for a value-less candidate
+00:20 +366: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_matcher_cache_test.dart: ShieldMatcher error reporting under reuse invalid range still reports one error for a value-less candidate
+00:20 +367: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_matcher_cache_test.dart: ShieldMatcher error reporting under reuse a broken rule does not stop a later rule from blocking
+00:20 +368: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_matcher_cache_test.dart: ShieldCandidate lazy tokens providers are not consulted when no token rule applies
+00:20 +369: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_matcher_cache_test.dart: ShieldCandidate lazy tokens providers are consulted at most once per match
+00:20 +370: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_matcher_cache_test.dart: ShieldCandidate lazy tokens an eager token list wins over the provider
+00:20 +371: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_matcher_cache_test.dart: ShieldCandidate lazy tokens lazy tokens reproduce the eager verdict
+00:20 +372: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_matcher_cache_test.dart: ShieldCandidate lazy tokens lazy author tokens feed userKeyword token rules
+00:21 +373: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer all-zero config produces no direct migration rules
+00:21 +374: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer pipe-separated ban words produce one keyword rule per word
+00:21 +375: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer complex regex ban word produces single regex rule
+00:21 +376: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer duration threshold is unsupported and has no suggested rule
+00:21 +377: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer play count threshold is unsupported
+00:21 +378: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer like ratio threshold is unsupported
+00:21 +379: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer exemptFollowed is partial and notes mention isFollowed gap
+00:21 +380: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer applyToRelatedVideos notes Phase 1 behavior
+00:21 +381: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer tag capability analysis reports ready state regardless of config
+00:21 +382: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer report aggregates counts correctly
+00:21 +383: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: ShieldMigrationCandidate direct candidate toBeApplied returns suggestedRule
+00:21 +384: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: ShieldMigrationCandidate unsupported candidate toBeApplied returns null
+00:22 +385: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: (setUpAll)
+00:22 +385: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher only enriches survivors, not blocked first-pass items
+00:22 +386: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher does not fetch for items with null bvid
+00:22 +387: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher tag-only second pass blocks by detail tag
+00:22 +388: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher tag-only second pass does not re-run title/user/reason/category rules
+00:22 +389: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher fail-open: fetch timeout keeps item visible
+00:22 +390: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher fail-open: thrown error keeps item visible
+00:22 +391: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher fail-open: failed LoadingState keeps item visible
+00:22 +392: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher fail-open: empty tag list keeps item visible
+00:22 +393: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher fail-open: tags with only empty/whitespace names kept visible
+00:22 +394: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher no more than 5 fetches active at once
+00:22 +395: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher successful tag fetch result is cached and reused
+00:22 +396: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher a failed tag fetch is negative-cached for 30s instead of retried
+00:22 +397: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher successful fetch cached by first instance is reused by a second instance
+00:22 +398: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher cache clear resets estimated bytes
+00:22 +399: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher cache overflow is corrected by estimated byte limit
+00:22 +400: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher tag-only second pass uses ShieldScope.recommendation
+00:22 +401: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher passes cid to tag fetch function
+00:22 +402: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher empty survivor list returns empty without any fetch
+00:22 +403: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher default concurrency is 5
+00:22 +404: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher default timeout is 3 seconds
+00:22 +405: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher default cache max size is 10 MB
+00:22 +406: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher custom concurrency is read from settings and enforced
+00:23 +407: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher custom concurrency is read from settings and enforced
+00:23 +408: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher custom concurrency is read from settings and enforced
+00:23 +409: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher custom concurrency is read from settings and enforced
+00:23 +410: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher custom concurrency is read from settings and enforced
+00:23 +411: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldRuleSet loads enumValue match mode name for internal compatibility
+00:23 +412: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldRuleSet loads enumValue match mode name for internal compatibility
+00:23 +413: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher invalid timeout value is clamped to defaults
+00:23 +414: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldRuleSet damaged JSON bypasses shielding instead of throwing
+00:23 +415: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher invalid cache max size is clamped to defaults
+00:23 +416: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldRuleSet round trips avatarPendant and garb rule types in JSON
+00:23 +417: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher K distinct bvids issue at most K upstream fetches, however often the batch repeats them
+00:23 +418: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore persists related video enabled flag through save and load
+00:23 +419: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore persists related video enabled flag through save and load
+00:23 +420: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore persists related video enabled flag through save and load
+00:23 +421: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore persists related video enabled flag through save and load
+00:23 +422: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: (tearDownAll)
+00:23 +422: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore setRelatedVideoEnabled updates snapshot and storage
+00:23 +423: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore clear removes related video enabled flag
+00:23 +424: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore loads damaged raw payload as disabled fallback
+00:23 +425: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore rejects invalid regex without overwriting previous payload
+00:23 +426: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore rejects invalid range without overwriting previous payload
+00:23 +427: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore adds quickAction block rule without rebuilding existing namespace
+00:23 +428: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore quickAction preserves existing namespace flags without rules payload
+00:23 +429: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore dedupes quickAction rules by type scope and trimmed pattern ignoring case
+00:23 +430: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore dedupes quickAction rules by match mode too
+00:23 +431: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore preserves persisted token rules for compatibility
+00:23 +432: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore preserves token and regex as separate modes
+00:23 +433: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore quickAction loads persisted rules before appending without cached snapshot
+00:23 +434: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore merges hidden legacy text filters into imported shielding rules
+00:23 +435: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore persists imported legacy rules when saving
+00:23 +436: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore does not duplicate legacy rules already saved in the new system
+00:23 +437: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore does not regenerate legacy rules after import marker is set
+00:23 +438: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore exact to contains migration loads old keyword and reason exact rules as contains
+00:23 +439: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore exact to contains migration keeps non-keyword exact rules as exact
+00:23 +440: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore exact to contains migration is idempotent and preserves regex and token compatibility
+00:23 +441: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore new rule defaults keyword and reason keyword default to contains
+00:23 +442: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore new rule defaults uid category tag and user keyword default to exact
+00:23 +443: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore new rule defaults numeric rule types default to range
+00:23 +444: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore new rule defaults comment member sex defaults to enum mode
+00:24 +445: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/upstream_reply_selection_test.dart: (setUpAll)
+00:24 +445: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/upstream_reply_selection_test.dart: selected comment text saves a structured rule, not legacy regex
+00:25 +446: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/upstream_reply_selection_test.dart: selected comment text saves a structured rule, not legacy regex
+00:25 +447: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/upstream_reply_selection_test.dart: selected comment text saves a structured rule, not legacy regex
+00:25 +448: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/upstream_reply_selection_test.dart: selected comment text saves a structured rule, not legacy regex
+00:25 +449: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/upstream_reply_selection_test.dart: selected comment text saves a structured rule, not legacy regex
+00:25 +450: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/upstream_reply_selection_test.dart: selected comment text saves a structured rule, not legacy regex
+00:25 +451: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/video_card_shield_quick_action_test.dart: VideoCardShieldQuickAction quickRule accepts explicit approved scope
+00:25 +452: D:/Documents/vibe/PiliAvalon-Worksite/test/features/zen_mode/home_zen_layout_test.dart: zen home top bar widgets toggle always visible; normal-state tap enters and exits zen (#97)
+00:26 +453: D:/Documents/vibe/PiliAvalon-Worksite/test/features/zen_mode/home_zen_layout_test.dart: zen home top bar widgets toggle always visible; normal-state tap enters and exits zen (#97)
+00:26 +454: D:/Documents/vibe/PiliAvalon-Worksite/test/features/zen_mode/home_zen_layout_test.dart: zen home top bar widgets toggle always visible; normal-state tap enters and exits zen (#97)
+00:26 +455: D:/Documents/vibe/PiliAvalon-Worksite/test/features/zen_mode/home_zen_layout_test.dart: zen home top bar widgets toggle always visible; normal-state tap enters and exits zen (#97)
+00:27 +456: D:/Documents/vibe/PiliAvalon-Worksite/test/features/zen_mode/home_zen_layout_test.dart: zen home top bar widgets toggle always visible; normal-state tap enters and exits zen (#97)
+00:27 +457: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/video_card_shield_quick_action_test.dart: VideoCardShieldQuickAction edited UP text is used for regex username keyword rule
+00:27 +458: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/video_card_shield_quick_action_test.dart: VideoCardShieldQuickAction edited UP text is used for regex username keyword rule
+00:27 +459: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/video_card_shield_quick_action_test.dart: VideoCardShieldQuickAction edited UP text is used for regex username keyword rule
+00:27 +460: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/video_card_shield_quick_action_test.dart: VideoCardShieldQuickAction edited UP text is used for regex username keyword rule
+00:27 +461: D:/Documents/vibe/PiliAvalon-Worksite/test/features/zen_mode/home_zen_layout_test.dart: zen home top bar widgets tapping the toggle flips and persists the mode (R8)
+00:27 +462: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/video_card_shield_quick_action_test.dart: VideoCardShieldQuickAction UP keyword regex escapes edited metacharacters
+00:27 +463: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/video_card_shield_quick_action_test.dart: VideoCardShieldQuickAction recommendation reason action creates reason keyword rule
+00:27 +464: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/video_card_shield_quick_action_test.dart: VideoCardShieldQuickAction recommendation reason action creates reason keyword rule
+00:27 +465: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/video_card_shield_quick_action_test.dart: VideoCardShieldQuickAction recommendation reason action creates reason keyword rule
+00:27 +466: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/video_card_shield_quick_action_test.dart: VideoCardShieldQuickAction UID action keeps original uid after UP text edit
+00:28 +467: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: (setUpAll)
+00:28 +467: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage SettingType includes commentShieldSetting
+00:28 +468: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage comment shield route renders the settings page
+00:28 +469: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage settings list contains first-level comment shield entry
+00:29 +470: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage settings list contains first-level comment shield entry
+00:29 +471: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage settings list contains first-level comment shield entry
+00:29 +472: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage settings list contains first-level comment shield entry
+00:29 +473: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage settings list contains first-level comment shield entry
+00:29 +474: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage settings list contains first-level comment shield entry
+00:29 +475: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage settings list contains first-level comment shield entry
+00:30 +476: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage settings list contains first-level comment shield entry
+00:30 +477: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage page title is correct
+00:30 +478: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage page title is correct
+00:30 +479: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage page title is correct
+00:30 +480: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage page title is correct
+00:30 +481: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/recommend_settings_test.dart: recommendSettings new 相关视频屏蔽 switch appears after old filter switch
+00:30 +482: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage no master switch is rendered
+00:30 +483: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage no master switch is rendered
+00:30 +484: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage no master switch is rendered
+00:30 +485: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage no master switch is rendered
+00:30 +486: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage no master switch is rendered
+00:30 +487: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage no master switch is rendered
+00:30 +488: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage no master switch is rendered
+00:30 +489: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage no master switch is rendered
+00:30 +490: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage no master switch is rendered
+00:30 +491: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage no master switch is rendered
+00:30 +492: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage no master switch is rendered
+00:30 +493: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage no master switch is rendered
+00:30 +494: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage no master switch is rendered
+00:30 +495: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage no master switch is rendered
+00:30 +496: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage no master switch is rendered
+00:30 +497: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage no master switch is rendered
+00:30 +498: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/recommend_settings_test.dart: recommendSettings range filtering entries show default subtitle
+00:30 +499: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage all nine direct controls render
+00:30 +500: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage all nine direct controls render
+00:30 +501: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage all nine direct controls render
+00:30 +502: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage all nine direct controls render
+00:30 +503: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage all nine direct controls render
+00:30 +504: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage all nine direct controls render
+00:30 +505: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage all nine direct controls render
+00:30 +506: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage all nine direct controls render
+00:31 +507: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage all nine direct controls render
+00:31 +508: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage all nine direct controls render
+00:31 +509: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage all nine direct controls render
+00:31 +510: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage all nine direct controls render
+00:31 +511: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage all nine direct controls render
+00:31 +512: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage all nine direct controls render
+00:31 +513: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage all nine direct controls render
+00:31 +514: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage all nine direct controls render
+00:31 +515: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage all nine direct controls render
+00:31 +516: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +517: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +518: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +519: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +520: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +521: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +522: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +523: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +524: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +525: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +526: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +527: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +528: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +529: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +530: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +531: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +532: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +533: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +534: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +535: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +536: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +537: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +538: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +539: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +540: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +541: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +542: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/comment_shield_settings/comment_shield_settings_test.dart: CommentShieldSettingsPage changing blockWithPicture saves config
+00:31 +543: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:31 +544: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:31 +545: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:32 +546: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:32 +547: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:32 +548: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:33 +549: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:33 +550: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:33 +551: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:33 +552: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:33 +553: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:33 +554: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:33 +555: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:33 +556: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:33 +557: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:33 +558: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:33 +559: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:33 +560: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:33 +561: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:33 +562: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:33 +563: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:33 +564: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:33 +565: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:33 +566: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new manual rule editor shows type match and action controls
+00:33 +567: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/recommend_range_shielding_test.dart: RecommendRangeShieldingPage shows empty state when no range rules exist
+00:33 +568: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage manual rule editor hides deprecated token match mode
+00:34 +569: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage manual rule editor hides deprecated token match mode
+00:34 +570: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage manual rule editor hides deprecated token match mode
+00:34 +571: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage manual rule editor hides deprecated token match mode
+00:34 +572: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/recommend_range_shielding_test.dart: RecommendRangeShieldingPage editor opens pre-configured for recommendation range
+00:34 +573: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/recommend_range_shielding_test.dart: RecommendRangeShieldingPage editor opens pre-configured for recommendation range
+00:34 +574: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/recommend_range_shielding_test.dart: RecommendRangeShieldingPage editor opens pre-configured for recommendation range
+00:35 +575: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage general editor shows full rule type set
+00:35 +576: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage general editor shows full rule type set
+00:35 +577: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage category chips group decoration types
+00:35 +578: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new-rule dialog type dropdown includes decoration types
+00:35 +579: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new-rule dialog type dropdown includes decoration types
+00:35 +580: D:/Documents/vibe/PiliAvalon-Worksite/test/pages/setting/models/shielding_settings_test.dart: ShieldingSettingsPage new-rule dialog type dropdown includes decoration types
+00:36 +581: D:/Documents/vibe/PiliAvalon-Worksite/test/utils/release_selection_test.dart: skips drafts and prereleases before selecting a stable release
+00:36 +582: D:/Documents/vibe/PiliAvalon-Worksite/test/utils/release_selection_test.dart: returns no release for an empty response or only test builds
+00:36 +583: D:/Documents/vibe/PiliAvalon-Worksite/test/utils/release_selection_test.dart: does not treat malformed entries as a published stable release
+00:36 +584: All tests passed!

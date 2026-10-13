@@ -1,0 +1,50 @@
+perf(shielding): replace comment gate batching with a refilling worker pool and cache (#75)
+
+Redo #50: the comment gate ran one gRPC per candidate in fixed batches behind a
+Future.wait barrier, so a whole page waited on its slowest check, nothing was
+deduped and nothing was remembered.
+
+What changed
+- home_feed_comment_gate.dart: the `for (start += maxConcurrent)` + Future.wait
+  barrier is gone. defaultMaxConcurrent (3) workers now pull candidates from a
+  shared cursor and refill as they finish, so a slow check only occupies one
+  slot. Verdicts are written back by original index, so page order is preserved.
+- Same aid merges into one request: a repeated aid inside one page and an aid
+  still in flight from an earlier page both await the same shared future. The
+  in-flight slot is registered before the load starts, because a loader that
+  throws synchronously would otherwise leave a dead key behind.
+- New decision cache: keep/hide verdicts live 30s (decisionCacheTtl), capped at
+  256 entries (decisionCacheMaxEntries), evicting the oldest writes first. One
+  cache generation is keyed by a strategy fingerprint: the comment config JSON,
+  the shield rule set (version, scope switches and every rule's
+  id/type/matchMode/scope/action/pattern/enabled) and the ReplyGrpc filter
+  switches (antiGoodsReply, enableFilter, useLegacyTextFilter, replyRegExp
+  pattern). A changed key abandons the whole generation, so a newly added rule
+  takes effect immediately; rule load timestamps are deliberately not in the key.
+- Failures, timeouts and Error states are never cached: they stay fail-open and
+  are retried on the next page. defaultMaxConcurrent (3) and defaultTimeout (3s)
+  are unchanged, the "tag enrich -> comment gate" order is untouched, and no
+  verdict moved to a lazy post-render check.
+- filter() keeps its signature, so recommendation_surfaces.dart needed no edit.
+
+Why
+- A 120ms check used to stall every later candidate for a full batch round.
+- The same aid came back page after page, and a hide verdict was recomputed from
+  scratch each time, one comment request per candidate per refresh.
+
+Verification
+- flutter test --no-pub -> 569 passed (baseline 554; 15 new), exit 0
+- flutter analyze --no-pub --no-fatal-infos -> 14 issues, all pre-existing infos
+  (3 tracked baseline + 11 from the untracked tool/probe/login_field_probe.dart),
+  0 error / 0 warning, exit 0; nothing reported in the two files changed here
+- controlled scenario, 5 candidates with loader delays 120/20/20/20/20ms and 3
+  slots: old code 147ms, new code 127ms (both cold, same temporary probe); the
+  new run's event log shows candidates 4 and 5 starting at t=46ms while candidate
+  1 was still in flight until t=126ms, i.e. refill rather than a faster request.
+  At the 2-slot scale used in #50 (1x120ms + 2x20ms, reference 140ms) the new
+  code takes 121ms.
+- the committed timing test uses 1x600ms + 4x200ms with 3 slots and asserts
+  elapsed < 700ms (the fixed barrier needs 800ms) plus peak concurrency 3 and
+  start order, keeping ~100ms of margin on both sides; start order, concurrency
+  peak and request counts are asserted structurally because a cold JIT run
+  inflates a 20ms timer to roughly 40ms.

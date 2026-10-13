@@ -1,0 +1,21 @@
+test(bench): add ShieldMatcher hot-path harness and frozen pre-change reference (#52)
+
+tool/bench/ holds development-only instruments: nothing in lib/ references them
+and they sit outside test/, so flutter test does not pick them up.
+
+- shield_matcher_bench.dart: micro-benchmark, 72 rules x 20 candidates, reports
+  median microseconds per round and per single match.
+- _reference_shield_matcher.dart: verbatim frozen copy of
+  lib/features/shielding/shielding_matcher.dart at commit e998665ab, the
+  pre-change state. Do not edit it, or the differential result is void.
+- shield_matcher_equivalence.dart: differential harness feeding the same
+  ruleSet/candidate pairs to both implementations and comparing the
+  visible#blockedBy.id#allowedBy.id#errors(ruleId:message) signature.
+
+README.md records the acceptance numbers, the coverage of the differential
+harness, what it deliberately does not cover, and the environment prerequisite
+(the Flutter SDK needs the repo's own patches, or lib/ does not compile at all).
+
+Evidence lives here rather than in docs/diagnostics/ because .gitignore:189
+ignores all of docs/, so an acceptance record written there cannot be re-checked
+by anyone cloning the repo.

@@ -1,0 +1,47 @@
+perf(shielding): share and dedupe recommendation tag fetches with in-flight merge and negative cache (#74)
+
+Redo #49: collapse tag fetching behind one injectable, shared entry point and
+stop re-requesting what we already have.
+
+What changed
+- New lib/features/shielding/recommendation_tag_store.dart: a process-wide tag
+  store. The cache key is now bvid + cid instead of bvid alone. Concurrent
+  fetches of the same key merge into a single shared Future. Failures and empty
+  results land in a 30s negative cache, successes in a 30min cache. Capacity
+  defaults to 10MB and is capped at 50MB, evicting oldest-first on estimated
+  bytes. The store caches raw tag data only, never a verdict - re-matching still
+  runs the current batch rule set.
+- shielding_recommend_tag_enricher.dart is now a thin layer over that store:
+  its private cache is gone, and it exposes fetchSharedTags() as the one shared
+  entry point for both the recommendation surface and the video detail page.
+  Survivor filtering, the concurrency worker pool (default 5), the 3s per-caller
+  timeout and fail-open behaviour are unchanged.
+- common_intro_controller.dart no longer calls UserHttp.videoTags directly; it
+  goes through fetchSharedTags(), so the detail page reuses tags the
+  recommendation surface already fetched.
+- No per-caller cancellation: a request keeps running and writes back to the
+  shared cache after a caller times out or a page goes away, which avoids
+  subscriber counting and the races that come with it.
+
+Why
+- The same bvid was fetched over and over: every recommendation batch repeated
+  it, then the detail page fetched it once more.
+- A broken part was retried once per batch; the negative cache cuts that to one
+  attempt per 30s window.
+
+Also fixes an in-flight slot leak found on the way
+- The in-flight slot used to be registered _after_ _load() was called, but an
+  async body runs synchronously up to its first await. When the fetcher threw
+  synchronously, _load() swallowed it and ran to completion before returning, so
+  the future registered afterwards was already finished and nothing ever cleared
+  it. That key could never fetch again - neither the success cache nor the
+  negative cache could recover it. The slot is now registered before the load
+  starts and released on both the success and the error path. The existing
+  synchronous-throwing fail-open test triggered this and turned five tests red;
+  the fix makes the suite green again.
+
+Verification
+- flutter test --no-pub -> 554 passed (baseline 539; 15 new), exit 0
+- flutter analyze --no-pub --no-fatal-infos -> 14 issues, all pre-existing
+  infos, 0 error / 0 warning, exit 0
+- dart format applied to the new/rewritten files

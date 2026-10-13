@@ -1,0 +1,10 @@
+﻿rules=72 candidates=20 iterations=100 samples=7
+per-pass median=530.1us min=451.0us max=609.3us
+per-match median=26.50us warmupMatches=200
+dart.bat : Running build hooks...Running build hooks...
+所在位置 行:3 字符: 1
++ & D:/flutter-sdk/flutter/bin/dart.bat run tool/bench/shield_matcher_b ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Running build h... build hooks...:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
