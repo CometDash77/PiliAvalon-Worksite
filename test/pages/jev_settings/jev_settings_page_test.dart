@@ -809,6 +809,34 @@ void main() {
       expect((await llmStore.load()).httpInsecureConfirmed, isTrue);
     },
   );
+
+  testWidgets('settings exposes generic video rule editing (issue #136)', (
+    tester,
+  ) async {
+    final box = _MemoryBox();
+    final store = JevSettingsStore(box: box);
+    await pumpPage(
+      tester,
+      store: store,
+      credentials: _FakeCredentialStore(),
+      validator: JevKeyValidator(),
+      messages: [],
+    );
+    final tile = find.text('视频屏蔽规则');
+    await tester.ensureVisible(tile);
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    // 进入通用线视频规则页并完成一次创建。
+    expect(find.text('添加规则'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey('rule-text')),
+      '屏蔽标题含有剧透的视频',
+    );
+    await tester.tap(find.text('保存规则'));
+    await tester.pumpAndSettle();
+    final saved = await LlmVideoRuleStore(box: store.box).load();
+    expect(saved.rules.single.text, '屏蔽标题含有剧透的视频');
+  });
   // 评论过滤标准区块已在 issue #122 中随双轨合并移除：独立开关与标准文本
   // 不复存在，评论面只消费「判断规则」页的评论规则。
 }

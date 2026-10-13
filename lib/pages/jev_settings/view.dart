@@ -6,6 +6,7 @@ import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/llm/llm.dart';
 import 'package:PiliPlus/pages/jev_settings/jev_rules_page.dart';
 import 'package:PiliPlus/pages/jev_settings/jev_screen_log_page.dart';
+import 'package:PiliPlus/pages/jev_settings/llm_video_rules_page.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:material_ui/material_ui.dart' hide ListTile;
@@ -434,6 +435,18 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
               MaterialPageRoute(
                 builder: (_) =>
                     JevRulesPage(store: JevRuleStore(box: _store.box)),
+              ),
+            ),
+          ),
+          custom.ListTile(
+            leading: const Icon(Icons.block_outlined),
+            title: const Text('视频屏蔽规则'),
+            subtitle: const Text('通用模型线的自然语言视频规则：不走阈值，命中即屏蔽并给出理由（issue #136）'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(
+                builder: (_) =>
+                    LlmVideoRulesPage(store: LlmVideoRuleStore(box: _store.box)),
               ),
             ),
           ),
