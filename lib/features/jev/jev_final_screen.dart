@@ -4,6 +4,8 @@ import 'package:PiliPlus/features/jev/jev_contract.dart';
 import 'package:PiliPlus/features/jev/jev_screen_log.dart';
 import 'package:PiliPlus/features/jev/jev_evaluator.dart';
 import 'package:PiliPlus/features/jev/jev_filter_log.dart';
+import 'package:PiliPlus/features/llm/llm_contract.dart';
+import 'package:PiliPlus/features/llm/llm_screening.dart';
 import 'package:PiliPlus/features/shielding/live_shielding.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo;
@@ -17,13 +19,17 @@ import 'package:PiliPlus/models_new/pgc/pgc_rank/pgc_rank_item_model.dart';
 ///
 /// 红线：任何失败都 fail-open——候选取不出、评测器抛异常、返回结构异常，
 /// 都返回原列表原顺序，绝不因为 JEV 故障吞掉正常内容。
-/// 面开关的判定在 [JevEvaluator.screen] 内部（isSurfaceEnabled），
-/// 这里不重复读设置，只负责映射与结果套用。
+/// 双线模式（issue #113）：通用 LLM 线在 Jev 之后对幸存者复筛；
+/// Jev 拿到共享页预算的一半（JevLimits.dualShare），剩余时间归通用线。
+/// Jev 面开关的判定在 [JevEvaluator.screen] 内部（isSurfaceEnabled）；
+/// 通用线的门控在 [LlmVideoScreening.isEnabled] 内部。两线独立，
+/// 任一有效命中都隐藏（fail-open 各自独立）。
 class JevFinalScreen<T> {
   JevFinalScreen({
     required this.surface,
     required this.toCandidate,
     this.evaluator,
+    this.videoScreening,
   });
 
   final JevSurface surface;
@@ -33,15 +39,27 @@ class JevFinalScreen<T> {
 
   final JevEvaluator? evaluator;
 
+  /// 通用 LLM 视频线；测试整体注入，null 时用进程内共享实例。
+  final LlmVideoScreening? videoScreening;
+
   static JevEvaluator? _shared;
+
+  static LlmVideoScreening? _sharedVideo;
+
+  static LlmVideoScreening get sharedVideoScreening =>
+      _sharedVideo ??= LlmVideoScreening();
 
   /// 进程内共享评测器：各面共用同一套设置/凭据/偏好档。测试整体注入。
   static JevEvaluator get sharedEvaluator => _shared ??= JevEvaluator();
 
   JevEvaluator get _effectiveEvaluator => evaluator ?? sharedEvaluator;
 
+  LlmVideoScreening get _effectiveVideoScreening =>
+      videoScreening ?? sharedVideoScreening;
+
   Future<List<T>> screen(List<T> items) async {
     if (items.isEmpty) return items;
+    final watch = Stopwatch()..start();
     final candidates = <JevCandidate>[];
     final indices = <int>[];
     for (var i = 0; i < items.length; i++) {
@@ -58,53 +76,63 @@ class JevFinalScreen<T> {
     }
     if (candidates.isEmpty) return items;
     try {
+      LlmVideoScreening? generic;
+      bool dualLine = false;
+      try {
+        generic = _effectiveVideoScreening;
+        dualLine = await generic.isEnabled();
+      } catch (_) {
+        generic = null; // 通用线任何故障按未启用处理，Jev 线不受影响
+      }
       final screening = await _effectiveEvaluator.screen(
         candidates,
         surface: surface,
+        passTimeout: dualLine ? JevLimits.dualShare : null,
       );
-      if (screening.status != JevScreenStatus.evaluated) return items;
-      final hidden = screening.hidden;
-      final decisions = screening.decisions;
       var anyHidden = false;
       final keep = List<bool>.filled(items.length, true);
       final kind = T == ReplyInfo
           ? JevScreenLogKind.comment
           : JevScreenLogKind.video;
-      final now = DateTime.now().millisecondsSinceEpoch;
       final blocked = <JevScreenLogEntry>[];
       final filterBlocked = <JevFilterLogEntry>[];
-      for (var k = 0; k < indices.length && k < hidden.length; k++) {
-        if (hidden[k]) {
-          keep[indices[k]] = false;
-          anyHidden = true;
-          final candidate = candidates[k];
-          blocked.add(
-            JevScreenLogEntry(
-              time: now,
-              kind: kind,
-              surface: surface.id,
-              title: candidate.title,
-              snippet: candidate.snippet ?? _tagSummary(candidate.tags),
-            ),
-          );
-          // #105:同一真实筛除写入判定详情日志;数值只在本次判定真实产生
-          // 时记录,判定缓存命中的槽位留空,由界面说明缺失,不编造。
-          final JevScreenDecision? decision =
-              k < decisions.length ? decisions[k] : null;
-          filterBlocked.add(
-            JevFilterLogEntry(
-              time: now,
-              surface: surface.id,
-              title: candidate.title,
-              snippet: candidate.snippet,
-              tags: candidate.tags,
-              noul: decision?.noul,
-              confidence: decision?.confidence,
-              threshold: decision?.threshold,
-              ruleId: decision?.ruleId,
-              reason: decision?.reason,
-            ),
-          );
+      if (screening.status == JevScreenStatus.evaluated) {
+        final hidden = screening.hidden;
+        final decisions = screening.decisions;
+        final now = DateTime.now().millisecondsSinceEpoch;
+        for (var k = 0; k < indices.length && k < hidden.length; k++) {
+          if (hidden[k]) {
+            keep[indices[k]] = false;
+            anyHidden = true;
+            final candidate = candidates[k];
+            blocked.add(
+              JevScreenLogEntry(
+                time: now,
+                kind: kind,
+                surface: surface.id,
+                title: candidate.title,
+                snippet: candidate.snippet ?? _tagSummary(candidate.tags),
+              ),
+            );
+            // #105:同一真实筛除写入判定详情日志;数值只在本次判定真实产生
+            // 时记录,判定缓存命中的槽位留空,由界面说明缺失,不编造。
+            final JevScreenDecision? decision =
+                k < decisions.length ? decisions[k] : null;
+            filterBlocked.add(
+              JevFilterLogEntry(
+                time: now,
+                surface: surface.id,
+                title: candidate.title,
+                snippet: candidate.snippet,
+                tags: candidate.tags,
+                noul: decision?.noul,
+                confidence: decision?.confidence,
+                threshold: decision?.threshold,
+                ruleId: decision?.ruleId,
+                reason: decision?.reason,
+              ),
+            );
+          }
         }
       }
       if (blocked.isNotEmpty) {
@@ -123,6 +151,88 @@ class JevFinalScreen<T> {
           );
         } catch (_) {
           // 日志失败不影响筛选。
+        }
+      }
+      // 通用线只看 Jev 幸存者（#113：低成本→Jev→通用 LLM）。
+      if (dualLine && generic != null) {
+        final remaining = LlmLimits.requestTimeout - watch.elapsed;
+        if (remaining > Duration.zero) {
+          final survivors = <LlmVideoCandidate>[];
+          final survivorSlots = <int>[];
+          for (var k = 0; k < indices.length; k++) {
+            if (!keep[indices[k]]) continue;
+            final candidate = candidates[k];
+            survivors.add(
+              LlmVideoCandidate(
+                title: candidate.title,
+                snippet: candidate.snippet,
+                tags: candidate.tags,
+                identity: candidate.localKey,
+              ),
+            );
+            survivorSlots.add(indices[k]);
+          }
+          if (survivors.isNotEmpty) {
+            try {
+              final genericOutcome = await generic.screen(
+                survivors,
+                timeout: remaining,
+              );
+              final genericHidden = genericOutcome.hidden;
+              final genericBlocked = <JevScreenLogEntry>[];
+              for (var s = 0; s < survivorSlots.length; s++) {
+                if (genericHidden[s]) {
+                  keep[survivorSlots[s]] = false;
+                  anyHidden = true;
+                  genericBlocked.add(
+                    JevScreenLogEntry(
+                      time: DateTime.now().millisecondsSinceEpoch,
+                      kind: kind,
+                      surface: surface.id,
+                      title: survivors[s].title,
+                      line: JevScreenLogLine.llm,
+                      snippet:
+                          survivors[s].snippet ??
+                          _tagSummary(survivors[s].tags),
+                      ruleId: genericOutcome.ruleIds[s],
+                      modelId: genericOutcome.modelId,
+                      reason: genericOutcome.reasons[s],
+                      elapsedMs: genericOutcome.elapsedMs,
+                    ),
+                  );
+                }
+              }
+              if (genericBlocked.isNotEmpty) {
+                try {
+                  unawaited(JevScreenLog.instance.record(genericBlocked));
+                } catch (_) {
+                  // 日志失败不影响筛选。
+                }
+              } else if (genericOutcome.failure != null) {
+                // 通用线整轮失败:只记类别/模型/耗时,不携带任何条目内容。
+                try {
+                  unawaited(
+                    JevScreenLog.instance.record([
+                      JevScreenLogEntry(
+                        time: DateTime.now().millisecondsSinceEpoch,
+                        kind: kind,
+                        surface: surface.id,
+                        title: '',
+                        line: JevScreenLogLine.llm,
+                        modelId: genericOutcome.modelId,
+                        failure: genericOutcome.failure,
+                        elapsedMs: genericOutcome.elapsedMs,
+                      ),
+                    ]),
+                  );
+                } catch (_) {
+                  // 日志失败不影响筛选。
+                }
+              }
+            } catch (_) {
+              // 通用线失败 fail-open：只丢通用线命中，Jev 命中保留。
+            }
+          }
         }
       }
       if (!anyHidden) return items;
@@ -216,7 +326,8 @@ class JevFinalScreen<T> {
   }
 }
 
-String? _tagSummary(List<String> tags) => tags.isEmpty ? null : tags.join(' / ');
+String? _tagSummary(List<String> tags) =>
+    tags.isEmpty ? null : tags.join(' / ');
 
 /// 视频面卡片的本地缓存身份（issue #123）：bvid 优先，退回 aid；都没有就留
 /// 空，评测器回退到规范化标题。仅用于本地判定缓存，绝不进上游载荷（#34）。
@@ -227,4 +338,3 @@ String? jevVideoLocalKey(BaseVideoItemModel item) {
   if (aid != null) return 'aid:$aid';
   return null;
 }
-
