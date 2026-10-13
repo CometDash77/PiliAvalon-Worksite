@@ -58,8 +58,8 @@ jobs:
       - name: Surface failing test names
         if: failure()
         run: |
-          grep -E "\[E\]" flutter-test.log | head -40 | sed "s/^/::error::/" || true
-          tail -5 flutter-test.log | sed "s/^/::error::/" || true
+          grep -E "::group::" flutter-test.log | head -10 | sed "s/^/::error::/" || true
+          tail -80 flutter-test.log | sed "s/^/::error::/" || true
 
       - name: Test Android launcher resolution
         run: python3 -m unittest discover -s tool -p android_runtime_smoke_launch_test.py
