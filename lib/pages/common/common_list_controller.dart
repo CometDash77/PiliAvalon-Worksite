@@ -13,6 +13,15 @@ abstract class CommonListController<R, T> extends CommonController<R, T> {
 
   void handleListResponse(List<T> dataList) {}
 
+  /// Await work that must finish before any part of a response becomes visible.
+  Future<void> beforeListResponse(bool isRefresh, R response) async {}
+
+  void afterListResponse(bool isRefresh, R response) {}
+
+  Future<void> prepareListResponse(List<T> dataList) async {
+    if (dataList.isNotEmpty) handleListResponse(dataList);
+  }
+
   List<T>? getDataList(R response) {
     return response as List<T>?;
   }
@@ -26,8 +35,12 @@ abstract class CommonListController<R, T> extends CommonController<R, T> {
     final LoadingState<R> res = await customGetData();
     if (res case Success(:final response)) {
       if (!customHandleResponse(isRefresh, res)) {
+        await beforeListResponse(isRefresh, response);
         final dataList = getDataList(response);
-        if (dataList == null || dataList.isEmpty) {
+        final sourceEmpty = dataList == null || dataList.isEmpty;
+        if (dataList != null) await prepareListResponse(dataList);
+        afterListResponse(isRefresh, response);
+        if (sourceEmpty) {
           isEnd = true;
           if (isRefresh) {
             loadingState.value = Success(dataList);
@@ -37,7 +50,6 @@ abstract class CommonListController<R, T> extends CommonController<R, T> {
           isLoading = false;
           return;
         }
-        handleListResponse(dataList);
         if (isRefresh) {
           checkIsEnd(dataList.length);
           loadingState.value = Success(dataList);

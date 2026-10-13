@@ -48,6 +48,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
 
   late final JevModelCatalog _catalog = widget.catalog ?? JevModelCatalog();
   final TextEditingController _modelController = TextEditingController();
+  final TextEditingController _commentController = TextEditingController();
   int _generation = 0;
   int _catalogGeneration = 0;
   bool _catalogBusy = false;
@@ -80,6 +81,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   void dispose() {
     _keyController.dispose();
     _modelController.dispose();
+    _commentController.dispose();
     super.dispose();
   }
 
@@ -113,6 +115,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     setState(() {
       _settings = JevSettingsStore.snapshot;
       _profile = profile;
+      _commentController.text = _settings.commentCriteria;
       final provider = _settings.provider;
       if (provider != null) {
         _modelController.text = _settings.modelFor(provider);
@@ -344,6 +347,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         children: [
           ..._buildSwitchSection(),
           const Divider(height: 1),
+          ..._buildCommentSection(),
+          const Divider(height: 1),
           ..._buildProfileSection(),
           const Divider(height: 1),
           ..._buildProviderSection(errorColor),
@@ -384,6 +389,66 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
                   _saveSettings(_settings.withSurface(surface, value: value))
             : null,
       ),
+  ];
+
+  Future<void> _saveCommentCriteria({bool restorePreset = false}) async {
+    final criteria = restorePreset
+        ? JevSettings.defaultCommentCriteria
+        : _commentController.text;
+    if (await _saveSettings(_settings.copyWith(commentCriteria: criteria))) {
+      if (!mounted) return;
+      _commentController.text = criteria;
+      _toast(restorePreset ? '已恢复评论预设' : '评论标准已保存');
+    }
+  }
+
+  List<Widget> _buildCommentSection() => [
+    SwitchListTile(
+      key: const ValueKey('jev-comment-enabled'),
+      title: const Text('Jev 评论过滤'),
+      subtitle: const Text('主评论、楼中楼、对话及首页可见评论判断共用此标准；默认关闭'),
+      value: _settings.commentEnabled,
+      onChanged: _settings.enabled
+          ? (value) => _saveSettings(_settings.copyWith(commentEnabled: value))
+          : null,
+    ),
+    Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: TextField(
+        key: const ValueKey('jev-comment-criteria'),
+        controller: _commentController,
+        minLines: 3,
+        maxLines: 6,
+        maxLength: 4000,
+        decoration: const InputDecoration(
+          labelText: '评论过滤标准（可自定义）',
+          helperText: '保存后生效；留空不调用 Jev。上下文不足、不确定或请求失败时保留评论。',
+          helperMaxLines: 2,
+          border: OutlineInputBorder(),
+        ),
+      ),
+    ),
+    Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Wrap(
+        children: [
+          TextButton(
+            key: const ValueKey('jev-comment-save'),
+            onPressed: _saveCommentCriteria,
+            child: const Text('保存评论标准'),
+          ),
+          TextButton(
+            key: const ValueKey('jev-comment-restore'),
+            onPressed: () => _saveCommentCriteria(restorePreset: true),
+            child: const Text('恢复评论预设'),
+          ),
+        ],
+      ),
+    ),
+    const Padding(
+      padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: Text('启用后仅向已确认提供方发送评论正文和此标准，不发送作者、评论 ID 或账号信息。'),
+    ),
   ];
 
   List<Widget> _buildProviderSection(Color errorColor) => [
@@ -685,7 +750,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   Widget _buildPrivacySection() => const ExpansionTile(
     leading: Icon(Icons.privacy_tip_outlined),
     title: Text('隐私说明'),
-    subtitle: Text('只发送最小候选字段与本地显式负反馈摘要'),
+    subtitle: Text('只发送最小候选字段；评论过滤发送正文与自定义标准'),
     childrenPadding: EdgeInsets.fromLTRB(16, 0, 16, 12),
     children: [
       Text('发送：候选标题，以及候选数据自带时的短简介或分类/标签；最多 20 个未过期负主题及大致次数。'),
