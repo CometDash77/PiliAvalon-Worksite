@@ -1,6 +1,6 @@
-import 'dart:convert';
 
 import 'package:PiliPlus/features/jev/jev.dart';
+import 'package:PiliPlus/features/jev/jev_comment_screening.dart';
 import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/jev/jev_screen_log.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart';
@@ -97,7 +97,6 @@ class Harness {
     : settingsBox = MemoryBox(),
       preferenceBox = MemoryBox() {
     settingsBox.values[JevSettingsStore.enabledKey] = true;
-    settingsBox.values[JevSettingsStore.commentEnabledKey] = true;
     for (final surface in surfaces) {
       settingsBox.values[JevSettingsStore.surfaceKey(surface)] = true;
     }
@@ -119,12 +118,14 @@ class Harness {
   );
 }
 
-HotVideoItemModel hot(String title) => HotVideoItemModel.fromJson({
-  // bvid 按 title 派生：判定缓存身份取 localKey，恒同 bvid 会把不同
-  // 标题的假视频并成同组并跨用例命中（#123）。
-  'aid': 1,
+HotVideoItemModel hot(
+  String title, {
+  int aid = 1,
+  String bvid = 'BV1',
+}) => HotVideoItemModel.fromJson({
+  'aid': aid,
   'cid': 101,
-  'bvid': 'BV$title',
+  'bvid': bvid,
   'videos': 1,
   'tid': 17,
   'tname': '游戏',
@@ -157,6 +158,7 @@ void main() {
   setUp(() {
     JevSettingsStore.resetCache();
     JevPreferenceStore.resetCache();
+    JevVerdictCache.resetCache();
   });
 
   tearDown(() {
@@ -260,7 +262,13 @@ void main() {
         evaluator: Harness(surfaces: {JevSurface.hot}).evaluator(capture),
       );
 
-      final result = await screen.screen([hot('a'), hot('b'), hot('c')]);
+      // 判定缓存按卡片身份分组(issue #123, bvid 优先):三个条目必须携带
+      // 不同 bvid,否则会被当作同一视频的别名而只评估一个位置。
+      final result = await screen.screen([
+        hot('a'),
+        hot('b', bvid: 'BV2'),
+        hot('c', bvid: 'BV3'),
+      ]);
       await pumpEventQueue();
 
       expect(result.map((e) => e.title), ['a', 'c']);
@@ -272,55 +280,62 @@ void main() {
       expect(entries.single.snippet, '游戏');
     });
 
-    test('评论面:hidden 条目进入日志(kind=comment,snippet=父评论)', () async {
+    // 评论面日志走 JevCommentScreening(issue #122:评论过滤合并到判断规则,
+    // JevFinalScreen 不再有评论工厂)。
+    test('评论面:hidden 条目进入日志(kind=comment,ruleId,snippet=父评论)', () async {
       final box = MemoryBox();
       JevScreenLog.instance = JevScreenLog(box: box);
-      // 评论目标没有内置判断,必须存在启用的自定义规则才发请求。
-      final harness = Harness(surfaces: {JevSurface.comment});
-      harness.settingsBox.values[JevRuleStore.key] = jsonEncode({
-        'version': 1,
-        'rules': [
-          {
-            'id': 'r1',
-            'target': 'comment',
-            'question': '这条评论是否在灌水?',
-            'type': 'noul',
-            'enabled': true,
-            'threshold': 0.95,
-            'hideOnYes': true,
-            'yesMeaning': '',
-            'noMeaning': '',
-            'options': [],
-            'hiddenOptions': [],
-          },
-        ],
-        'disabledBuiltins': [],
-      });
-      // 自定义规则路径要求答案显式携带 type: noul(jev_rules.dart hides 与
-      // _context 校验都拒绝无类型答案)。
-      final capture = CapturingTransport(
-        reply: (index) => {
-          'answers': {
-            'candidate_1_rule_1_context': {'type': 'noul', 'noul': 0.98},
-            'candidate_1_rule_1': {'type': 'noul', 'noul': 0.99},
-          },
-        },
+      final settingsBox = MemoryBox();
+      final store = JevSettingsStore(box: settingsBox);
+      await store.save(
+        const JevSettings(
+          enabled: true,
+          provider: JevProvider.typeSafe,
+          providerConfirmed: true,
+          surfaces: {JevSurface.comment},
+        ),
       );
-      final screen = JevFinalScreen.comment(
-        parentBody: '父评论正文',
-        evaluator: harness.evaluator(capture),
+      final rulesStore = JevRuleStore(box: settingsBox);
+      await rulesStore.save(
+        const JevRuleConfig(
+          rules: [
+            JevRule(
+              id: 'r1',
+              target: JevRuleTarget.comment,
+              question: '这条评论是否在灌水?',
+            ),
+          ],
+        ),
+      );
+      final screening = JevCommentScreening(
+        transport:
+            ({required provider, required apiKey, required body}) async => {
+              'answers': {
+                'candidate_1_rule_1_context': {
+                  'type': 'noul',
+                  'noul': 0.98,
+                },
+                'candidate_1_rule_1': {'type': 'noul', 'noul': 0.99},
+              },
+            },
+        settings: store,
+        rules: rulesStore,
+        credentials: FakeCredentials(),
       );
 
-      final result = await screen.screen([reply('被屏蔽的评论'), reply('正常评论')]);
-      await pumpEventQueue();
+      final result = await screening.filter(
+        [reply('被屏蔽的评论'), reply('正常评论')],
+        parents: const ['父评论正文', null],
+      );
 
-      expect(result.map((e) => e.content.message), ['正常评论']);
+      expect(result.replies.map((e) => e.content.message), ['正常评论']);
       final entries = JevScreenLog(box: box).load();
       expect(entries, hasLength(1));
       expect(entries.single.kind, JevScreenLogKind.comment);
       expect(entries.single.surface, JevSurface.comment.id);
       expect(entries.single.title, '被屏蔽的评论');
       expect(entries.single.snippet, '父评论正文');
+      expect(entries.single.ruleId, 'r1');
     });
 
     test('fail-open:transport 失败时不写日志', () async {

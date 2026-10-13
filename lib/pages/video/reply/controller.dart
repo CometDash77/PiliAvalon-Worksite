@@ -1,4 +1,3 @@
-import 'package:PiliPlus/features/jev/jev_final_screen.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show MainListReply, ReplyInfo, CursorReply, SubjectControl;
 import 'package:PiliPlus/grpc/reply.dart';
@@ -44,18 +43,6 @@ class VideoReplyController extends ReplyController<MainListReply>
   @override
   List<ReplyInfo>? getDataList(MainListReply response) {
     return response.replies;
-  }
-
-  @override
-  Future<void> handleListResponse(List<ReplyInfo> dataList) async {
-    super.handleListResponse(dataList);
-    final visible = await JevFinalScreen.comments(dataList);
-    if (isClosed) return;
-    if (!identical(visible, dataList)) {
-      dataList
-        ..clear()
-        ..addAll(visible);
-    }
   }
 
   // The API cursor is authoritative; filtered visible length is not a count.

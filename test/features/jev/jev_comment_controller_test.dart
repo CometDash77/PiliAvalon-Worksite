@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/features/jev/jev_comment_screening.dart';
+import 'package:PiliPlus/features/jev/jev_rules.dart';
 
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart';
@@ -23,6 +24,12 @@ ReplyInfo _reply(
   id: Int64(id),
   content: Content(message: message),
   replies: children,
+);
+
+JevRule _commentRule() => JevRule(
+  id: 'r1',
+  target: JevRuleTarget.comment,
+  question: '这条评论是否在灌水?',
 );
 
 Future<List<ReplyInfo>> _hideAdvertising(List<ReplyInfo> replies) async {
@@ -51,8 +58,10 @@ class _MainController extends ReplyController<MainListReply> {
   CommentShieldingConfig get commentShieldingConfig =>
       const CommentShieldingConfig(minCharCount: 2);
   @override
-  Future<List<ReplyInfo>> screenComments(List<ReplyInfo> replies) =>
-      screen?.call(replies) ?? super.screenComments(replies);
+  Future<List<ReplyInfo>> screenComments(
+    List<ReplyInfo> replies, {
+    Map<ReplyInfo, String>? parentBodies,
+  }) => screen?.call(replies) ?? super.screenComments(replies, parentBodies: parentBodies);
   @override
   List<ReplyInfo> getDataList(MainListReply response) => response.replies;
   @override
@@ -93,8 +102,10 @@ class _DetailController extends VideoReplyReplyController {
   CommentShieldingConfig get commentShieldingConfig =>
       const CommentShieldingConfig();
   @override
-  Future<List<ReplyInfo>> screenComments(List<ReplyInfo> replies) =>
-      screen?.call(replies) ?? super.screenComments(replies);
+  Future<List<ReplyInfo>> screenComments(
+    List<ReplyInfo> replies, {
+    Map<ReplyInfo, String>? parentBodies,
+  }) => screen?.call(replies) ?? super.screenComments(replies, parentBodies: parentBodies);
   @override
   Future<LoadingState> customGetData() async => Success(response);
 }
@@ -112,12 +123,19 @@ MainListReply _page(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  setUp(() {
+    // 判定缓存是进程级静态存储；各测试用同一 fixture rpid，逐用例清空防串扰。
+    JevVerdictCache.resetCache();
+  });
+
   test('real queryData -> screening -> Jev transport hides roots and nested replies', () async {
-    final store = JevSettingsStore(box: MemoryBox());
+    final box = MemoryBox();
+    final store = JevSettingsStore(box: box);
+    await JevRuleStore(box: box).save(JevRuleConfig(rules: [_commentRule()]));
     await store.save(
       const JevSettings(
         enabled: true,
-        commentEnabled: true,
+        surfaces: {JevSurface.comment},
         provider: JevProvider.openRouter,
         providerConfirmed: true,
       ),
@@ -136,13 +154,18 @@ void main() {
         await gate.future;
         return {
           'answers': {
-            for (final entry in candidates.entries)
-              entry.key: {
+            for (final entry in candidates.entries) ...{
+              entry.key + '_rule_1_context': const {
+                'type': 'noul',
+                'noul': 0.98,
+              },
+              entry.key + '_rule_1': {
                 'type': 'noul',
                 'noul': (entry.value as Map)['text'] == 'advertising'
                     ? .95
                     : .01,
               },
+            },
           },
         };
       },
@@ -178,11 +201,13 @@ void main() {
   test(
     'real transport failure retains comments and completes publication',
     () async {
-      final store = JevSettingsStore(box: MemoryBox());
+      final box = MemoryBox();
+    final store = JevSettingsStore(box: box);
+    await JevRuleStore(box: box).save(JevRuleConfig(rules: [_commentRule()]));
       await store.save(
         const JevSettings(
           enabled: true,
-          commentEnabled: true,
+          surfaces: {JevSurface.comment},
           provider: JevProvider.openRouter,
           providerConfirmed: true,
         ),
@@ -350,11 +375,13 @@ void main() {
   test(
     'real detail chain screens root despite an empty child source',
     () async {
-      final store = JevSettingsStore(box: MemoryBox());
+      final box = MemoryBox();
+    final store = JevSettingsStore(box: box);
+    await JevRuleStore(box: box).save(JevRuleConfig(rules: [_commentRule()]));
       await store.save(
         const JevSettings(
           enabled: true,
-          commentEnabled: true,
+          surfaces: {JevSurface.comment},
           provider: JevProvider.openRouter,
           providerConfirmed: true,
         ),
@@ -375,7 +402,11 @@ void main() {
                 );
                 return {
                   'answers': {
-                    'candidate_1': {'type': 'noul', 'noul': .95},
+                    'candidate_1_rule_1_context': const {
+                      'type': 'noul',
+                      'noul': 0.98,
+                    },
+                    'candidate_1_rule_1': const {'type': 'noul', 'noul': 0.95},
                   },
                 };
               },

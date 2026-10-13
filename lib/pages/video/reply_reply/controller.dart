@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:PiliPlus/features/jev/jev_final_screen.dart';
 import 'package:PiliPlus/features/jev/jev_evaluator.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo, DetailListReply, Mode;
@@ -110,26 +109,35 @@ class VideoReplyReplyController extends ReplyController
   @override
   Future<void> prepareListResponse(List<ReplyInfo> dataList) async {
     if (!_hasPendingFirstFloor) {
-      return super.prepareListResponse(dataList);
+      // Video-detail pages defer the target jump until after comment
+      // screening so it lands on the screened visible index; other pages
+      // keep the synchronous pre-shielding jump in handleListResponse.
+      final targetId = isVideoDetail ? id : null;
+      if (isVideoDetail) {
+        id = null;
+      }
+      await super.prepareListResponse(dataList);
+      if (isClosed) return;
+      if (targetId != null) {
+        setIndexById(Int64(targetId), dataList);
+      }
+      return;
     }
     final root = _screenedFirstFloor!;
-    // handleListResponse already runs the Jev final screen for video-detail
-    // children; the jump is deferred until after comment screening so it
-    // lands on the final visible index.
+    // Children were detached from the root for first-floor screening; hand
+    // the merged comment pipeline their parent context explicitly. The
+    // target-jump is deferred until after comment screening so it lands on
+    // the final visible index.
     final targetId = id;
     id = null;
     await handleListResponse(dataList);
-    var rootCandidates = applyShielding([root]);
-    if (isVideoDetail) {
-      rootCandidates = await JevFinalScreen.comment(
-        evaluator: jevEvaluator,
-      ).screen(rootCandidates);
-      if (isClosed) return;
-    }
-    final visible = await screenComments([
-      ...rootCandidates,
-      ...dataList,
-    ]);
+    final visible = await screenComments(
+      [...applyShielding([root]), ...dataList],
+      parentBodies: {
+        for (final child in dataList) child: parentBody ?? root.content.message,
+      },
+    );
+    if (isClosed) return;
     _screenedFirstFloor = visible.any((r) => identical(r, root)) ? root : null;
     dataList
       ..clear()
@@ -151,31 +159,17 @@ class VideoReplyReplyController extends ReplyController
 
   @override
   Future<void> handleListResponse(List<ReplyInfo> dataList) async {
-    // Non-video pages jump synchronously on the raw list: target lookup must
-    // run before shielding. Video-detail pages jump only after Jev screening
-    // completes, landing on the screened visible index.
+    // Baseline contract: target lookup jumps on the raw list index here,
+    // before any filtering. Video-detail pages instead defer the jump until
+    // after comment screening (prepareListResponse captures id first, so
+    // this jump is suppressed there and the screened-index jump supersedes
+    // it); other pages and direct callers keep the synchronous raw jump.
     final targetId = id;
     id = null;
-    if (!isVideoDetail && targetId != null) {
+    if (targetId != null) {
       setIndexById(Int64(targetId), dataList);
     }
     await super.handleListResponse(dataList);
-    if (isVideoDetail) {
-      final visible = await JevFinalScreen.comments(
-        dataList,
-        parentBody: parentBody ?? _screenedFirstFloor?.content.message,
-        evaluator: jevEvaluator,
-      );
-      if (isClosed) return;
-      if (!identical(visible, dataList)) {
-        dataList
-          ..clear()
-          ..addAll(visible);
-      }
-      if (targetId != null) {
-        setIndexById(Int64(targetId), dataList);
-      }
-    }
   }
 
   ReplyInfo? applyFirstFloorShielding(ReplyInfo reply) {
