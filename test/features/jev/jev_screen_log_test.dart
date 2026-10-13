@@ -176,6 +176,7 @@ void main() {
   setUp(() {
     JevSettingsStore.resetCache();
     JevPreferenceStore.resetCache();
+    JevVerdictCache.resetCache();
   });
 
   tearDown(() {
