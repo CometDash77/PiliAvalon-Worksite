@@ -9,6 +9,7 @@ import 'package:PiliPlus/features/jev/jev_evaluator.dart';
 import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/jev/jev_screen_log.dart';
 import 'package:PiliPlus/features/jev/jev_settings.dart';
+import 'package:PiliPlus/features/jev/jev_verdict_cache.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo;
 
@@ -33,6 +34,12 @@ class JevCommentResult {
 /// least one active comment rule. Fail-open everywhere: a missing key, an
 /// unconfirmed provider, a timeout, a provider error, a malformed payload, or
 /// a mid-flight policy change keeps every affected candidate visible.
+///
+/// Issue #124: certain verdicts are memoized in the shared
+/// [JevVerdictCache] ('comment' face) keyed by the comment's stable
+/// oid+rpid, so re-entering or refreshing a comment list re-serves the same
+/// verdicts without re-billing upstream. Uncertain verdicts are never cached
+/// and the gate-facing [JevCommentResult.cacheable] contract is unchanged.
 class JevCommentScreening {
   JevCommentScreening({
     JevTransport? transport,
@@ -40,15 +47,23 @@ class JevCommentScreening {
     JevSettingsStore? settings,
     JevRuleStore? rules,
     this.passTimeout = JevLimits.requestTimeout,
+    JevVerdictCache? verdictCache,
   }) : _transport = transport ?? JevHttpTransport().call,
        _credentials = credentials ?? SecureJevCredentialStore(),
        _settings = settings ?? JevSettingsStore(),
-       _rules = rules ?? JevRuleStore(box: settings?.box);
+       _rules = rules ?? JevRuleStore(box: settings?.box),
+       _verdictCache =
+           verdictCache ?? JevVerdictCache(box: settings?.box, face: 'comment');
 
   final JevTransport _transport;
   final JevCredentialStore _credentials;
   final JevSettingsStore _settings;
   final JevRuleStore _rules;
+
+  /// Verdict cache shell for the comment face; the store itself is static,
+  /// so throw-away instances (one per ReplyController access) still share
+  /// entries process-wide.
+  final JevVerdictCache _verdictCache;
 
   /// Upper bound of the whole pass; single calls never exceed it.
   final Duration passTimeout;
@@ -58,6 +73,10 @@ class JevCommentScreening {
 
   /// Parent-context snippet bound, mirroring JevEvaluator._boundedContext.
   static const int maxSnippetChars = 800;
+
+  /// Prefix of the comment-face cache generation: the rest is the policy
+  /// fingerprint (issue #124 Q2 - comment rule config only).
+  static const String _generationPrefix = 'jev-comment-verdict.v1|';
 
   /// Runs the one-time retired-key migration, then loads settings and the
   /// active comment rules together — the shared preamble of the three
@@ -110,6 +129,15 @@ class JevCommentScreening {
     var cacheable = true;
     var expired = false;
     var initialPolicy = '';
+    // Issue #124 verdict-cache bookkeeping. The store inside JevVerdictCache
+    // is static, so these serve the process-wide comment face.
+    final identities = List<String?>.filled(replies.length, null);
+    final servedFromCache = List<bool>.filled(replies.length, false);
+    final certain = List<bool>.filled(replies.length, true);
+    var cacheEnabled = false;
+    var generation = '';
+    final owned = <String, Completer<bool?>>{};
+    final waiters = <Future<void>>[];
     try {
       final (settings, activeRules) = await _loadActive();
       initialPolicy = _fingerprint(settings, activeRules);
@@ -117,6 +145,54 @@ class JevCommentScreening {
           activeRules.isEmpty ||
           replies.isEmpty) {
         return JevCommentResult(replies: replies, cacheable: cacheable);
+      }
+      // Cache setup mirrors the video-face evaluator: a storage failure only
+      // disables caching, never screening.
+      try {
+        cacheEnabled = _verdictCache.enabled;
+      } catch (_) {
+        cacheEnabled = false;
+      }
+      if (cacheEnabled) {
+        // initialPolicy is the same fingerprint, so reuse it verbatim.
+        generation = _generationPrefix + initialPolicy;
+      }
+      // repeat_count keeps duplicated texts from being billed as new
+      // candidates.
+      final repeats = <String, int>{};
+      for (final reply in replies) {
+        final text = reply.content.message.trim();
+        if (text.isEmpty) continue;
+        repeats[text] = (repeats[text] ?? 0) + 1;
+      }
+      // Blank bodies are never sent; oversized ones are not sent either but
+      // still poison the decision cache because their verdict stays unknown.
+      // Identifiable replies consult the verdict cache first (Q1: stable
+      // oid+rpid keys) — a hit is applied locally and never re-billed.
+      final sent = <int>[];
+      final claimed = <String>{};
+      for (var i = 0; i < replies.length; i++) {
+        final text = replies[i].content.message.trim();
+        if (text.isEmpty) continue;
+        if (text.runes.length > maxTextChars) {
+          cacheable = false;
+          continue;
+        }
+        if (cacheEnabled) {
+          final identity = _cacheIdentity(replies[i]);
+          // The same rpid twice in one pass keeps today's send behavior:
+          // only its first occurrence consults or feeds the cache.
+          if (identity != null && claimed.add(identity)) {
+            identities[i] = identity;
+            final hit = _verdictCache.lookup(generation, identity);
+            if (hit != null) {
+              servedFromCache[i] = true;
+              hidden[i] = hit;
+              continue;
+            }
+          }
+        }
+        sent.add(i);
       }
       // The confirmation latch is part of the routing rule (issue #38).
       final provider = settings.provider;
@@ -132,25 +208,35 @@ class JevCommentScreening {
       if (apiKey == null || apiKey.isEmpty) {
         return JevCommentResult(replies: replies, cacheable: false);
       }
-      // repeat_count keeps duplicated texts from being billed as new
-      // candidates.
-      final repeats = <String, int>{};
-      for (final reply in replies) {
-        final text = reply.content.message.trim();
-        if (text.isEmpty) continue;
-        repeats[text] = (repeats[text] ?? 0) + 1;
-      }
-      // Blank bodies are never sent; oversized ones are not sent either but
-      // still poison the decision cache because their verdict stays unknown.
-      final sent = <int>[];
+      // Single-flight registration happens before the first send await:
+      // concurrent passes for the same comment share one upstream request
+      // instead of double-billing it.
       for (var i = 0; i < replies.length; i++) {
-        final text = replies[i].content.message.trim();
-        if (text.isEmpty) continue;
-        if (text.runes.length > maxTextChars) {
-          cacheable = false;
-          continue;
+        if (servedFromCache[i]) continue;
+        final identity = identities[i];
+        if (identity == null) continue;
+        final completer = Completer<bool?>();
+        if (_verdictCache.registerInFlight(generation, identity, completer)) {
+          owned[identity] = completer;
+        } else {
+          // A concurrent pass owns this verdict: wait for it instead of
+          // re-billing the same comment upstream.
+          sent.remove(i);
+          final external = _verdictCache.inFlightFuture(generation, identity);
+          if (external != null) {
+            waiters.add(
+              external.then((verdict) {
+                if (verdict == null) {
+                  // The owning pass failed: no verdict for this slot, so
+                  // fail open and stay uncachable.
+                  cacheable = false;
+                } else {
+                  hidden[i] = verdict;
+                }
+              }),
+            );
+          }
         }
-        sent.add(i);
       }
       for (
         var start = 0;
@@ -197,11 +283,17 @@ class JevCommentScreening {
           ).timeout(budget - watch.elapsed);
           if (data is! Map || data['answers'] is! Map) {
             cacheable = false;
+            for (final index in batch) {
+              certain[index] = false;
+            }
             continue;
           }
           final rawAnswers = data['answers'] as Map;
           if (rawAnswers.isEmpty) {
             cacheable = false;
+            for (final index in batch) {
+              certain[index] = false;
+            }
             continue;
           }
           for (var b = 0; b < batch.length; b++) {
@@ -220,12 +312,14 @@ class JevCommentScreening {
                   p < JevLimits.minSufficientContext ||
                   p > 1) {
                 cacheable = false;
+                certain[index] = false;
                 continue;
               }
               final rule = activeRules[r];
               final ruleAnswer = rawAnswers[_ruleKey(b, r)];
               if (!_isWellFormedAnswer(ruleAnswer, rule)) {
                 cacheable = false;
+                certain[index] = false;
                 continue;
               }
               if (rule.hides(ruleAnswer)) {
@@ -239,18 +333,55 @@ class JevCommentScreening {
                 final band = 1 - rule.threshold;
                 if (value > band && value < rule.threshold) {
                   cacheable = false;
+                  certain[index] = false;
                 }
+              }
+            }
+            // This reply's verdict is final: a certain one lands in the
+            // verdict cache and releases single-flight waiters; an uncertain
+            // one releases them with null so their next pass resends.
+            final identity = identities[index];
+            if (cacheEnabled && identity != null) {
+              final completer = owned[identity];
+              if (certain[index]) {
+                _verdictCache.put(generation, identity, hide: hidden[index]);
+                if (completer != null && !completer.isCompleted) {
+                  completer.complete(hidden[index]);
+                }
+              } else if (completer != null && !completer.isCompleted) {
+                completer.complete(null);
               }
             }
           }
         } catch (_) {
           // Fail-open: this whole batch stays visible (issue #36).
           cacheable = false;
+          for (final index in batch) {
+            certain[index] = false;
+          }
         }
       }
     } catch (_) {
       expired = true;
       cacheable = false;
+    }
+    // Release single-flight registrations and drain external waiters before
+    // anything below may return: the policy recheck can still discard the
+    // local hidden flags, but the owned completers must resolve regardless.
+    for (final entry in owned.entries) {
+      if (!entry.value.isCompleted) {
+        entry.value.complete(null);
+      }
+      if (cacheEnabled) {
+        _verdictCache.releaseInFlight(generation, entry.key);
+      }
+    }
+    if (waiters.isNotEmpty) {
+      try {
+        await Future.wait(waiters);
+      } catch (_) {
+        // A failed waiter fails open: its slot keeps the default keep.
+      }
     }
     if (!expired) {
       final remaining = budget - watch.elapsed;
@@ -302,6 +433,14 @@ class JevCommentScreening {
       }
     }
     return JevCommentResult(replies: visible, cacheable: cacheable);
+  }
+
+  /// Issue #124 Q1: cache identity is the comment's region id + comment id
+  /// (oid+rpid), immutable per comment. Replies without an rpid (not yet
+  /// persisted) have no stable identity and stay uncacheable.
+  static String? _cacheIdentity(ReplyInfo reply) {
+    if (reply.id.toInt() <= 0) return null;
+    return 'c:${reply.oid}:${reply.id}';
   }
 
   String _fingerprint(JevSettings settings, List<JevRule> rules) => jsonEncode([
