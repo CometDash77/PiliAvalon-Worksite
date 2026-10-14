@@ -69,8 +69,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   late final JevModelCatalog _catalog = widget.catalog ?? JevModelCatalog();
 
   // Issue #131: generic-line provider dependencies and draft state.
-  late final LlmSettingsStore _llmStore =
-      widget.llmStore ?? LlmSettingsStore();
+  late final LlmSettingsStore _llmStore = widget.llmStore ?? LlmSettingsStore();
   late final LlmCredentialStore _llmCredentials =
       widget.llmCredentials ?? SecureLlmCredentialStore();
   late final LlmModelCatalog _llmCatalog =
@@ -433,7 +432,9 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
           custom.ListTile(
             leading: const Icon(Icons.rule_outlined),
             title: const Text('判断规则'),
-            subtitle: const Text('分别管理视频、评论、直播间的问题、隐藏答案和执行阈值；评论过滤只使用这里的评论规则（issue #122）'),
+            subtitle: const Text(
+              '分别管理视频、评论、直播间的问题、隐藏答案和执行阈值；评论过滤只使用这里的评论规则（issue #122）',
+            ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push<void>(
               MaterialPageRoute(
@@ -450,7 +451,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
             onTap: () => Navigator.of(context).push<void>(
               MaterialPageRoute(
                 builder: (_) =>
-                    LlmVideoRulesPage(store: LlmVideoRuleStore(box: _store.box)),
+                    LlmVideoRulesPage(store: JevRuleStore(box: _store.box)),
               ),
             ),
           ),
@@ -507,11 +508,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         dense: true,
         secondary: const Icon(Icons.filter_alt_outlined),
         title: Text(surface.label),
-        subtitle: surface.screeningWired
-            ? null
-            : const Text('尚未接线：本版本打开也不会生效'),
-        value:
-            surface.screeningWired && _settings.surfaces.contains(surface),
+        subtitle: surface.screeningWired ? null : const Text('尚未接线：本版本打开也不会生效'),
+        value: surface.screeningWired && _settings.surfaces.contains(surface),
         onChanged: _settings.enabled && surface.screeningWired
             ? (value) =>
                   _saveSettings(_settings.withSurface(surface, value: value))
@@ -531,9 +529,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       key: const ValueKey('jev-verdict-cache-enabled'),
       secondary: const Icon(Icons.cached_outlined),
       title: const Text('缓存判定结果'),
-      subtitle: const Text(
-        '同一视频在有效期内复用上次的判定，不再重复请求上游；规则、模型或偏好档变化时整批作废',
-      ),
+      subtitle: const Text('同一视频在有效期内复用上次的判定，不再重复请求上游；规则、模型或偏好档变化时整批作废'),
       // 总开关关闭时 Jev 整体失效，缓存开关随其余开关一起显示为关。
       value: _settings.enabled && _cacheEnabled,
       // 与其余开关一致：总开关关闭时缓存开关不可用（页面既有契约，测试
@@ -597,10 +593,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       // Toggle path: only persist the switch; the text fields may still be
       // empty mid-edit and must not block the toggle.
       try {
-        await _store.box.put(
-          SettingBoxKey.jevVerdictCacheEnabled,
-          nextEnabled,
-        );
+        await _store.box.put(SettingBoxKey.jevVerdictCacheEnabled, nextEnabled);
       } catch (error) {
         _toast('缓存设置保存失败：$error');
         return;
@@ -633,10 +626,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     try {
       await _store.box.put(SettingBoxKey.jevVerdictCacheEnabled, nextEnabled);
       await _store.box.put(SettingBoxKey.jevVerdictCacheTtlMinutes, clampedTtl);
-      await _store.box.put(
-        SettingBoxKey.jevVerdictCacheMaxEntries,
-        clampedMax,
-      );
+      await _store.box.put(SettingBoxKey.jevVerdictCacheMaxEntries, clampedMax);
     } catch (error) {
       _toast('缓存设置保存失败：$error');
       return;
@@ -680,10 +670,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     if (_selection.isBlockedByMismatch)
       custom.ListTile(
         leading: Icon(Icons.warning_amber_outlined, color: errorColor),
-        title: Text(
-          '格式提示与已选提供方不一致',
-          style: TextStyle(color: errorColor),
-        ),
+        title: Text('格式提示与已选提供方不一致', style: TextStyle(color: errorColor)),
         subtitle: const Text('格式识别不决定提供方。确认后才会按已选提供方验证，绝不会把该 Key 发给另一个提供方。'),
         trailing: TextButton(
           onPressed: _acknowledgeMismatch,
@@ -711,10 +698,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Wrap(
           children: [
-            TextButton(
-              onPressed: _saveModel,
-              child: const Text('保存模型'),
-            ),
+            TextButton(onPressed: _saveModel, child: const Text('保存模型')),
             TextButton(
               onPressed: () => _saveModel(restoreDefault: true),
               child: const Text('恢复默认'),
@@ -757,10 +741,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     if (_keyStoreStatus == JevKeyStoreStatus.unavailable)
       custom.ListTile(
         leading: Icon(Icons.lock_outline, color: errorColor),
-        title: Text(
-          '系统安全存储不可用，Jev 保持关闭',
-          style: TextStyle(color: errorColor),
-        ),
+        title: Text('系统安全存储不可用，Jev 保持关闭', style: TextStyle(color: errorColor)),
         subtitle: const Text('无法安全保存密钥时不会使用任何凭据，也不会退回明文存储。'),
       ),
     Padding(
@@ -906,10 +887,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       ),
     Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: TextButton(
-        onPressed: _saveLlmBaseUrl,
-        child: const Text('保存地址'),
-      ),
+      child: TextButton(onPressed: _saveLlmBaseUrl, child: const Text('保存地址')),
     ),
     Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -1017,9 +995,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         _llmConfig.confirmed ? Icons.verified_outlined : Icons.info_outline,
       ),
       title: Text(
-        _llmConfig.confirmed
-            ? '通用线已生效：配置已通过测试连接确认'
-            : '通用线未生效：配置需通过「测试连接」确认',
+        _llmConfig.confirmed ? '通用线已生效：配置已通过测试连接确认' : '通用线未生效：配置需通过「测试连接」确认',
       ),
       subtitle: const Text('保存配置只落盘，不等于可用；测试通过才把确认锁存进设置'),
     ),
@@ -1292,16 +1268,11 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         ),
       const Padding(
         padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
-        child: Text(
-          '最多保留 20 个主题：满额时先淘汰最近反馈最早的一个，6 个月没有新反馈的主题自动删除。',
-        ),
+        child: Text('最多保留 20 个主题：满额时先淘汰最近反馈最早的一个，6 个月没有新反馈的主题自动删除。'),
       ),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: TextButton(
-          onPressed: _clearProfile,
-          child: const Text('清空偏好档'),
-        ),
+        child: TextButton(onPressed: _clearProfile, child: const Text('清空偏好档')),
       ),
     ],
   ];
@@ -1330,11 +1301,15 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     subtitle: Text('只发送最小候选内容、启用规则与所需负反馈摘要；评论过滤发送正文与规则上下文'),
     childrenPadding: EdgeInsets.fromLTRB(16, 0, 16, 12),
     children: [
-      Text('发送：启用规则中的问题、答案含义与选项；视频标题及已有短简介/标签，评论正文及必要回复上下文，直播推荐卡标题/分区。启用内置规则时发送最多 20 个未过期负主题及大致次数。'),
+      Text(
+        '发送：启用规则中的问题、答案含义与选项；视频标题及已有短简介/标签，评论正文及必要回复上下文，直播推荐卡标题/分区。启用内置规则时发送最多 20 个未过期负主题及大致次数。',
+      ),
       SizedBox(height: 8),
       Text('不发送：完整浏览/观看历史、账号标识、cookie、原始点踩记录、UP 主、视频 ID、链接、长篇元数据。'),
       SizedBox(height: 8),
-      Text('不额外抓取：视频字幕、作者历史、直播房间消息。评论规则在视频详情评论列表、楼中楼/对话页与首页评论门控生效。规则保存在本机，编辑保存不会发起模型请求。'),
+      Text(
+        '不额外抓取：视频字幕、作者历史、直播房间消息。评论规则在视频详情评论列表、楼中楼/对话页与首页评论门控生效。规则保存在本机，编辑保存不会发起模型请求。',
+      ),
       SizedBox(height: 8),
       Text('低置信、超时、限流、缺答、密钥缺失或无效、provider 报错、安全存储不可用时，候选一律保持可见。'),
     ],

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:PiliPlus/features/jev/jev_credential_store.dart'
     show JevKeyStoreStatus;
+import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/jev/jev_settings.dart' show JevSettingsBox;
 import 'package:PiliPlus/features/llm/llm.dart';
 
@@ -88,9 +89,10 @@ Future<_FakeBox> _confirmedBox() async {
 
 Future<_FakeBox> _readyBox() async {
   final box = await _confirmedBox();
-  await LlmVideoRuleStore(box: box).save(
-    const LlmVideoRuleConfig(
-      rules: [LlmVideoRule(id: 'v1', text: '剧透内容')],
+  // 统一 blob：视频规则写入 videoTextRules 字段（#141）。
+  await JevRuleStore(box: box).save(
+    const JevRuleConfig(
+      videoTextRules: [LlmVideoRule(id: 'v1', text: '剧透内容')],
     ),
   );
   return box;
@@ -107,7 +109,7 @@ LlmVideoScreening _screening(_FakeBox box, _Stub stub, [_FakeCredentials? c]) {
     ),
     settings: LlmSettingsStore(box: box),
     credentials: credentials,
-    rules: LlmVideoRuleStore(box: box),
+    rules: JevRuleStore(box: box),
     cache: LlmVerdictCache(box: box),
   );
 }
@@ -212,9 +214,10 @@ void main() {
         ]),
       ),
     );
-    final outcome = await _screening(box, stub).screen([
-      const LlmVideoCandidate(title: '   ', identity: 'BV1'),
-    ]);
+    final outcome = await _screening(
+      box,
+      stub,
+    ).screen([const LlmVideoCandidate(title: '   ', identity: 'BV1')]);
     expect(outcome.hidden, [false]);
     expect(stub.calls, isEmpty);
     expect(LlmVerdictCache.cachedEntryCount, 0);
@@ -223,9 +226,10 @@ void main() {
   test('no active video rules: nothing is sent, hidden unchanged', () async {
     final box = await _confirmedBox();
     final stub = _Stub((_, _, _) async => _openaiOk(_llmJson([])));
-    final outcome = await _screening(box, stub).screen([
-      const LlmVideoCandidate(title: '第一话', identity: 'BV1'),
-    ]);
+    final outcome = await _screening(
+      box,
+      stub,
+    ).screen([const LlmVideoCandidate(title: '第一话', identity: 'BV1')]);
     expect(outcome.hidden, [false]);
     expect(stub.calls, isEmpty);
   });
@@ -233,9 +237,10 @@ void main() {
   test('an upstream failure fails open and caches nothing', () async {
     final box = await _readyBox();
     final stub = _Stub((_, _, _) async => throw StateError('offline'));
-    final outcome = await _screening(box, stub).screen([
-      const LlmVideoCandidate(title: '第一话', identity: 'BV1'),
-    ]);
+    final outcome = await _screening(
+      box,
+      stub,
+    ).screen([const LlmVideoCandidate(title: '第一话', identity: 'BV1')]);
     expect(outcome.hidden, [false]);
     expect(outcome.failure, 'upstream');
     expect(LlmVerdictCache.cachedEntryCount, 0);
@@ -244,9 +249,10 @@ void main() {
   test('unparseable output is not cached', () async {
     final box = await _readyBox();
     final stub = _Stub((_, _, _) async => _openaiOk('这不是 JSON'));
-    final outcome = await _screening(box, stub).screen([
-      const LlmVideoCandidate(title: '第一话', identity: 'BV1'),
-    ]);
+    final outcome = await _screening(
+      box,
+      stub,
+    ).screen([const LlmVideoCandidate(title: '第一话', identity: 'BV1')]);
     expect(outcome.hidden, [false]);
     expect(outcome.failure, 'parse');
     expect(LlmVerdictCache.cachedEntryCount, 0);
@@ -255,10 +261,9 @@ void main() {
   test('a zero budget returns all false without upstream', () async {
     final box = await _readyBox();
     final stub = _Stub((_, _, _) async => _openaiOk(_llmJson([])));
-    final outcome = await _screening(box, stub).screen(
-      [const LlmVideoCandidate(title: '第一话', identity: 'BV1')],
-      timeout: Duration.zero,
-    );
+    final outcome = await _screening(box, stub).screen([
+      const LlmVideoCandidate(title: '第一话', identity: 'BV1'),
+    ], timeout: Duration.zero);
     expect(outcome.hidden, [false]);
     expect(stub.calls, isEmpty);
   });
@@ -275,10 +280,9 @@ void main() {
           ]),
         );
       });
-      final outcome = await _screening(box, stub).screen(
-        [const LlmVideoCandidate(title: '第一话', identity: 'BV1')],
-        timeout: const Duration(milliseconds: 50),
-      );
+      final outcome = await _screening(box, stub).screen([
+        const LlmVideoCandidate(title: '第一话', identity: 'BV1'),
+      ], timeout: const Duration(milliseconds: 50));
       expect(outcome.hidden, [false]);
       expect(outcome.failure, 'timeout');
       expect(LlmVerdictCache.cachedEntryCount, 0);
@@ -302,9 +306,10 @@ void main() {
         ]),
       );
     });
-    final outcome = await _screening(box, stub).screen([
-      const LlmVideoCandidate(title: '第一话', identity: 'BV1'),
-    ]);
+    final outcome = await _screening(
+      box,
+      stub,
+    ).screen([const LlmVideoCandidate(title: '第一话', identity: 'BV1')]);
     expect(outcome.hidden, [false]);
     expect(outcome.failure, 'drift');
   });
@@ -344,9 +349,10 @@ void main() {
     final box = await _confirmedBox();
     box.map['piliavalon.llm.v1.video_rules.v1'] = '{corrupt';
     final stub = _Stub((_, _, _) async => _openaiOk(_llmJson([])));
-    final outcome = await _screening(box, stub).screen([
-      const LlmVideoCandidate(title: '第一话', identity: 'BV1'),
-    ]);
+    final outcome = await _screening(
+      box,
+      stub,
+    ).screen([const LlmVideoCandidate(title: '第一话', identity: 'BV1')]);
     expect(outcome.hidden, [false]);
     expect(stub.calls, isEmpty);
   });

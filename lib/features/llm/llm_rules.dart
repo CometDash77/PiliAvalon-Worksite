@@ -1,132 +1,9 @@
-import 'package:flutter/foundation.dart' show immutable;
+export 'package:PiliPlus/features/jev/jev_rules.dart'
+    show LlmVideoRule, LlmVideoRuleConfig, LlmVideoRuleStore;
 
 import 'dart:convert';
 
 import 'package:PiliPlus/features/jev/jev_rules.dart';
-import 'package:PiliPlus/features/jev/jev_settings.dart';
-
-/// A generic-line natural-language hide rule for the video surface.
-///
-/// 命中即屏蔽：unlike Jev typed rules there is no threshold — the model
-/// decides and must return the rule id plus a short reason.
-@immutable
-class LlmVideoRule {
-  const LlmVideoRule({
-    required this.id,
-    required this.text,
-    this.enabled = true,
-  });
-
-  static const maxRulesPerSurface = 20;
-  static const maxTextRunes = 4000;
-
-  final String id;
-  final String text;
-  final bool enabled;
-
-  String? validate() {
-    if (id.trim().isEmpty) return '规则标识不能为空';
-    final runes = text.trim().runes.length;
-    if (runes < 1 || runes > maxTextRunes) {
-      return '规则内容需要 1-$maxTextRunes 个字符';
-    }
-    return null;
-  }
-
-  LlmVideoRule copyWith({String? text, bool? enabled}) => LlmVideoRule(
-    id: id,
-    text: text ?? this.text,
-    enabled: enabled ?? this.enabled,
-  );
-
-  Map<String, Object?> toJson() => {
-    'id': id,
-    'text': text,
-    'enabled': enabled,
-  };
-
-  factory LlmVideoRule.fromJson(Map json) => LlmVideoRule(
-    id: json['id'] as String,
-    text: json['text'] as String,
-    enabled: json['enabled'] == true,
-  );
-}
-
-/// Enabled-and-valid video rules, capped per surface (spec §2).
-@immutable
-class LlmVideoRuleConfig {
-  const LlmVideoRuleConfig({this.rules = const []});
-  final List<LlmVideoRule> rules;
-
-  List<LlmVideoRule> activeFor() => rules
-      .where((r) => r.enabled && r.validate() == null)
-      .take(LlmVideoRule.maxRulesPerSurface)
-      .toList();
-}
-
-/// A single non-secret blob keeps generic-line video rule edits atomic.
-class LlmVideoRuleStore {
-  LlmVideoRuleStore({JevSettingsBox? box}) : _boxOrNull = box;
-
-  // 构造期不触碰 JevSettingsStore/GStorage（#130）：解析推迟到首次读写。
-  final JevSettingsBox? _boxOrNull;
-  JevSettingsBox? _lazyBox;
-  JevSettingsStore? _store;
-  JevSettingsBox get _box =>
-      _lazyBox ??= _boxOrNull ?? (_store ??= JevSettingsStore()).box;
-  static const key = 'piliavalon.llm.v1.video_rules.v1';
-
-  Future<LlmVideoRuleConfig> load() async {
-    final raw = _box.get(key);
-    if (raw == null) return const LlmVideoRuleConfig();
-    try {
-      final json = jsonDecode(raw as String) as Map;
-      if (json['version'] != 1) {
-        throw const FormatException('Unknown rule version');
-      }
-      final rules = <LlmVideoRule>[];
-      final ids = <String>{};
-      for (final entry in json['rules'] as List) {
-        try {
-          final rule = LlmVideoRule.fromJson(entry as Map);
-          if (rule.validate() == null &&
-              ids.add(rule.id) &&
-              rules.length < LlmVideoRule.maxRulesPerSurface) {
-            rules.add(rule);
-          }
-        } catch (_) {
-          /* 无效单条规则不能隐藏内容。 */
-        }
-      }
-      return LlmVideoRuleConfig(rules: List.unmodifiable(rules));
-    } catch (_) {
-      // 损坏配置按空配置处理：宁可漏屏蔽，不可错屏蔽。
-      return const LlmVideoRuleConfig();
-    }
-  }
-
-  Future<void> save(LlmVideoRuleConfig config) async {
-    final ids = <String>{};
-    for (final rule in config.rules) {
-      final error = rule.validate();
-      if (error != null || !ids.add(rule.id)) {
-        throw ArgumentError(error ?? '规则标识重复');
-      }
-    }
-    if (config.rules.length > LlmVideoRule.maxRulesPerSurface) {
-      throw ArgumentError(
-        '视频规则最多 ${LlmVideoRule.maxRulesPerSurface} 条',
-      );
-    }
-    await _box.put(
-      key,
-      jsonEncode({
-        'version': 1,
-        'rules': config.rules.map((r) => r.toJson()).toList(),
-      }),
-    );
-  }
-}
 
 /// FNV-1a over the UTF-8 bytes of the canonical JSON.
 ///
@@ -166,7 +43,6 @@ String videoRuleVersion(List<LlmVideoRule> activeRules) => ruleVersion(
 /// Rendering is deliberately threshold-free: a generic chat model returns a
 /// qualitative hit with a reason, not a calibrated probability, so the typed
 /// threshold has no faithful translation here.
-@immutable
 class LlmCommentRuleView {
   const LlmCommentRuleView({required this.id, required this.criteria});
   final String id;
@@ -174,10 +50,7 @@ class LlmCommentRuleView {
 
   static List<LlmCommentRuleView> of(List<JevRule> activeCommentRules) => [
     for (final rule in activeCommentRules)
-      LlmCommentRuleView(
-        id: rule.id,
-        criteria: _render(rule),
-      ),
+      LlmCommentRuleView(id: rule.id, criteria: _render(rule)),
   ];
 
   static String _render(JevRule rule) {

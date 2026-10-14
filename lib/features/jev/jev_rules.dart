@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show immutable;
+
 import 'package:PiliPlus/features/jev/jev_contract.dart';
 import 'package:PiliPlus/features/jev/jev_settings.dart';
 
@@ -224,15 +226,159 @@ class JevRuleConfig {
   const JevRuleConfig({
     this.rules = const [],
     this.disabledBuiltins = const {},
+    this.videoTextRules = const [],
   });
   final List<JevRule> rules;
   final Set<JevRuleTarget> disabledBuiltins;
+
+  /// Natural-language video rules migrated from the retired standalone
+  /// LlmVideoRuleStore (#141). No threshold: the generic model decides and
+  /// must return the rule id plus a reason.
+  final List<LlmVideoRule> videoTextRules;
   bool builtinEnabled(JevRuleTarget target) =>
       target != JevRuleTarget.comment && !disabledBuiltins.contains(target);
   List<JevRule> activeFor(JevRuleTarget target) => rules
       .where((r) => r.target == target && r.enabled && r.validate() == null)
       .take(JevRule.maxRulesPerTarget)
       .toList();
+
+  /// Active video-text rules for the generic line — mirrors the retired
+  /// LlmVideoRuleConfig.activeFor semantics (enabled, valid, capped).
+  List<LlmVideoRule> activeVideoTextRules() => videoTextRules
+      .where((r) => r.enabled && r.validate() == null)
+      .take(LlmVideoRule.maxRulesPerSurface)
+      .toList();
+
+  JevRuleConfig copyWith({
+    List<JevRule>? rules,
+    Set<JevRuleTarget>? disabledBuiltins,
+    List<LlmVideoRule>? videoTextRules,
+  }) => JevRuleConfig(
+    rules: rules ?? this.rules,
+    disabledBuiltins: disabledBuiltins ?? this.disabledBuiltins,
+    videoTextRules: videoTextRules ?? this.videoTextRules,
+  );
+}
+
+/// A generic-line natural-language hide rule for the video surface.
+///
+/// 命中即屏蔽：unlike Jev typed rules there is no threshold — the model
+/// decides and must return the rule id plus a short reason. Lives in the
+/// unified rule model since #141 as the video-text rule type; the 4000-rune
+/// budget survives migration losslessly (typed questions stay ≤1000).
+@immutable
+class LlmVideoRule {
+  const LlmVideoRule({
+    required this.id,
+    required this.text,
+    this.enabled = true,
+  });
+
+  static const maxRulesPerSurface = 20;
+  static const maxTextRunes = 4000;
+
+  final String id;
+  final String text;
+  final bool enabled;
+
+  String? validate() {
+    if (id.trim().isEmpty) return '规则标识不能为空';
+    final runes = text.trim().runes.length;
+    if (runes < 1 || runes > maxTextRunes) {
+      return '规则内容需要 1-$maxTextRunes 个字符';
+    }
+    return null;
+  }
+
+  LlmVideoRule copyWith({String? text, bool? enabled}) => LlmVideoRule(
+    id: id,
+    text: text ?? this.text,
+    enabled: enabled ?? this.enabled,
+  );
+
+  Map<String, Object?> toJson() => {'id': id, 'text': text, 'enabled': enabled};
+
+  factory LlmVideoRule.fromJson(Map json) => LlmVideoRule(
+    id: json['id'] as String,
+    text: json['text'] as String,
+    enabled: json['enabled'] == true,
+  );
+}
+
+/// Enabled-and-valid video rules, capped per surface.
+@immutable
+class LlmVideoRuleConfig {
+  const LlmVideoRuleConfig({this.rules = const []});
+  final List<LlmVideoRule> rules;
+
+  List<LlmVideoRule> activeFor() => rules
+      .where((r) => r.enabled && r.validate() == null)
+      .take(LlmVideoRule.maxRulesPerSurface)
+      .toList();
+}
+
+/// Retired standalone store of the generic video line (#141): no longer a
+/// formal rule source — UI and pipeline read/write [JevRuleStore] instead.
+/// Kept so the one-shot migration and its tests can parse the legacy blob.
+class LlmVideoRuleStore {
+  LlmVideoRuleStore({JevSettingsBox? box}) : _boxOrNull = box;
+
+  // 构造期不触碰 JevSettingsStore/GStorage（#130）：解析推迟到首次读写。
+  final JevSettingsBox? _boxOrNull;
+  JevSettingsBox? _lazyBox;
+  JevSettingsStore? _store;
+  JevSettingsBox get _box =>
+      _lazyBox ??= _boxOrNull ?? (_store ??= JevSettingsStore()).box;
+  static const key = 'piliavalon.llm.v1.video_rules.v1';
+
+  Future<LlmVideoRuleConfig> load() async {
+    final raw = _box.get(key);
+    if (raw == null) return const LlmVideoRuleConfig();
+    try {
+      final json = jsonDecode(raw as String) as Map;
+      if (json['version'] != 1) {
+        throw const FormatException('Unknown rule version');
+      }
+      final rules = <LlmVideoRule>[];
+      final ids = <String>{};
+      for (final entry in json['rules'] as List) {
+        try {
+          final rule = LlmVideoRule.fromJson(entry as Map);
+          if (rule.validate() == null &&
+              ids.add(rule.id) &&
+              rules.length < LlmVideoRule.maxRulesPerSurface) {
+            rules.add(rule);
+          }
+        } catch (_) {
+          /* 无效单条规则不能隐藏内容。 */
+        }
+      }
+      return LlmVideoRuleConfig(rules: List.unmodifiable(rules));
+    } catch (_) {
+      // 损坏配置按空配置处理：宁可漏屏蔽，不可错屏蔽。
+      return const LlmVideoRuleConfig();
+    }
+  }
+
+  Future<void> save(LlmVideoRuleConfig config) async {
+    final ids = <String>{};
+    for (final rule in config.rules) {
+      final error = rule.validate();
+      if (error != null || !ids.add(rule.id)) {
+        throw ArgumentError(error ?? '规则标识重复');
+      }
+    }
+    if (config.rules.length > LlmVideoRule.maxRulesPerSurface) {
+      throw ArgumentError('视频规则最多 ${LlmVideoRule.maxRulesPerSurface} 条');
+    }
+    await _box.put(
+      key,
+      jsonEncode({
+        'version': 1,
+        'rules': config.rules.map((r) => r.toJson()).toList(),
+      }),
+    );
+  }
 }
 
 /// A single non-secret blob keeps rule edits and builtin switches atomic.
@@ -275,9 +421,24 @@ class JevRuleStore {
       final disabled = (json['disabledBuiltins'] as List)
           .map((s) => JevRuleTarget.values.byName(s as String))
           .toSet();
+      final videoText = <LlmVideoRule>[];
+      final videoIds = <String>{};
+      for (final entry in json['videoTextRules'] as List? ?? const []) {
+        try {
+          final rule = LlmVideoRule.fromJson(entry as Map);
+          if (rule.validate() == null &&
+              videoIds.add(rule.id) &&
+              videoText.length < LlmVideoRule.maxRulesPerSurface) {
+            videoText.add(rule);
+          }
+        } catch (_) {
+          /* Invalid individual rules cannot hide content. */
+        }
+      }
       return JevRuleConfig(
         rules: List.unmodifiable(rules),
         disabledBuiltins: Set.unmodifiable(disabled),
+        videoTextRules: List.unmodifiable(videoText),
       );
     } catch (_) {
       // Corruption must not silently re-enable a previously disabled builtin.
@@ -299,13 +460,93 @@ class JevRuleStore {
         throw ArgumentError('每个场景最多 20 条规则');
       }
     }
+    final videoIds = <String>{};
+    for (final rule in config.videoTextRules) {
+      final error = rule.validate();
+      if (error != null || !videoIds.add(rule.id)) {
+        throw ArgumentError(error ?? '视频规则标识重复');
+      }
+    }
+    if (config.videoTextRules.length > LlmVideoRule.maxRulesPerSurface) {
+      throw ArgumentError('视频规则最多 ${LlmVideoRule.maxRulesPerSurface} 条');
+    }
     await _box.put(
       key,
       jsonEncode({
         'version': 1,
         'rules': config.rules.map((r) => r.toJson()).toList(),
         'disabledBuiltins': config.disabledBuiltins.map((t) => t.name).toList(),
+        'videoTextRules': config.videoTextRules.map((r) => r.toJson()).toList(),
       }),
     );
+  }
+
+  Future<void>? _legacyMigration;
+
+  /// One-shot idempotent migration of the retired LlmVideoRuleStore blob
+  /// into this unified store (#141). Lossless: id/text/enabled move verbatim
+  /// into [JevRuleConfig.videoTextRules]; the legacy key is deleted only
+  /// after a successful save. Re-runs are no-ops once the key is gone.
+  /// A corrupt legacy blob is ignored (fail-open, key kept for inspection);
+  /// a corrupt unified blob blocks the merge so a load() fallback is never
+  /// persisted over it. A legacy set exceeding the per-surface cap migrates
+  /// nothing and keeps the key: nothing is dropped.
+  Future<void> migrateLegacyLlmVideoRules() {
+    Future<void> run() async {
+      try {
+        await _migrateLegacy();
+      } catch (_) {
+        _legacyMigration = null; // allow a retry at the next entry point.
+        rethrow;
+      }
+    }
+
+    return _legacyMigration ??= run();
+  }
+
+  Future<void> _migrateLegacy() async {
+    final Object? unifiedRaw;
+    try {
+      unifiedRaw = _box.get(key);
+    } catch (_) {
+      return; // box unavailable: leave both sources untouched.
+    }
+    if (unifiedRaw is String) {
+      try {
+        jsonDecode(unifiedRaw);
+      } catch (_) {
+        return; // corrupt unified blob: never persist a fallback over it.
+      }
+    }
+    final String? legacyRaw;
+    try {
+      legacyRaw = _box.get(LlmVideoRuleStore.key) as String?;
+    } catch (_) {
+      return;
+    }
+    if (legacyRaw == null) return; // already migrated (or never existed).
+    final List<LlmVideoRule> legacy;
+    try {
+      final json = jsonDecode(legacyRaw) as Map;
+      if (json['version'] != 1) throw const FormatException('bad version');
+      legacy = [
+        for (final entry in json['rules'] as List)
+          LlmVideoRule.fromJson(entry as Map),
+      ];
+    } catch (_) {
+      return; // corrupt legacy blob: fail-open, keep it for inspection.
+    }
+    final config = await load();
+    final merged = <String, LlmVideoRule>{
+      // Verbatim lossless upsert; later entries overwrite, so unified-side
+      // entries (listed last) win on id collision.
+      for (final r in legacy) r.id: r,
+      for (final r in config.videoTextRules) r.id: r,
+    };
+    if (merged.length > LlmVideoRule.maxRulesPerSurface) {
+      return; // keep the legacy key: nothing is dropped, nothing persisted.
+    }
+    await save(config.copyWith(videoTextRules: merged.values.toList()));
+    await _box.delete(LlmVideoRuleStore.key);
   }
 }

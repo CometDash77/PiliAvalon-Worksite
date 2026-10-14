@@ -1,18 +1,21 @@
-import 'package:PiliPlus/features/llm/llm_rules.dart';
+import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Video-face natural-language blocking rules for the generic LLM line
 /// (issue #136). Saving does not make a network request.
 class LlmVideoRulesPage extends StatefulWidget {
   const LlmVideoRulesPage({super.key, this.store});
-  final LlmVideoRuleStore? store;
+
+  /// Store of the unified rule blob (#141); the retired standalone
+  /// LlmVideoRuleStore is only a migration source.
+  final JevRuleStore? store;
 
   @override
   State<LlmVideoRulesPage> createState() => _LlmVideoRulesPageState();
 }
 
 class _LlmVideoRulesPageState extends State<LlmVideoRulesPage> {
-  late final LlmVideoRuleStore _store = widget.store ?? LlmVideoRuleStore();
+  late final JevRuleStore _store = widget.store ?? JevRuleStore();
   LlmVideoRuleConfig? _config;
   String? _error;
   bool _saving = false;
@@ -25,7 +28,14 @@ class _LlmVideoRulesPageState extends State<LlmVideoRulesPage> {
 
   Future<void> _load() async {
     try {
-      final config = await _store.load();
+      try {
+        // One-shot idempotent legacy migration (#141); a failure must not
+        // block editing the unified blob.
+        await _store.migrateLegacyLlmVideoRules();
+      } catch (_) {}
+      final config = LlmVideoRuleConfig(
+        rules: (await _store.load()).videoTextRules,
+      );
       if (mounted) {
         setState(() {
           _config = config;
@@ -41,7 +51,9 @@ class _LlmVideoRulesPageState extends State<LlmVideoRulesPage> {
     if (_saving) return false;
     setState(() => _saving = true);
     try {
-      await _store.save(next);
+      // Persist into the unified blob, leaving typed rules untouched (#141).
+      final full = await _store.load();
+      await _store.save(full.copyWith(videoTextRules: next.rules));
       if (!mounted) return false;
       setState(() {
         _config = next;
@@ -120,9 +132,7 @@ class _LlmVideoRulesPageState extends State<LlmVideoRulesPage> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                const Text(
-                  '通用模型逐条判定视频标题与分区/标签上下文；任一启用规则命中就屏蔽并给出理由，不走阈值。',
-                ),
+                const Text('通用模型逐条判定视频标题与分区/标签上下文；任一启用规则命中就屏蔽并给出理由，不走阈值。'),
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
@@ -174,9 +184,7 @@ class _LlmVideoRulesPageState extends State<LlmVideoRulesPage> {
                                           rules: [
                                             for (final r in config.rules)
                                               r.id == rule.id
-                                                  ? r.copyWith(
-                                                      enabled: enabled,
-                                                    )
+                                                  ? r.copyWith(enabled: enabled)
                                                   : r,
                                           ],
                                         ),

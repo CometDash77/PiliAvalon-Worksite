@@ -440,24 +440,36 @@ class LlmVideoScreening {
     LlmChatClient? client,
     LlmSettingsStore? settings,
     LlmCredentialStore? credentials,
-    LlmVideoRuleStore? rules,
+    JevRuleStore? rules,
     LlmVerdictCache? cache,
   }) : _client = client ?? LlmChatClient(),
        _settings = settings ?? LlmSettingsStore(),
        _credentials = credentials ?? SecureLlmCredentialStore(),
-       _rules = rules ?? LlmVideoRuleStore(),
+       _rules = rules ?? JevRuleStore(),
        _cache = cache ?? LlmVerdictCache();
 
   final LlmChatClient _client;
+
+  // Unified rule source (#141): typed rules and video-text rules live in
+  // one blob, so switching backends never re-asks for the same rule.
+  final JevRuleStore _rules;
   final LlmSettingsStore _settings;
   final LlmCredentialStore _credentials;
-  final LlmVideoRuleStore _rules;
   final LlmVerdictCache _cache;
+
+  /// One-shot legacy-blob migration (#141); a failed migration fails open
+  /// downstream (legacy rules simply stay invisible this pass).
+  Future<void> _migrateRules() async {
+    try {
+      await _rules.migrateLegacyLlmVideoRules();
+    } catch (_) {}
+  }
 
   /// Whether the generic video line would run at all.
   Future<bool> isEnabled() async {
     try {
-      final rules = (await _rules.load()).activeFor();
+      await _migrateRules();
+      final rules = (await _rules.load()).activeVideoTextRules();
       if (rules.isEmpty) return false;
       await _resolve(settings: _settings, credentials: _credentials);
       return true;
@@ -504,7 +516,8 @@ class LlmVideoScreening {
     String? modelId;
     String? failure;
     try {
-      final rules = (await _rules.load()).activeFor();
+      await _migrateRules();
+      final rules = (await _rules.load()).activeVideoTextRules();
       if (rules.isEmpty) return done(hidden);
       final context = await _resolve(
         settings: _settings,
@@ -589,7 +602,8 @@ class LlmVideoScreening {
         );
       }
       final config = await _settings.load().timeout(remaining);
-      final rulesNow = (await _rules.load().timeout(remaining)).activeFor();
+      final rulesNow = (await _rules.load().timeout(remaining))
+          .activeVideoTextRules();
       if (rulesNow.isNotEmpty &&
           _fingerprint(config, rulesNow) != fingerprint) {
         return done(

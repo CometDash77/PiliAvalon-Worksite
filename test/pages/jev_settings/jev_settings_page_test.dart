@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:PiliPlus/features/jev/jev.dart';
+import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/llm/llm.dart';
 import 'package:PiliPlus/pages/jev_settings/view.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -388,9 +389,14 @@ void main() {
     }
     // A surface with no call site says so and cannot be switched on.
     // 判定缓存开关(issue #123)自带副标题但不是生效入口，按 key 排除。
-    for (final tile in enabled.skip(1).where((tile) =>
-        tile.subtitle != null &&
-        tile.key != const ValueKey('jev-verdict-cache-enabled'))) {
+    for (final tile
+        in enabled
+            .skip(1)
+            .where(
+              (tile) =>
+                  tile.subtitle != null &&
+                  tile.key != const ValueKey('jev-verdict-cache-enabled'),
+            )) {
       expect(tile.onChanged, isNull);
       expect(tile.value, isFalse);
     }
@@ -406,7 +412,10 @@ void main() {
     await tester.tap(find.text(JevSurface.live.label), warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(box.values[JevSettingsStore.surfaceKey(JevSurface.live)], isFalse);
-    expect(JevSettingsStore.snapshot.isSurfaceEnabled(JevSurface.live), isFalse);
+    expect(
+      JevSettingsStore.snapshot.isSurfaceEnabled(JevSurface.live),
+      isFalse,
+    );
   });
 
   testWidgets('a hinted key never validates against the wrong provider', (
@@ -455,10 +464,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(probes, <JevProvider>[JevProvider.typeSafe]);
-    expect(
-      box.values[JevSettingsStore.providerConfirmedKey],
-      isTrue,
-    );
+    expect(box.values[JevSettingsStore.providerConfirmedKey], isTrue);
   });
 
   testWidgets('saving a key writes it to the credential store only', (
@@ -677,10 +683,7 @@ void main() {
 
       await tester.tap(find.text('OpenAI Compatible'));
       await tester.pumpAndSettle();
-      expect(
-        llmBox.values[LlmSettingsStore.protocolKey],
-        'openai_compatible',
-      );
+      expect(llmBox.values[LlmSettingsStore.protocolKey], 'openai_compatible');
 
       await tester.enterText(
         find.byKey(const ValueKey('llm-base-url')),
@@ -795,10 +798,7 @@ void main() {
 
       await tester.tap(find.widgetWithText(TextButton, '保存地址'));
       await tester.pumpAndSettle();
-      expect(
-        messages.last,
-        'HTTP 地址不安全，需在设置中显式确认后才能使用',
-      );
+      expect(messages.last, 'HTTP 地址不安全，需在设置中显式确认后才能使用');
       expect((await llmStore.load()).baseUrl, isEmpty);
 
       await tester.tap(find.widgetWithText(TextButton, '确认使用 HTTP'));
@@ -836,8 +836,8 @@ void main() {
     );
     await tester.tap(find.text('保存规则'));
     await tester.pumpAndSettle();
-    final saved = await LlmVideoRuleStore(box: store.box).load();
-    expect(saved.rules.single.text, '屏蔽标题含有剧透的视频');
+    final saved = await JevRuleStore(box: store.box).load();
+    expect(saved.videoTextRules.single.text, '屏蔽标题含有剧透的视频');
   });
   // 评论过滤标准区块已在 issue #122 中随双轨合并移除：独立开关与标准文本
   // 不复存在，评论面只消费「判断规则」页的评论规则。
