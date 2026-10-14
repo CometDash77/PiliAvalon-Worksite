@@ -1,3 +1,4 @@
+import 'package:PiliPlus/features/llm/llm_contract.dart';
 import 'package:PiliPlus/features/llm/llm_settings.dart';
 import 'package:flutter/foundation.dart';
 
@@ -543,6 +544,17 @@ class LlmResolvedProvider {
   }
 }
 
+/// 路线展示名（设置页路线单选；#145）。
+extension LlmRouteProtocolLabel on LlmRouteProtocol {
+  String get label => switch (this) {
+        LlmRouteProtocol.openaiChat => 'OpenAI Chat Completions',
+        LlmRouteProtocol.openaiResponses => 'OpenAI Responses',
+        LlmRouteProtocol.anthropicMessages => 'Anthropic Messages',
+        LlmRouteProtocol.google => 'Google Gemini',
+        LlmRouteProtocol.systemone => 'SystemOne',
+      };
+}
+
 /// 筛选线（v1）可消费的两协议配置，或一条明确的协议不匹配原因。
 class LlmLegacyMapping {
   const LlmLegacyMapping(this.config, this.error);
@@ -604,5 +616,6 @@ LlmLegacyMapping llmLegacyMappingFor(
       bearerAuth: isAnthropic &&
           resolved.effectiveAuth == LlmPresetAuth.bearer,
     ),
+    null,
   );
 }
