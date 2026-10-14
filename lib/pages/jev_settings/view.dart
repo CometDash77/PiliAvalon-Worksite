@@ -1287,7 +1287,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       _provCatalogResult = result;
       if (result.error != null) {
         // 目录失败：目录态草稿不可信，输入框回退到已保存模型。
-        _llmModelController.text = _provAccount.model ?? '';
+        _llmModelController.text = _provAccount.model;
       }
     });
   }

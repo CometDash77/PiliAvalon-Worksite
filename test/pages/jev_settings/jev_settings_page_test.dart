@@ -90,28 +90,6 @@ class _FakeLlmCredentials implements LlmCredentialStore {
   }
 }
 
-class _FakeLlmCatalog extends LlmModelCatalog {
-  final response = Completer<LlmModelCatalogResult>();
-  @override
-  Future<LlmModelCatalogResult> load({
-    required LlmProviderConfig config,
-    required String apiKey,
-  }) => response.future;
-}
-
-class _FakeLlmProbe extends LlmHttpProbe {
-  _FakeLlmProbe(this.result);
-
-  final LlmProbeResult result;
-
-  @override
-  Future<LlmProbeResult> call({
-    required LlmProviderConfig config,
-    required String apiKey,
-    String? model,
-  }) async => result;
-}
-
 class _FakeLlmProviderCredentials implements LlmProviderCredentialStore {
   final keys = <String, String>{};
   final deleted = <String>[];
