@@ -233,6 +233,23 @@ void main() {
     expect(stub.calls, isEmpty);
   });
 
+  for (final change in ['last rule removed', 'surface disabled']) {
+    test('comment late hit is discarded after $change', () async {
+      final box = await _readyBox();
+      final stub = _Stub((_, _, _) async {
+        if (change == 'last rule removed') {
+          await JevRuleStore(box: box).save(const JevRuleConfig());
+        } else {
+          await box.put(JevSettingsStore.surfaceKey(JevSurface.comment), false);
+        }
+        return _openaiOk(_llmJson([{'rule_id': 'candidate_1:r1', 'reason': 'hit'}]));
+      });
+      final input = [reply('comment')];
+      expect((await _screening(box, stub).filter(input, screenLog: false)).replies, input);
+      expect(stub.calls, hasLength(1));
+    });
+  }
+
   test('a hit hides only the matching candidate', () async {
     final box = await _readyBox();
     final stub = _Stub(

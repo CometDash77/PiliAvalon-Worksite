@@ -5,8 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:PiliPlus/features/jev/jev_credential_store.dart'
     show JevKeyStoreStatus;
 import 'package:PiliPlus/features/jev/jev_rules.dart';
+import 'package:PiliPlus/features/jev/jev_evaluator.dart';
+import 'package:PiliPlus/features/jev/jev_final_screen.dart';
 import 'package:PiliPlus/features/jev/jev_settings.dart';
-import 'package:PiliPlus/features/jev/jev_contract.dart' show JevSurface;
+import 'package:PiliPlus/features/jev/jev_contract.dart' show JevSurface, JevCandidate;
 import 'package:PiliPlus/features/llm/llm.dart';
 
 class _FakeBox implements JevSettingsBox {
@@ -182,6 +184,27 @@ void main() {
     ])).hidden, [false]);
     expect(fresh.calls, hasLength(1));
   });
+
+  for (final change in ['last rule removed', 'surface disabled']) {
+    test('video late hit is discarded after $change', () async {
+      final box = await _readyBox();
+      final stub = _Stub((_, _, _) async {
+        if (change == 'last rule removed') {
+          await JevRuleStore(box: box).save(const JevRuleConfig());
+        } else {
+          await box.put(JevSettingsStore.surfaceKey(JevSurface.hot), false);
+        }
+        return _openaiOk(_llmJson([{'rule_id': 'v1', 'reason': 'hit'}]));
+      });
+      final screen = JevFinalScreen<String>(
+        surface: JevSurface.hot, toCandidate: (title) => JevCandidate(title: title),
+        evaluator: JevEvaluator(settings: JevSettingsStore(box: box)),
+        videoScreening: _screening(box, stub),
+      );
+      expect(await screen.screen(['video']), ['video']);
+      expect(stub.calls, hasLength(1));
+    });
+  }
 
   test('a hit hides the candidate and quotes title and rule text', () async {
     final box = await _readyBox();
