@@ -168,6 +168,29 @@ void main() {
     expect(calls, 1);
   });
 
+  for (final change in ['model', 'surface', 'rules']) {
+    test('Decision discards a late hit after changing $change', () async {
+      final h = _Harness();
+      final evaluator = h.evaluator(_CapturingTransport(), transport:
+        ({required provider, required apiKey, required body}) async {
+          switch (change) {
+            case 'model':
+              await h.settingsBox.put(JevSettingsStore.modelKey(provider), 'new-model');
+            case 'surface':
+              await h.settingsBox.put(JevSettingsStore.surfaceKey(JevSurface.homeWeb), false);
+            case 'rules':
+              await JevRuleStore(box: h.settingsBox).save(
+                const JevRuleConfig(disabledBuiltins: {JevRuleTarget.video}));
+          }
+          return _answers({'candidate_1': 1});
+        });
+      final result = await evaluator.screen([candidate('x')], surface: JevSurface.homeWeb);
+      expect(result.requests, 1);
+      expect(result.hidden, [false]);
+      expect(result.decisions.whereType<JevScreenDecision>(), isEmpty);
+    });
+  }
+
   for (final provider in JevProvider.values) {
     test(
       '${provider.id} HTTP batches associate reordered and missing answers by name',
