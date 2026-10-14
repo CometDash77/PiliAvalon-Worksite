@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:PiliPlus/features/jev/jev_comment_screening.dart';
+import 'package:PiliPlus/features/jev/screening_mode.dart';
 import 'package:PiliPlus/features/shielding/comment_shielding_config.dart';
 import 'package:PiliPlus/features/shielding/shielding_adapters.dart';
 import 'package:PiliPlus/features/shielding/shielding_matcher.dart';
@@ -79,6 +80,7 @@ abstract final class HomeFeedCommentGate {
     }
 
     final screening = commentScreening ?? JevCommentScreening();
+    final mode = await screening.modes.load();
     String semanticPolicy;
     bool semanticEnabled;
     try {
@@ -94,6 +96,7 @@ abstract final class HomeFeedCommentGate {
 
     // 判定按原下标回填，worker 谁先完成都不影响输出顺序。
     final kept = List<bool>.filled(items.length, true);
+    final withoutSemantic = List<bool>.filled(items.length, true);
     var next = 0;
 
     Future<void> worker() async {
@@ -111,23 +114,26 @@ abstract final class HomeFeedCommentGate {
           timeout: timeout,
           screening: screening,
           cacheResults: !semanticEnabled,
+          mode: mode,
         );
         // 没有判定（失败 / 超时）→ 保留条目（fail-open）。
-        kept[index] = decision ?? true;
+        kept[index] = decision?.keep ?? true;
+        withoutSemantic[index] = decision?.withoutSemantic ?? true;
       }
     }
 
     final workerCount = maxConcurrent.clamp(1, items.length);
     await Future.wait([for (var i = 0; i < workerCount; i++) worker()]);
 
+    final visible = mode.isCurrent ? kept : withoutSemantic;
     return [
       for (var i = 0; i < items.length; i++)
-        if (kept[i]) items[i],
+        if (visible[i]) items[i],
     ];
   }
 
   /// 一个 aid 的 keep/hide 判定；拿不到判定时返回 null（调用方 fail-open）。
-  static Future<bool?> _decisionFor(
+  static Future<({bool keep, bool withoutSemantic})?> _decisionFor(
     int aid, {
     required _DecisionCache cache,
     required CommentShieldingConfig config,
@@ -136,11 +142,12 @@ abstract final class HomeFeedCommentGate {
     required Duration timeout,
     required JevCommentScreening screening,
     required bool cacheResults,
+    required ScreeningModeSnapshot mode,
   }) {
     // Paid semantic outcomes are deliberately not persisted: a changed key,
     // provider recovery, or uncertainty must be retried on the next pass.
     final cached = cacheResults ? cache.lookup(aid) : null;
-    if (cached != null) return Future.value(cached);
+    if (cached != null) return Future.value((keep: cached, withoutSemantic: cached));
 
     final pending = cache.inFlight[aid];
     if (pending != null) return pending;
@@ -148,7 +155,7 @@ abstract final class HomeFeedCommentGate {
     // 在飞登记必须早于请求开始：loader 可能同步抛错，那种情况下 [_load] 的函数体
     // 在返回前就跑完了（异常被它自己接住），先调用后登记会留下一个永远没人清理的
     // 死键 —— 之后这个 aid 再也发不出请求，也走不到缓存那一步。
-    final completer = Completer<bool?>();
+    final completer = Completer<({bool keep, bool withoutSemantic})?>();
     cache.inFlight[aid] = completer.future;
     _load(
       aid,
@@ -157,11 +164,12 @@ abstract final class HomeFeedCommentGate {
       loader: loader,
       timeout: timeout,
       screening: screening,
+      mode: mode,
     ).then(
       (decision) {
         // 释放与完成之间没有 await：合并进来的调用方被唤醒时缓存已经写完。
         cache.inFlight.remove(aid);
-        if (decision != null && cacheResults) cache.put(aid, decision);
+        if (decision != null && cacheResults) cache.put(aid, decision.keep);
         completer.complete(decision);
       },
       onError: (Object error, StackTrace stackTrace) {
@@ -178,13 +186,14 @@ abstract final class HomeFeedCommentGate {
   /// 超时以**发起这次请求的那一方**传入的 [timeout] 为准：合并进来的调用方共享这
   /// 同一个截止时间，所以一次超时既不会写缓存（下次会重试），也不会把「没有判定」
   /// 当成隐藏。
-  static Future<bool?> _load(
+  static Future<({bool keep, bool withoutSemantic})?> _load(
     int aid, {
     required CommentShieldingConfig config,
     required ShieldRuleSet ruleSet,
     required HomeFeedCommentLoader loader,
     required Duration timeout,
     required JevCommentScreening screening,
+    required ScreeningModeSnapshot mode,
   }) async {
     final elapsed = Stopwatch()..start();
     try {
@@ -198,7 +207,9 @@ abstract final class HomeFeedCommentGate {
 
       if (state case Success(:final response)) {
         // No fetched comments remains fail-open, as in the original gate.
-        if (response.replies.isEmpty && !response.hasUpTop()) return true;
+        if (response.replies.isEmpty && !response.hasUpTop()) {
+          return (keep: true, withoutSemantic: true);
+        }
         final candidates =
             [
                   if (response.hasUpTop()) response.upTop,
@@ -212,6 +223,10 @@ abstract final class HomeFeedCommentGate {
                   ),
                 )
                 .toList();
+        final withoutSemantic = candidates.isNotEmpty || !_checkedCommentsExhausted(response);
+        if (!mode.isCurrent || candidates.isEmpty) {
+          return (keep: withoutSemantic, withoutSemantic: withoutSemantic);
+        }
         // Loading and semantic work share one bounded aid budget, rather than
         // adding a fresh full provider deadline after a slow comment request.
         final semantic = await screening.filter(
@@ -221,10 +236,10 @@ abstract final class HomeFeedCommentGate {
           screenLog: false,
         );
         if (!semantic.cacheable) return null;
-        if (semantic.replies.isNotEmpty) {
-          return true;
-        }
-        return !_checkedCommentsExhausted(response);
+        return (
+          keep: semantic.replies.isNotEmpty || !_checkedCommentsExhausted(response),
+          withoutSemantic: withoutSemantic,
+        );
       }
       return null;
     } on TimeoutException {
@@ -339,7 +354,7 @@ class _DecisionCache {
   final Map<int, _CachedDecision> _entries = {};
 
   /// 在飞请求：aid → 共享的那一个 future。
-  final Map<int, Future<bool?>> inFlight = {};
+  final Map<int, Future<({bool keep, bool withoutSemantic})?>> inFlight = {};
 
   int get entryCount => _entries.length;
 

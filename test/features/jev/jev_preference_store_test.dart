@@ -109,7 +109,7 @@ void main() {
       box.values[JevSettingsStore.surfaceKey(JevSurface.homeWeb)] = true;
       expect(await store.record(signal, surface: JevSurface.homeWeb), isTrue);
 
-      box.values[JevSettingsStore.enabledKey] = false;
+      await ScreeningModeStore(box: box).save(ScreeningEngineMode.off);
       expect(
         await store.record(
           const JevDislikeSignal.card(

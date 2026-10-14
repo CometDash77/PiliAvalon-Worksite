@@ -226,10 +226,10 @@ class JevSettingsStore {
     return settings;
   }
 
-  Future<void> save(JevSettings settings) async {
+  Future<void> save(JevSettings settings, {bool saveMode = true}) async {
     // Config edits must not erase an unknown/future mode or migration notice.
     final rawMode = _box.get(ScreeningModeStore.key);
-    if (rawMode == null || ScreeningEngineMode.values.any((m) => m.name == rawMode)) {
+    if (saveMode && (rawMode == null || ScreeningEngineMode.values.any((m) => m.name == rawMode))) {
       if (rawMode != settings.mode.name) await modes.save(settings.mode);
     }
     await _box.put(enabledKey, settings.enabled);

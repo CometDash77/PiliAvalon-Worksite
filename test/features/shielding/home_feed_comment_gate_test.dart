@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:PiliPlus/features/jev/jev_comment_screening.dart';
+import 'package:PiliPlus/features/jev/jev_settings.dart';
 import 'package:PiliPlus/features/shielding/home_feed_comment_gate.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart';
@@ -25,6 +27,19 @@ const _guardOff = CommentShieldingConfig();
 LoadingState<MainListReply> _visible() =>
     Success(MainListReply(replies: [_reply('visible comment')]));
 
+class _SemanticScreening extends JevCommentScreening {
+  int calls = 0;
+  @override
+  Future<bool> isEnabled() async => true;
+  @override
+  Future<JevCommentResult> filter(List<ReplyInfo> replies, {
+    List<String?>? parents, Duration? timeout, bool screenLog = true,
+  }) async {
+    calls++;
+    return const JevCommentResult(replies: [], cacheable: true);
+  }
+}
+
 void main() {
   late Directory directory;
 
@@ -45,6 +60,29 @@ void main() {
   setUp(() {
     HomeFeedCommentGate.resetDecisionCache();
     HomeFeedCommentGate.decisionCacheClock = DateTime.now;
+  });
+
+  test('mode switch restores prior semantic hits but keeps deterministic removals', () async {
+    final screening = _SemanticScreening();
+    await screening.modes.save(ScreeningEngineMode.decision);
+    final waiting = Completer<void>();
+    final last = Completer<LoadingState<MainListReply>>();
+    final pending = HomeFeedCommentGate.filter<int>(
+      [1, 2, 3], config: _guardOn, ruleSet: ShieldRuleSet(),
+      getAid: (item) => item, maxConcurrent: 1, commentScreening: screening,
+      loader: ({required oid, required type, required mode, required offset, required cursorNext}) async {
+        if (oid == 1) return _visible(); // Removed only by semantics.
+        if (oid == 2) return Success(MainListReply(replies: [_reply('x')]));
+        waiting.complete();
+        return last.future;
+      },
+    );
+    await waiting.future; // Earlier decisions have already been aggregated.
+    await screening.modes.save(ScreeningEngineMode.off);
+    await screening.modes.save(ScreeningEngineMode.decision);
+    last.complete(_visible());
+    expect(await pending, [1, 3]);
+    expect(screening.calls, 1); // No new semantic work after the switch.
   });
 
   group('HomeFeedCommentGate', () {

@@ -774,7 +774,7 @@ void main() {
       expect(legacy.confirmed, isTrue);
       expect(v1Credentials.stored[LlmProtocol.openAICompatible], 'sk-or-k');
       expect((await provStore.load('openrouter'))!.confirmed, isTrue);
-      expect(messages.last, '测试通过，筛选线已切换到该提供方');
+      expect(messages.last, '测试通过，已保存 LLM 提供方；全局模式保持不变');
     },
   );
 

@@ -1,6 +1,7 @@
 import 'dart:async';
-import 'package:PiliPlus/features/jev/jev_settings.dart';
 import 'dart:math' as math;
+
+import 'package:PiliPlus/features/jev/jev_settings.dart';
 
 import 'package:PiliPlus/features/jev/jev_contract.dart';
 import 'package:PiliPlus/features/jev/jev_rules.dart';
@@ -58,11 +59,8 @@ class LlmCommentResult {
   final bool cacheable;
 }
 
-/// Generic-line COMMENT pipeline (spec 3): Jev runs first, this pass sees
-/// only the survivors. Serial batches of [JevLimits.batchSize] candidates,
-/// one request per batch, no retries; a failed batch fails open; the page
-/// budget arrives via [filter]'s [timeout], tightened by the controller
-/// that runs both lines. Mid-pass policy drift voids the whole page.
+/// LLM comment pipeline: runs only in global LLM mode, after deterministic
+/// filters. Serial batches, no fallback; stale mode results fail open.
 class LlmCommentScreening {
   LlmCommentScreening({
     LlmChatClient? client,
@@ -451,8 +449,8 @@ class LlmVideoScreenOutcome {
   final int elapsedMs;
 }
 
-/// Generic-line VIDEO pipeline (spec 3): runs after the Jev evaluation on
-/// the unhit survivors. One request per candidate, no retries; a failed
+/// LLM video pipeline: runs only in global LLM mode.
+/// One request per candidate, no retries or fallback; a failed
 /// item fails open. Returns an [LlmVideoScreenOutcome] and never throws.
 class LlmVideoScreening {
   LlmVideoScreening({

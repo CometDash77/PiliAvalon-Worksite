@@ -88,6 +88,16 @@ void main() {
     expect(before.isCurrent, isFalse);
   });
 
+  test('saving an old configuration draft cannot restore its old mode', () async {
+    final box = _MemoryBox();
+    final store = JevSettingsStore(box: box);
+    final draft = await store.load();
+    await store.modes.save(ScreeningEngineMode.off);
+    await store.save(draft.withSurface(JevSurface.hot, value: true), saveMode: false);
+    expect((await store.load()).mode, ScreeningEngineMode.off);
+    expect((await store.load()).surfaces, contains(JevSurface.hot));
+  });
+
   test('round-trips the non-secret configuration', () async {
     final box = _MemoryBox();
     await JevSettingsStore(box: box).save(

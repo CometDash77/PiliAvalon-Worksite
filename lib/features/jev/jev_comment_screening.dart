@@ -106,7 +106,10 @@ class JevCommentScreening {
   Future<bool> isEnabled() async {
     final mode = await modes.load();
     if (mode.mode == ScreeningEngineMode.off) return false;
-    if (mode.mode == ScreeningEngineMode.llm) return _llm.isEnabled();
+    if (mode.mode == ScreeningEngineMode.llm) {
+      await JevCommentCriteriaMigration.ensureRun(settings: _settings, rules: _rules);
+      return mode.isCurrent && await _llm.isEnabled();
+    }
     final (_, activeRules) = await _loadActive();
     if (activeRules.isEmpty) return false;
     final settings = await _settings.load();
@@ -136,6 +139,8 @@ class JevCommentScreening {
       return JevCommentResult(replies: replies, cacheable: true);
     }
     if (mode.mode == ScreeningEngineMode.llm) {
+      await JevCommentCriteriaMigration.ensureRun(settings: _settings, rules: _rules);
+      if (!mode.isCurrent) return JevCommentResult(replies: replies, cacheable: false);
       final result = await _llm.filter(replies, parents: parents,
           timeout: timeout, screenLog: screenLog);
       return JevCommentResult(

@@ -249,10 +249,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     if (!mounted) return false;
     final previous = _settings;
     setState(() => _settings = next);
-    final write = _saveQueue.then((_) async {
-      final mode = await _store.modes.load();
-      await _store.save(next.copyWith(mode: mode.mode));
-    });
+    final write = _saveQueue.then((_) => _store.save(next, saveMode: false));
     _saveQueue = write.catchError((Object _) {});
     try {
       await write;
@@ -1170,7 +1167,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       ),
       title: Text(
         _provAccount.confirmed
-            ? '该提供方已通过测试并驱动筛选线'
+            ? '该提供方已通过测试；仅在全局 LLM 模式下参与筛选'
             : '该提供方尚未生效：需「测试连接」通过后才驱动筛选线',
       ),
       subtitle: const Text('目录成功只说明能拉到模型；保存配置只落盘；测试通过才锁存确认并写穿到筛选线'),
@@ -1398,7 +1395,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       _provBusy = false;
       _llmProbeResult = result;
     });
-    _toast('测试通过，筛选线已切换到该提供方');
+    _toast('测试通过，已保存 LLM 提供方；全局模式保持不变');
   }
 
   String _llmProbeMessage(LlmProbeResult probe) {
