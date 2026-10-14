@@ -131,6 +131,17 @@ String _userOf(_Call call) =>
 void main() {
   setUp(LlmVerdictCache.resetCache);
 
+  test('global Off sends zero LLM requests despite saved ready config', () async {
+    final box = await _readyBox();
+    await box.put('piliavalon.screening.v1.mode', 'off');
+    final stub = _Stub((_, _, _) async => _openaiOk(_llmJson([])));
+    final result = await _screening(box, stub).screen([
+      const LlmVideoCandidate(title: '第一话', identity: 'BV1'),
+    ]);
+    expect(result.hidden, [false]);
+    expect(stub.calls, isEmpty);
+  });
+
   test('a hit hides the candidate and quotes title and rule text', () async {
     final box = await _readyBox();
     final stub = _Stub(
