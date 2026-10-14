@@ -1,12 +1,12 @@
 import 'package:PiliPlus/features/jev/jev_contract.dart';
 import 'package:PiliPlus/features/jev/screening_mode.dart';
-export 'package:PiliPlus/features/jev/screening_mode.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:flutter/foundation.dart' show immutable, setEquals, mapEquals;
 
 // Issue #144: JevSettingsBox itself moved to the pure-interface
 // jev_contract.dart; re-exported here so existing importers are unaffected.
 export 'package:PiliPlus/features/jev/jev_contract.dart' show JevSettingsBox;
+export 'package:PiliPlus/features/jev/screening_mode.dart';
 
 /// Persisted, non-secret Jev configuration (issues #32/#35).
 @immutable

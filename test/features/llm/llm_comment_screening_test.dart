@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:PiliPlus/features/jev/jev_comment_screening.dart';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -160,6 +162,36 @@ void main() {
   tearDown(() {
     // 默认构造会触碰 GStorage.setting(测试环境未初始化),注入空 box 隔离。
     JevScreenLog.instance = JevScreenLog(box: _LogBox());
+  });
+
+  test('shared comment route uses LLM only and discards stale replies', () async {
+    final box = await _readyBox();
+    final entered = Completer<void>();
+    final response = Completer<Object?>();
+    final stub = _Stub((_, _, _) {
+      entered.complete();
+      return response.future;
+    });
+    var decisionCalls = 0;
+    final shared = JevCommentScreening(
+      settings: JevSettingsStore(box: box), rules: JevRuleStore(box: box),
+      llmScreening: _screening(box, stub),
+      transport: ({required provider, required apiKey, required body}) async {
+        decisionCalls++;
+        return null;
+      },
+    );
+    expect(await shared.isEnabled(), isTrue);
+    final replies = [reply('垃圾评论')];
+    final pending = shared.filter(replies, screenLog: false);
+    await entered.future;
+    await shared.modes.save(ScreeningEngineMode.off);
+    response.complete(_openaiOk(_llmJson([{'rule_id': 'c1_r1', 'reason': 'hit'}])));
+    expect((await pending).replies, replies);
+    expect(await shared.isEnabled(), isFalse);
+    expect((await shared.filter(replies)).replies, replies);
+    expect(decisionCalls, 0);
+    expect(stub.calls, hasLength(1));
   });
 
   test('no active comment rules: nothing is sent', () async {

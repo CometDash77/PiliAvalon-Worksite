@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -144,6 +145,42 @@ void main() {
     ]);
     expect(result.hidden, [false]);
     expect(stub.calls, isEmpty);
+  });
+
+  test('Decision sends zero LLM requests', () async {
+    final box = await _readyBox();
+    await ScreeningModeStore(box: box).save(ScreeningEngineMode.decision);
+    final stub = _Stub((_, _, _) async => _openaiOk(_llmJson([])));
+    expect((await _screening(box, stub).screen([
+      const LlmVideoCandidate(title: 'x'),
+    ])).hidden, [false]);
+    expect(stub.calls, isEmpty);
+  });
+
+  test('LLM switch invalidates pending hits, cache and following requests', () async {
+    final box = await _readyBox();
+    final entered = Completer<void>();
+    final response = Completer<Object?>();
+    final stub = _Stub((_, _, _) {
+      entered.complete();
+      return response.future;
+    });
+    final screening = _screening(box, stub);
+    final pending = screening.screen([
+      const LlmVideoCandidate(title: 'first', identity: 'BV1'),
+      const LlmVideoCandidate(title: 'second', identity: 'BV2'),
+    ]);
+    await entered.future;
+    await screening.modes.save(ScreeningEngineMode.off);
+    await screening.modes.save(ScreeningEngineMode.llm);
+    response.complete(_openaiOk(_llmJson([{'rule_id': 'v1', 'reason': 'hit'}])));
+    expect((await pending).hidden, [false, false]);
+    expect(stub.calls, hasLength(1));
+    final fresh = _Stub((_, _, _) async => _openaiOk(_llmJson([])));
+    expect((await _screening(box, fresh).screen([
+      const LlmVideoCandidate(title: 'first', identity: 'BV1'),
+    ])).hidden, [false]);
+    expect(fresh.calls, hasLength(1));
   });
 
   test('a hit hides the candidate and quotes title and rule text', () async {

@@ -249,7 +249,10 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     if (!mounted) return false;
     final previous = _settings;
     setState(() => _settings = next);
-    final write = _saveQueue.then((_) => _store.save(next));
+    final write = _saveQueue.then((_) async {
+      final mode = await _store.modes.load();
+      await _store.save(next.copyWith(mode: mode.mode));
+    });
     _saveQueue = write.catchError((Object _) {});
     try {
       await write;
@@ -521,8 +524,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   Future<void> _selectMode(ScreeningEngineMode mode) async {
     setState(() => _modeBusy = true);
     try {
-      await _saveQueue;
       await _store.modes.save(mode);
+      await _saveQueue;
       final settings = await _store.load();
       if (mounted) setState(() {
         _settings = settings;
@@ -554,7 +557,9 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         segments: [for (final mode in ScreeningEngineMode.values)
           ButtonSegment(value: mode, label: Text(mode.label))],
         selected: {_settings.mode},
-        onSelectionChanged: _modeBusy ? null : (value) => _selectMode(value.single),
+        emptySelectionAllowed: _needsModeChoice,
+        onSelectionChanged: _modeBusy ? null : (value) =>
+            _selectMode(value.isEmpty ? ScreeningEngineMode.off : value.single),
       ),
     ),
     custom.ListTile(

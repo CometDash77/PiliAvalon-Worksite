@@ -33,6 +33,61 @@ void main() {
     }
   });
 
+  test('legacy migration preserves config and requires an explicit LLM choice', () async {
+    for (final enabled in [true, false]) {
+      for (final llmKey in [null, 'piliavalon.llm.v1.model', 'piliavalon.llm.v2.accounts']) {
+        final box = _MemoryBox();
+        box.values.addAll({
+          JevSettingsStore.enabledKey: enabled,
+          JevSettingsStore.providerKey: 'typesafe',
+          'piliavalon.jev.v1.rules.v1': 'legacy-rule-blob',
+          if (llmKey != null) llmKey: 'saved-config',
+        });
+        final before = Map<String, Object?>.of(box.values);
+        final store = JevSettingsStore(box: box);
+        final first = await store.load();
+        expect(first.mode, llmKey != null || !enabled
+            ? ScreeningEngineMode.off : ScreeningEngineMode.decision);
+        expect(store.modes.needsChoice, llmKey != null);
+        expect(await store.load(), first);
+        for (final entry in before.entries) {
+          expect(box.values[entry.key], entry.value);
+        }
+        // A config save is not an explicit mode choice.
+        await store.save(first.withSurface(JevSurface.hot, value: true));
+        expect(store.modes.needsChoice, llmKey != null);
+        await store.modes.save(ScreeningEngineMode.llm);
+        expect((await store.load()).mode, ScreeningEngineMode.llm);
+        expect(store.modes.needsChoice, isFalse);
+        expect(box.values['piliavalon.jev.v1.rules.v1'], 'legacy-rule-blob');
+      }
+    }
+  });
+
+  test('unknown mode fails open without rewriting future data', () async {
+    final box = _MemoryBox()..values[ScreeningModeStore.key] = 'future-mode';
+    final store = JevSettingsStore(box: box);
+    final settings = await store.load();
+    expect(settings.mode, ScreeningEngineMode.off);
+    await store.save(settings.withSurface(JevSurface.hot, value: true));
+    expect(box.values[ScreeningModeStore.key], 'future-mode');
+    await store.modes.save(ScreeningEngineMode.off);
+    expect(store.modes.needsChoice, isFalse);
+  });
+
+  test('mode switches serialize and invalidate old snapshots even after ABA', () async {
+    final store = ScreeningModeStore(box: _MemoryBox());
+    final before = await store.load();
+    final off = store.save(ScreeningEngineMode.off);
+    expect(before.isCurrent, isFalse);
+    final back = store.save(ScreeningEngineMode.decision);
+    await Future.wait([off, back]);
+    final after = await store.load();
+    expect(after.mode, ScreeningEngineMode.decision);
+    expect(after.isCurrent, isTrue);
+    expect(before.isCurrent, isFalse);
+  });
+
   test('round-trips the non-secret configuration', () async {
     final box = _MemoryBox();
     await JevSettingsStore(box: box).save(
