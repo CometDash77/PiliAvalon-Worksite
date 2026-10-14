@@ -445,7 +445,8 @@ void main() {
     await store.save(settings.copyWith(provider: JevProvider.typeSafe));
     expect(await svc.policyKey(), isNot(edited));
     await store.save(settings);
-    expect(await svc.policyKey(), edited);
+    // Returning to Decision must not revive pre-switch cached decisions.
+    expect(await svc.policyKey(), isNot(edited));
   });
 
   test('bounded batch and oversized comment retain without truncation',

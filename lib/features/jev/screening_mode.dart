@@ -24,7 +24,7 @@ class ScreeningModeStore {
   static int _generation = 0;
   static int _pendingWrites = 0;
   // ponytail: serialize rare settings writes globally; use per-box queues if needed.
-  static Future<void> _writes = Future<void>.value();
+  static Future<void>? _writes;
 
   ScreeningEngineMode get _mode => switch (_box.get(key)) {
     'decision' => ScreeningEngineMode.decision,
@@ -79,9 +79,11 @@ class ScreeningModeStore {
   Future<void> _write(Future<void> Function() action) {
     _generation++;
     _pendingWrites++;
-    final result = _writes.then((_) => action()).whenComplete(() {
+    final result = (_writes ?? Future<void>.value()).then((_) => action()).whenComplete(() {
       _generation++;
       _pendingWrites--;
+      // Do not retain a completed Future from an expired caller/test zone.
+      if (_pendingWrites == 0) _writes = null;
     });
     // A failed save must reach its caller without poisoning subsequent writes.
     _writes = result.then<void>((_) {}, onError: (Object _, StackTrace __) {});

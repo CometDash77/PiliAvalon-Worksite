@@ -131,11 +131,11 @@ void main() {
         'small_card_v1': {'title': 'hide', 'area_name': '聊天', 'uid': 56},
       },
     });
-    final result = await JevFinalScreen.live<Object>(evaluator: evaluator)
-        .screen([raw, wrapped]);
-    expect(result, [raw]);
-    expect(evaluator.calls.single.$1, JevSurface.live);
-    expect(evaluator.calls.single.$2.first.toContext(), {
+    final screen = JevFinalScreen.live<Object>(evaluator: evaluator);
+    expect(await screen.screen([raw, wrapped]), [raw, wrapped]);
+    expect(evaluator.calls, isEmpty); // Live remains deliberately unwired.
+    expect(screen.toCandidate(wrapped)!.title, 'hide');
+    expect(screen.toCandidate(raw)!.toContext(), {
       'title': 'keep',
       'tags': ['游戏'],
     });
