@@ -363,7 +363,7 @@ void main() {
     },
   );
 
-  testWidgets('an unusable secure store keeps Jev off', (tester) async {
+  testWidgets('an unusable secure store preserves the route but sends nothing', (tester) async {
     final box = _MemoryBox();
     box.values[JevSettingsStore.enabledKey] = true;
     final credentials = _FakeCredentialStore(
@@ -390,14 +390,13 @@ void main() {
     );
 
     expect(find.text('系统安全存储不可用，Jev 保持关闭'), findsOneWidget);
-    expect(box.values[JevSettingsStore.enabledKey], isFalse);
+    expect(box.values[ScreeningModeStore.key], 'decision');
     expect(credentials.writeCount, 0);
     expect(probes, isEmpty);
-    final master = tester.widget<SwitchListTile>(
-      find.byType(SwitchListTile).first,
-    );
-    expect(master.value, isFalse);
-    expect(master.onChanged, isNull);
+    expect(find.textContaining('未就绪，不发送请求'), findsOneWidget);
+    await tester.tap(find.text('关闭'));
+    await tester.pumpAndSettle();
+    expect(box.values[ScreeningModeStore.key], 'off');
   });
 
   testWidgets('per-surface switches need the master switch', (tester) async {
@@ -416,23 +415,25 @@ void main() {
       messages: <String>[],
     );
 
+    await tester.tap(find.text('关闭'));
+    await tester.pumpAndSettle();
     final surfaces = tester
         .widgetList<SwitchListTile>(find.byType(SwitchListTile))
         .toList();
     // 母开关 + 判定缓存开关(issue #123) + 各生效入口；评论过滤开关区块已随
     // issue #122 移除，不再计入。
-    expect(surfaces.length, JevSurface.values.length + 2);
-    for (final tile in surfaces.skip(1)) {
+    expect(surfaces.length, JevSurface.values.length + 1);
+    for (final tile in surfaces) {
       expect(tile.onChanged, isNull);
       expect(tile.value, isFalse);
     }
 
-    await tester.tap(find.text('启用 LLM 语义筛选'));
+    await tester.tap(find.text('Decision'));
     await tester.pumpAndSettle();
     final enabled = tester
         .widgetList<SwitchListTile>(find.byType(SwitchListTile))
         .toList();
-    final wired = enabled.skip(1).where((tile) => tile.subtitle == null);
+    final wired = enabled.where((tile) => tile.subtitle == null);
     expect(wired.length, JevSurface.values.length - 1);
     for (final tile in wired) {
       expect(tile.onChanged, isNotNull);
@@ -441,7 +442,6 @@ void main() {
     // 判定缓存开关(issue #123)自带副标题但不是生效入口，按 key 排除。
     for (final tile
         in enabled
-            .skip(1)
             .where(
               (tile) =>
                   tile.subtitle != null &&
@@ -591,7 +591,7 @@ void main() {
       messages: <String>[],
     );
 
-    expect(find.text('Jev 已关闭：暂停收集，档与过期计时保留'), findsOneWidget);
+    expect(find.text('当前模式：Decision'), findsOneWidget);
     expect(find.text('甲主题'), findsOneWidget);
     expect(find.text('乙主题'), findsOneWidget);
 

@@ -7,7 +7,7 @@ import 'package:PiliPlus/features/jev/jev_credential_store.dart'
 import 'package:PiliPlus/features/jev/jev_contract.dart' show JevSurface;
 import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/jev/jev_screen_log.dart';
-import 'package:PiliPlus/features/jev/jev_settings.dart' show JevSettingsBox;
+import 'package:PiliPlus/features/jev/jev_settings.dart';
 import 'package:PiliPlus/features/llm/llm.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
@@ -87,6 +87,9 @@ ReplyInfo reply(String text, {int id = 1}) => ReplyInfo(
 
 Future<_FakeBox> _readyBox() async {
   final box = _FakeBox();
+  await JevSettingsStore(box: box).save(const JevSettings(
+    mode: ScreeningEngineMode.llm, surfaces: {JevSurface.comment, JevSurface.hot},
+  ));
   await LlmSettingsStore(box: box).save(
     const LlmProviderConfig(
       protocol: LlmProtocol.openAICompatible,

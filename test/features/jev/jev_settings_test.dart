@@ -22,9 +22,9 @@ class _MemoryBox implements JevSettingsBox {
 void main() {
   setUp(JevSettingsStore.resetCache);
 
-  test('defaults to fully disabled', () async {
+  test('defaults to Decision with no configured surfaces', () async {
     final settings = await JevSettingsStore(box: _MemoryBox()).load();
-    expect(settings.enabled, isFalse);
+    expect(settings.mode, ScreeningEngineMode.decision);
     expect(settings.provider, isNull);
     expect(settings.providerConfirmed, isFalse);
     expect(settings.surfaces, isEmpty);
@@ -123,7 +123,7 @@ void main() {
     );
     expect(box.values, isNotEmpty);
     for (final key in box.values.keys) {
-      expect(key.startsWith(JevSettingsStore.namespace), isTrue, reason: key);
+      expect(key == ScreeningModeStore.key || key.startsWith(JevSettingsStore.namespace), isTrue, reason: key);
     }
     expect(box.values.containsKey('piliavalon.jev.v1.surface.music'), isTrue);
     expect(box.values['piliavalon.jev.v1.surface.music'], isFalse);

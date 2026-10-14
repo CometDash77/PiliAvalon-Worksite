@@ -4,7 +4,7 @@ import 'package:PiliPlus/features/jev/jev_contract.dart';
 import 'package:PiliPlus/features/jev/jev_screen_log.dart';
 import 'package:PiliPlus/features/jev/jev_evaluator.dart';
 import 'package:PiliPlus/features/jev/jev_filter_log.dart';
-import 'package:PiliPlus/features/llm/llm_contract.dart';
+import 'package:PiliPlus/features/jev/screening_mode.dart';
 import 'package:PiliPlus/features/llm/llm_screening.dart';
 import 'package:PiliPlus/features/shielding/live_shielding.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
@@ -19,11 +19,7 @@ import 'package:PiliPlus/models_new/pgc/pgc_rank/pgc_rank_item_model.dart';
 ///
 /// 红线：任何失败都 fail-open——候选取不出、评测器抛异常、返回结构异常，
 /// 都返回原列表原顺序，绝不因为 JEV 故障吞掉正常内容。
-/// 双线模式（issue #113）：通用 LLM 线在 Jev 之后对幸存者复筛；
-/// Jev 拿到共享页预算的一半（JevLimits.dualShare），剩余时间归通用线。
-/// Jev 面开关的判定在 [JevEvaluator.screen] 内部（isSurfaceEnabled）；
-/// 通用线的门控在 [LlmVideoScreening.isEnabled] 内部。两线独立，
-/// 任一有效命中都隐藏（fail-open 各自独立）。
+/// 全局模式只选择一个后端；失败不回退，切换后的旧结果不应用。
 class JevFinalScreen<T> {
   JevFinalScreen({
     required this.surface,
@@ -59,7 +55,6 @@ class JevFinalScreen<T> {
 
   Future<List<T>> screen(List<T> items) async {
     if (items.isEmpty) return items;
-    final watch = Stopwatch()..start();
     final candidates = <JevCandidate>[];
     final indices = <int>[];
     for (var i = 0; i < items.length; i++) {
@@ -76,167 +71,69 @@ class JevFinalScreen<T> {
     }
     if (candidates.isEmpty) return items;
     try {
-      LlmVideoScreening? generic;
-      bool dualLine = false;
-      try {
-        generic = _effectiveVideoScreening;
-        dualLine = await generic.isEnabled();
-      } catch (_) {
-        generic = null; // 通用线任何故障按未启用处理，Jev 线不受影响
+      final mode = await _effectiveEvaluator.modes.load();
+      final settings = await _effectiveEvaluator.settings.load();
+      if (!mode.isCurrent || !settings.isSurfaceEnabled(surface)) return items;
+      final List<bool> hidden;
+      JevScreening? decision;
+      LlmVideoScreenOutcome? llm;
+      switch (mode.mode) {
+        case ScreeningEngineMode.off:
+          return items;
+        case ScreeningEngineMode.decision:
+          decision = await _effectiveEvaluator.screen(candidates, surface: surface);
+          hidden = decision.hidden;
+        case ScreeningEngineMode.llm:
+          llm = await _effectiveVideoScreening.screen([
+            for (final candidate in candidates)
+              LlmVideoCandidate(title: candidate.title, snippet: candidate.snippet,
+                tags: candidate.tags, identity: candidate.localKey),
+          ]);
+          hidden = llm.hidden;
       }
-      final screening = await _effectiveEvaluator.screen(
-        candidates,
-        surface: surface,
-        passTimeout: dualLine ? JevLimits.dualShare : null,
-      );
-      var anyHidden = false;
+      if (!mode.isCurrent || hidden.length != candidates.length) return items;
       final keep = List<bool>.filled(items.length, true);
-      final kind = T == ReplyInfo
-          ? JevScreenLogKind.comment
-          : JevScreenLogKind.video;
+      final kind = T == ReplyInfo ? JevScreenLogKind.comment : JevScreenLogKind.video;
       final blocked = <JevScreenLogEntry>[];
       final filterBlocked = <JevFilterLogEntry>[];
-      if (screening.status == JevScreenStatus.evaluated) {
-        final hidden = screening.hidden;
-        final decisions = screening.decisions;
-        final now = DateTime.now().millisecondsSinceEpoch;
-        for (var k = 0; k < indices.length && k < hidden.length; k++) {
-          if (hidden[k]) {
-            keep[indices[k]] = false;
-            anyHidden = true;
-            final candidate = candidates[k];
-            blocked.add(
-              JevScreenLogEntry(
-                time: now,
-                kind: kind,
-                surface: surface.id,
-                title: candidate.title,
-                snippet: candidate.snippet ?? _tagSummary(candidate.tags),
-              ),
-            );
-            // #105:同一真实筛除写入判定详情日志;数值只在本次判定真实产生
-            // 时记录,判定缓存命中的槽位留空,由界面说明缺失,不编造。
-            final JevScreenDecision? decision =
-                k < decisions.length ? decisions[k] : null;
-            filterBlocked.add(
-              JevFilterLogEntry(
-                time: now,
-                surface: surface.id,
-                title: candidate.title,
-                snippet: candidate.snippet,
-                tags: candidate.tags,
-                noul: decision?.noul,
-                confidence: decision?.confidence,
-                threshold: decision?.threshold,
-                ruleId: decision?.ruleId,
-              ),
-            );
-          }
+      final now = DateTime.now().millisecondsSinceEpoch;
+      for (var k = 0; k < indices.length; k++) {
+        if (!hidden[k]) continue;
+        keep[indices[k]] = false;
+        final candidate = candidates[k];
+        blocked.add(JevScreenLogEntry(
+          time: now, kind: kind, surface: surface.id, title: candidate.title,
+          snippet: candidate.snippet ?? _tagSummary(candidate.tags),
+          line: llm == null ? JevScreenLogLine.jev : JevScreenLogLine.llm,
+          ruleId: llm?.ruleIds[k], modelId: llm?.modelId,
+          reason: llm?.reasons[k], elapsedMs: llm?.elapsedMs,
+        ));
+        if (decision != null) {
+          final judgment = k < decision.decisions.length ? decision.decisions[k] : null;
+          filterBlocked.add(JevFilterLogEntry(
+            time: now, surface: surface.id, title: candidate.title,
+            snippet: candidate.snippet, tags: candidate.tags,
+            noul: judgment?.noul, confidence: judgment?.confidence,
+            threshold: judgment?.threshold, ruleId: judgment?.ruleId,
+          ));
         }
       }
-      if (blocked.isNotEmpty) {
-        try {
-          unawaited(JevScreenLog.instance.record(blocked));
-        } catch (_) {
-          // 日志失败不影响筛选。
-        }
+      if (blocked.isEmpty && llm?.failure != null) {
+        blocked.add(JevScreenLogEntry(
+          time: now, kind: kind, surface: surface.id, title: '',
+          line: JevScreenLogLine.llm, modelId: llm!.modelId,
+          failure: llm.failure, elapsedMs: llm.elapsedMs,
+        ));
       }
-      if (filterBlocked.isNotEmpty) {
-        try {
-          unawaited(JevFilterLog.instance.record(filterBlocked));
-        } catch (_) {
-          // 日志失败不影响筛选。
-        }
+      try {
+        if (blocked.isNotEmpty) unawaited(JevScreenLog.instance.record(blocked));
+        if (filterBlocked.isNotEmpty) unawaited(JevFilterLog.instance.record(filterBlocked));
+      } catch (_) {
+        // Log storage must not affect screening.
       }
-      // 通用线只看 Jev 幸存者（#113：低成本→Jev→通用 LLM）。
-      if (dualLine && generic != null) {
-        final remaining = LlmLimits.requestTimeout - watch.elapsed;
-        if (remaining > Duration.zero) {
-          final survivors = <LlmVideoCandidate>[];
-          final survivorSlots = <int>[];
-          for (var k = 0; k < indices.length; k++) {
-            if (!keep[indices[k]]) continue;
-            final candidate = candidates[k];
-            survivors.add(
-              LlmVideoCandidate(
-                title: candidate.title,
-                snippet: candidate.snippet,
-                tags: candidate.tags,
-                identity: candidate.localKey,
-              ),
-            );
-            survivorSlots.add(indices[k]);
-          }
-          if (survivors.isNotEmpty) {
-            try {
-              final genericOutcome = await generic.screen(
-                survivors,
-                timeout: remaining,
-              );
-              final genericHidden = genericOutcome.hidden;
-              final genericBlocked = <JevScreenLogEntry>[];
-              for (var s = 0; s < survivorSlots.length; s++) {
-                if (genericHidden[s]) {
-                  keep[survivorSlots[s]] = false;
-                  anyHidden = true;
-                  genericBlocked.add(
-                    JevScreenLogEntry(
-                      time: DateTime.now().millisecondsSinceEpoch,
-                      kind: kind,
-                      surface: surface.id,
-                      title: survivors[s].title,
-                      line: JevScreenLogLine.llm,
-                      snippet:
-                          survivors[s].snippet ??
-                          _tagSummary(survivors[s].tags),
-                      ruleId: genericOutcome.ruleIds[s],
-                      modelId: genericOutcome.modelId,
-                      reason: genericOutcome.reasons[s],
-                      elapsedMs: genericOutcome.elapsedMs,
-                    ),
-                  );
-                }
-              }
-              if (genericBlocked.isNotEmpty) {
-                try {
-                  unawaited(JevScreenLog.instance.record(genericBlocked));
-                } catch (_) {
-                  // 日志失败不影响筛选。
-                }
-              } else if (genericOutcome.failure != null) {
-                // 通用线整轮失败:只记类别/模型/耗时,不携带任何条目内容。
-                try {
-                  unawaited(
-                    JevScreenLog.instance.record([
-                      JevScreenLogEntry(
-                        time: DateTime.now().millisecondsSinceEpoch,
-                        kind: kind,
-                        surface: surface.id,
-                        title: '',
-                        line: JevScreenLogLine.llm,
-                        modelId: genericOutcome.modelId,
-                        failure: genericOutcome.failure,
-                        elapsedMs: genericOutcome.elapsedMs,
-                      ),
-                    ]),
-                  );
-                } catch (_) {
-                  // 日志失败不影响筛选。
-                }
-              }
-            } catch (_) {
-              // 通用线失败 fail-open：只丢通用线命中，Jev 命中保留。
-            }
-          }
-        }
-      }
-      if (!anyHidden) return items;
-      return [
-        for (var i = 0; i < items.length; i++)
-          if (keep[i]) items[i],
-      ];
+      return [for (var i = 0; i < items.length; i++) if (keep[i]) items[i]];
     } catch (_) {
-      return items; // 评测层任何异常都 fail-open
+      return items;
     }
   }
 

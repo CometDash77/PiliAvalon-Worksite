@@ -68,6 +68,7 @@ class LlmChatClient {
     required String system,
     required String user,
     Duration? timeout,
+    bool Function()? isCurrent,
   }) async {
     final config = await _settings.load();
     if (config.issues.isNotEmpty ||
@@ -86,6 +87,9 @@ class LlmChatClient {
       return const LlmChatOutcome.failed(LlmChatFailureKind.credential, null);
     }
     try {
+      if (isCurrent != null && !isCurrent()) {
+        return const LlmChatOutcome.failed(LlmChatFailureKind.cancelled, null);
+      }
       final data = await _transport(
         endpoint: config.chatEndpoint!,
         headers: <String, String>{

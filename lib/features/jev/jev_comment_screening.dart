@@ -10,6 +10,8 @@ import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/jev/jev_screen_log.dart';
 import 'package:PiliPlus/features/jev/jev_settings.dart';
 import 'package:PiliPlus/features/jev/jev_verdict_cache.dart';
+import 'package:PiliPlus/features/llm/llm_screening.dart';
+import 'package:PiliPlus/features/llm/llm_settings.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo;
 
@@ -48,9 +50,11 @@ class JevCommentScreening {
     JevRuleStore? rules,
     this.passTimeout = JevLimits.requestTimeout,
     JevVerdictCache? verdictCache,
+    LlmCommentScreening? llmScreening,
   }) : _transport = transport ?? JevHttpTransport().call,
        _credentials = credentials ?? SecureJevCredentialStore(),
        _settings = settings ?? JevSettingsStore(),
+       _llmScreening = llmScreening,
        _rules = rules ?? JevRuleStore(box: settings?.box),
        _verdictCache =
            verdictCache ?? JevVerdictCache(box: settings?.box, face: 'comment');
@@ -59,6 +63,12 @@ class JevCommentScreening {
   final JevCredentialStore _credentials;
   final JevSettingsStore _settings;
   final JevRuleStore _rules;
+  final LlmCommentScreening? _llmScreening;
+  LlmCommentScreening get _llm => _llmScreening ?? LlmCommentScreening(
+    settings: LlmSettingsStore(box: _settings.box),
+    rules: _rules,
+  );
+  ScreeningModeStore get modes => _settings.modes;
 
   /// Verdict cache shell for the comment face; the store itself is static,
   /// so throw-away instances (one per ReplyController access) still share
@@ -94,6 +104,9 @@ class JevCommentScreening {
 
   /// Whether the merged comment pipeline would run at all.
   Future<bool> isEnabled() async {
+    final mode = await modes.load();
+    if (mode.mode == ScreeningEngineMode.off) return false;
+    if (mode.mode == ScreeningEngineMode.llm) return _llm.isEnabled();
     final (_, activeRules) = await _loadActive();
     if (activeRules.isEmpty) return false;
     final settings = await _settings.load();
@@ -105,7 +118,8 @@ class JevCommentScreening {
   /// cached comment decisions.
   Future<String> policyKey() async {
     final (settings, activeRules) = await _loadActive();
-    return _fingerprint(settings, activeRules);
+    final mode = await modes.load();
+    return '${mode.mode.name}|${mode.generation}|${_fingerprint(settings, activeRules)}';
   }
 
   /// Screens [replies] (flat, source order; callers may pass the matching
@@ -117,6 +131,18 @@ class JevCommentScreening {
     Duration? timeout,
     bool screenLog = true,
   }) async {
+    final mode = await modes.load();
+    if (!mode.isCurrent || mode.mode == ScreeningEngineMode.off) {
+      return JevCommentResult(replies: replies, cacheable: true);
+    }
+    if (mode.mode == ScreeningEngineMode.llm) {
+      final result = await _llm.filter(replies, parents: parents,
+          timeout: timeout, screenLog: screenLog);
+      return JevCommentResult(
+        replies: mode.isCurrent ? result.replies : replies,
+        cacheable: mode.isCurrent && result.cacheable,
+      );
+    }
     final budget = timeout == null || timeout >= passTimeout
         ? passTimeout
         : timeout;
@@ -155,7 +181,7 @@ class JevCommentScreening {
       }
       if (cacheEnabled) {
         // initialPolicy is the same fingerprint, so reuse it verbatim.
-        generation = _generationPrefix + initialPolicy;
+        generation = '$_generationPrefix${mode.generation}|$initialPolicy';
       }
       // repeat_count keeps duplicated texts from being billed as new
       // candidates.
@@ -245,7 +271,7 @@ class JevCommentScreening {
       ) {
         final end = math.min(start + JevLimits.batchSize, sent.length);
         final batch = sent.sublist(start, end);
-        if (watch.elapsed >= budget) {
+        if (!mode.isCurrent || watch.elapsed >= budget) {
           expired = true;
           cacheable = false;
           break;
@@ -281,6 +307,7 @@ class JevCommentScreening {
               },
             ),
           ).timeout(budget - watch.elapsed);
+          if (!mode.isCurrent) break;
           if (data is! Map || data['answers'] is! Map) {
             cacheable = false;
             for (final index in batch) {
@@ -404,6 +431,9 @@ class JevCommentScreening {
       } catch (_) {
         cacheable = false;
       }
+    }
+    if (!mode.isCurrent) {
+      return JevCommentResult(replies: replies, cacheable: false);
     }
     final now = DateTime.now().millisecondsSinceEpoch;
     final blocked = <JevScreenLogEntry>[];

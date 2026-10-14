@@ -525,7 +525,8 @@ void main() {
         surface: JevSurface.hot,
         toCandidate: (item) =>
             JevCandidate(title: item.title, tags: [item.tname ?? '']),
-        evaluator: Harness(surfaces: {JevSurface.hot}).evaluator(capture),
+        evaluator: (Harness(surfaces: {JevSurface.hot})
+          ..settingsBox.values[ScreeningModeStore.key] = 'llm').evaluator(capture),
         videoScreening: _FakeVideoScreening(
           const LlmVideoScreenOutcome(
             hidden: [true, false],
@@ -565,7 +566,8 @@ void main() {
       final screen = JevFinalScreen<HotVideoItemModel>(
         surface: JevSurface.hot,
         toCandidate: (item) => JevCandidate(title: item.title),
-        evaluator: Harness(surfaces: {JevSurface.hot}).evaluator(capture),
+        evaluator: (Harness(surfaces: {JevSurface.hot})
+          ..settingsBox.values[ScreeningModeStore.key] = 'llm').evaluator(capture),
         videoScreening: _FakeVideoScreening(
           const LlmVideoScreenOutcome(
             hidden: [false, false],

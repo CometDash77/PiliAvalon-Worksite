@@ -128,6 +128,9 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   bool _busy = false;
   bool _obscureKey = true;
   bool _hasStoredKey = false;
+  bool _modeBusy = false;
+  bool _needsModeChoice = false;
+  LlmProviderConfig _activeLlm = LlmProviderConfig.empty;
 
   // Issue #123: verdict-cache bounds, read from the settings box in _load().
   bool _cacheEnabled = true;
@@ -165,6 +168,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
 
   Future<void> _load() async {
     final settings = await _store.load();
+    LlmProviderConfig activeLlm = LlmProviderConfig.empty;
+    try { activeLlm = await _llmStore.load(); } catch (_) {}
     final profile = await _preferences.load();
     final status = await _credentials.status();
     // Issue #123: verdict-cache bounds live in the settings box; reads are
@@ -198,13 +203,10 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     LlmProviderPreset providerPreset =
         kLlmProviderPresets.firstWhere((p) => p.id == providerId);
     if (!mounted) return;
-    if (status == JevKeyStoreStatus.unavailable && settings.enabled) {
-      // Issue #32: without a usable credential store Jev stays disabled.
-      await _saveSettings(settings.copyWith(enabled: false));
-      if (!mounted) return;
-    }
     setState(() {
-      _settings = JevSettingsStore.snapshot;
+      _settings = settings;
+      _activeLlm = activeLlm;
+      _needsModeChoice = _store.modes.needsChoice;
       _profile = profile;
       _cacheEnabled = cacheEnabled;
       _cacheEntries = JevVerdictCache.cachedEntryCount;
@@ -516,16 +518,56 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     );
   }
 
+  Future<void> _selectMode(ScreeningEngineMode mode) async {
+    setState(() => _modeBusy = true);
+    try {
+      await _saveQueue;
+      await _store.modes.save(mode);
+      final settings = await _store.load();
+      if (mounted) setState(() {
+        _settings = settings;
+        _needsModeChoice = false;
+      });
+    } catch (error) {
+      _toast('模式保存失败：$error');
+    } finally {
+      if (mounted) setState(() => _modeBusy = false);
+    }
+  }
+
+  String get _routeStatus => switch (_settings.mode) {
+    ScreeningEngineMode.off => '语义筛选已关闭：两个后端均不发送请求；确定性屏蔽照常运行。',
+    ScreeningEngineMode.decision =>
+      'Decision · ${_settings.provider?.label ?? "未选择提供方"} · '
+      '${_settings.provider == null ? "未配置模型" : _settings.modelFor(_settings.provider!)} · '
+      '${_settings.providerConfirmed && _hasStoredKey && _keyStoreStatus == JevKeyStoreStatus.available ? "配置就绪，按入口与规则运行" : "未就绪，不发送请求"}；LLM 不参与。',
+    ScreeningEngineMode.llm =>
+      'LLM · ${_activeLlm.normalizedBaseUrl} · ${_activeLlm.model} · '
+      '${_activeLlm.confirmed && _activeLlm.issues.isEmpty ? "配置已确认，仍需有效密钥及入口与规则" : "未就绪，不发送请求"}；Decision 不参与。',
+  };
+
   List<Widget> _buildSwitchSection() => [
-    SwitchListTile(
-      secondary: const Icon(Icons.psychology_outlined),
-      title: const Text('启用 LLM 语义筛选'),
-      subtitle: const Text('在所有更便宜的过滤之后，对幸存候选做最后一次语义判断'),
-      value: _settings.enabled,
-      onChanged: _keyStoreStatus == JevKeyStoreStatus.unavailable
-          ? null
-          : (value) => _saveSettings(_settings.copyWith(enabled: value)),
+    Padding(
+      padding: const EdgeInsets.all(16),
+      child: SegmentedButton<ScreeningEngineMode>(
+        key: const ValueKey('screening-mode'),
+        segments: [for (final mode in ScreeningEngineMode.values)
+          ButtonSegment(value: mode, label: Text(mode.label))],
+        selected: {_settings.mode},
+        onSelectionChanged: _modeBusy ? null : (value) => _selectMode(value.single),
+      ),
     ),
+    custom.ListTile(
+      key: const ValueKey('screening-route'),
+      title: Text('当前模式：${_settings.mode.label}'),
+      subtitle: Text(_routeStatus),
+    ),
+    if (_needsModeChoice)
+      const custom.ListTile(
+        leading: Icon(Icons.info_outline),
+        title: Text('升级后需要选择筛选模式'),
+        subtitle: Text('旧版 LLM 配置或未知模式已暂停；请选择关闭、Decision 或 LLM。两套模型、密钥与规则均已保留。'),
+      ),
     const Padding(
       padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Text('生效入口（各自的开关）'),
@@ -1326,6 +1368,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     final legacy = mapping.config!;
     try {
       await _llmStore.save(legacy);
+      if (mounted) setState(() => _activeLlm = legacy);
       if (key.isEmpty) {
         await _llmCredentials.delete(legacy.protocol!);
       } else {

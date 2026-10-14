@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:PiliPlus/features/jev/jev_settings.dart';
 import 'dart:math' as math;
 
 import 'package:PiliPlus/features/jev/jev_contract.dart';
@@ -77,6 +78,7 @@ class LlmCommentScreening {
 
   final LlmChatClient _client;
   final LlmSettingsStore _settings;
+  ScreeningModeStore get modes => _settings.modes;
   final LlmCredentialStore _credentials;
   final JevRuleStore _rules;
   final LlmVerdictCache _cache;
@@ -89,6 +91,10 @@ class LlmCommentScreening {
   /// rules remain the single comment config source, #113).
   Future<bool> isEnabled() async {
     try {
+      final mode = await modes.load();
+      if (mode.mode != ScreeningEngineMode.llm || !mode.isCurrent) return false;
+      if (!(await JevSettingsStore(box: _settings.box).load())
+          .isSurfaceEnabled(JevSurface.comment)) return false;
       final views = await _commentViews();
       if (views.isEmpty) return false;
       await _resolve(settings: _settings, credentials: _credentials);
@@ -112,6 +118,10 @@ class LlmCommentScreening {
     Duration? timeout,
     bool screenLog = true,
   }) async {
+    final mode = await modes.load();
+    if (mode.mode != ScreeningEngineMode.llm || !mode.isCurrent) {
+      return LlmCommentResult(replies: replies, cacheable: false);
+    }
     final budget = timeout == null || timeout >= LlmLimits.requestTimeout
         ? LlmLimits.requestTimeout
         : timeout;
@@ -128,6 +138,10 @@ class LlmCommentScreening {
     var expired = false;
     var initialFingerprint = '';
     try {
+      if (!(await JevSettingsStore(box: _settings.box).load())
+          .isSurfaceEnabled(JevSurface.comment)) {
+        return LlmCommentResult(replies: replies, cacheable: false);
+      }
       final views = await _commentViews();
       if (views.isEmpty || replies.isEmpty) {
         return LlmCommentResult(replies: replies, cacheable: cacheable);
@@ -161,7 +175,7 @@ class LlmCommentScreening {
       // Definite cached verdicts answer without the upstream (spec 5).
       final resolved = List<bool>.filled(replies.length, false);
       final cacheOn = _cache.enabled;
-      final generation = initialFingerprint;
+      final generation = '${mode.generation}|$initialFingerprint';
       if (cacheOn) {
         for (final i in sent) {
           final identity = _commentIdentity(replies[i]);
@@ -183,7 +197,7 @@ class LlmCommentScreening {
       ) {
         final end = math.min(start + JevLimits.batchSize, pending.length);
         final batch = pending.sublist(start, end);
-        if (watch.elapsed >= budget) {
+        if (!mode.isCurrent || watch.elapsed >= budget) {
           expired = true;
           cacheable = false;
           break;
@@ -208,6 +222,7 @@ class LlmCommentScreening {
           final remaining = budget - watch.elapsed;
           final outcome = await _client
               .call(
+                isCurrent: () => mode.isCurrent,
                 system: llmSystemPrompt,
                 user: LlmPrompt.commentUserMessage(
                   rules: views,
@@ -216,6 +231,7 @@ class LlmCommentScreening {
                 timeout: remaining,
               )
               .timeout(remaining);
+          if (!mode.isCurrent) break;
           if (!outcome.ok) {
             failure ??= 'upstream';
             cacheable = false;
@@ -292,6 +308,9 @@ class LlmCommentScreening {
       } catch (_) {
         cacheable = false;
       }
+    }
+    if (!mode.isCurrent) {
+      return LlmCommentResult(replies: replies, cacheable: false);
     }
     final now = DateTime.now().millisecondsSinceEpoch;
     final blocked = <JevScreenLogEntry>[];
@@ -454,6 +473,7 @@ class LlmVideoScreening {
   // one blob, so switching backends never re-asks for the same rule.
   final JevRuleStore _rules;
   final LlmSettingsStore _settings;
+  ScreeningModeStore get modes => _settings.modes;
   final LlmCredentialStore _credentials;
   final LlmVerdictCache _cache;
 
@@ -468,6 +488,8 @@ class LlmVideoScreening {
   /// Whether the generic video line would run at all.
   Future<bool> isEnabled() async {
     try {
+      final mode = await modes.load();
+      if (mode.mode != ScreeningEngineMode.llm || !mode.isCurrent) return false;
       await _migrateRules();
       final rules = (await _rules.load()).activeVideoTextRules();
       if (rules.isEmpty) return false;
@@ -487,7 +509,8 @@ class LlmVideoScreening {
     Duration? timeout,
   }) async {
     final hidden = List<bool>.filled(candidates.length, false);
-    if (candidates.isEmpty) {
+    final mode = await modes.load();
+    if (mode.mode != ScreeningEngineMode.llm || !mode.isCurrent || candidates.isEmpty) {
       return LlmVideoScreenOutcome(hidden: hidden);
     }
     final budget = timeout == null || timeout >= LlmLimits.requestTimeout
@@ -525,6 +548,7 @@ class LlmVideoScreening {
       );
       modelId = context.config.model;
       final fingerprint = _fingerprint(context.config, rules);
+      final generation = '${mode.generation}|$fingerprint';
       final knownIds = {for (final rule in rules) rule.id};
       final cacheOn = _cache.enabled;
       final resolved = List<bool>.filled(candidates.length, false);
@@ -532,19 +556,20 @@ class LlmVideoScreening {
         for (var i = 0; i < candidates.length; i++) {
           final identity = _videoIdentity(candidates[i]);
           if (identity == null) continue;
-          final cached = _cache.lookup(fingerprint, identity);
+          final cached = _cache.lookup(generation, identity);
           if (cached == null) continue;
           resolved[i] = true;
           if (cached) hidden[i] = true;
         }
       }
       for (var i = 0; i < candidates.length; i++) {
+        if (!mode.isCurrent) return done(List<bool>.filled(candidates.length, false));
         if (resolved[i]) continue;
         final candidate = candidates[i];
         final title = candidate.title.trim();
         // Empty titles carry no semantic to judge; fail open, do not cache.
         if (title.isEmpty) continue;
-        if (watch.elapsed >= budget) {
+        if (!mode.isCurrent || watch.elapsed >= budget) {
           // Over budget: no further verdict may be applied or cached.
           return done(
             List<bool>.filled(candidates.length, false),
@@ -556,6 +581,7 @@ class LlmVideoScreening {
           final remaining = budget - watch.elapsed;
           final outcome = await _client
               .call(
+                isCurrent: () => mode.isCurrent,
                 system: llmSystemPrompt,
                 user: LlmPrompt.videoUserMessage(
                   rules: rules,
@@ -566,6 +592,7 @@ class LlmVideoScreening {
                 timeout: remaining,
               )
               .timeout(remaining);
+          if (!mode.isCurrent) break;
           if (!outcome.ok) {
             failure ??= 'upstream';
             continue;
@@ -584,7 +611,7 @@ class LlmVideoScreening {
           if (!verdict.droppedHits && cacheOn) {
             final identity = _videoIdentity(candidate);
             if (identity != null) {
-              _cache.put(fingerprint, identity, hide: hidden[i]);
+              _cache.put(generation, identity, hide: hidden[i]);
             }
           }
         } catch (e) {
@@ -592,6 +619,7 @@ class LlmVideoScreening {
           failure ??= e is TimeoutException ? 'timeout' : 'upstream';
         }
       }
+      if (!mode.isCurrent) return done(List<bool>.filled(candidates.length, false));
       // Mid-pass policy drift voids the whole pass (Jev precedent).
       final remaining = budget - watch.elapsed;
       if (remaining <= Duration.zero) {
@@ -612,6 +640,7 @@ class LlmVideoScreening {
           failure: failure ?? 'drift',
         );
       }
+      if (!mode.isCurrent) return done(List<bool>.filled(candidates.length, false));
       return done(
         hidden,
         ruleIds: ruleIds,
