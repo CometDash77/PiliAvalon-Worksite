@@ -1,0 +1,192 @@
+name: Signed Android PR
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+
+jobs:
+  android-pr-apks:
+    name: Android PR APKs
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Require a trusted Worksite branch
+        if: github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Fork-originated changes must be reviewed and brought onto a trusted Worksite branch before Android signing."
+          exit 1
+
+      - name: Checkout PR merge revision
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: |
+            android/*.gradle*
+            android/**/gradle-wrapper.properties
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+
+      - name: Apply Android patches
+        shell: pwsh
+        run: lib/scripts/patch.ps1 android
+
+      - name: Configure release signing
+        env:
+          SIGN_KEYSTORE_BASE64: ${{ secrets.SIGN_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in SIGN_KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "Required Android signing secret is missing: ${name}" >&2
+              exit 1
+            fi
+          done
+          python3 - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+
+          def escape_property(value):
+              escaped = []
+              for index, char in enumerate(value):
+                  code = ord(char)
+                  if char == "\\":
+                      escaped.append("\\\\")
+                  elif char == "\t":
+                      escaped.append("\\t")
+                  elif char == "\n":
+                      escaped.append("\\n")
+                  elif char == "\r":
+                      escaped.append("\\r")
+                  elif char == "\f":
+                      escaped.append("\\f")
+                  elif char in " \\t" and all(previous in " \\t" for previous in value[:index]):
+                      escaped.append("\\" + char)
+                  elif char in "=:#!":
+                      escaped.append("\\" + char)
+                  elif code < 0x20 or code > 0xFF:
+                      escaped.append(f"\\u{code:04x}")
+                  else:
+                      escaped.append(char)
+              return "".join(escaped)
+
+          encoded_keystore = "".join(os.environ["SIGN_KEYSTORE_BASE64"].split())
+          keystore = base64.b64decode(encoded_keystore, validate=True)
+          if not keystore:
+              raise SystemExit("Android signing keystore is empty")
+          Path("android/app/key.jks").write_bytes(keystore)
+
+          values = {
+              "storeFile": "key.jks",
+              "storePassword": os.environ["KEYSTORE_PASSWORD"],
+              "keyAlias": os.environ["KEY_ALIAS"],
+              "keyPassword": os.environ["KEY_PASSWORD"],
+          }
+          Path("android/key.properties").write_text(
+              "".join(f"{key}={escape_property(value)}\n" for key, value in values.items()),
+              encoding="ascii",
+          )
+          PY
+
+      - name: Set version metadata
+        shell: pwsh
+        env:
+          PILI_VERSION_CODE_FLOOR: 5150
+        run: lib/scripts/build.ps1 android
+
+      - name: Build split APKs
+        run: flutter build apk --release --split-per-abi --dart-define-from-file=pili_release.json --no-pub
+
+      - name: Rename split APKs
+        shell: bash
+        env:
+          VERSION: ${{ env.version }}
+        run: |
+          set -euo pipefail
+          output_dir="build/app/outputs/flutter-apk"
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            source="${output_dir}/app-${abi}-release.apk"
+            test -s "$source"
+            mv "$source" "PiliAvalon_android_${VERSION}_${abi}.apk"
+          done
+
+      - name: Build universal APK
+        run: flutter build apk --release --dart-define-from-file=pili_release.json --no-pub
+
+      - name: Rename universal APK
+        shell: bash
+        env:
+          VERSION: ${{ env.version }}
+        run: |
+          set -euo pipefail
+          source="build/app/outputs/flutter-apk/app-release.apk"
+          test -s "$source"
+          mv "$source" "PiliAvalon_android_${VERSION}_universal.apk"
+
+      - name: Verify signed APK variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          build_tools="${ANDROID_HOME}/build-tools/$(ls "${ANDROID_HOME}/build-tools" | sort -V | tail -n 1)"
+          for abi in arm64-v8a armeabi-v7a x86_64 universal; do
+            apk="PiliAvalon_android_${{ env.version }}_${abi}.apk"
+            test -s "$apk"
+            "${build_tools}/apksigner" verify --print-certs "$apk" >/dev/null
+          done
+
+      - name: Upload arm64-v8a APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: Android_arm64-v8a
+          path: PiliAvalon_android_*_arm64-v8a.apk
+          archive: false
+          if-no-files-found: error
+
+      - name: Upload armeabi-v7a APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: Android_armeabi-v7a
+          path: PiliAvalon_android_*_armeabi-v7a.apk
+          archive: false
+          if-no-files-found: error
+
+      - name: Upload x86_64 APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: Android_x86_64
+          path: PiliAvalon_android_*_x86_64.apk
+          archive: false
+          if-no-files-found: error
+
+      - name: Upload universal APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: Android_universal
+          path: PiliAvalon_android_*_universal.apk
+          archive: false
+          if-no-files-found: error

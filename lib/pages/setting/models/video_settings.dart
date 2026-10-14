@@ -83,15 +83,39 @@ List<SettingsModel> get videoSettings => [
     defaultVal: false,
     onChanged: (value) => VideoUtils.disableAudioCDN = value,
   ),
+  if (Platform.isAndroid || Platform.isIOS)
+    NormalModel(
+      title: '半屏默认画质',
+      leading: const Icon(Icons.video_settings_outlined),
+      getSubtitle: () {
+        final quality = Pref.defaultVideoQaHalfScreen;
+        if (quality == null) {
+          return '跟随全屏画质'
+              '（WiFi ${VideoQuality.fromCode(Pref.defaultVideoQa).desc}'
+              '｜蜂窝 ${VideoQuality.fromCode(Pref.defaultVideoQaCellular).desc}）';
+        }
+        final clamped = [
+          if (Pref.defaultVideoQa < quality)
+            'WiFi 下实际 ${VideoQuality.fromCode(Pref.defaultVideoQa).desc}',
+          if (Pref.defaultVideoQaCellular < quality)
+            '蜂窝下实际 ${VideoQuality.fromCode(Pref.defaultVideoQaCellular).desc}',
+        ];
+        final description = VideoQuality.fromCode(quality).desc;
+        return clamped.isEmpty
+            ? '当前画质：$description'
+            : '当前画质：$description（${clamped.join('｜')}）';
+      },
+      onTap: showVideoQaHalfScreenDialog,
+    ),
   NormalModel(
-    title: '默认画质',
+    title: '全屏默认画质',
     leading: const Icon(Icons.video_settings_outlined),
     getSubtitle: () =>
         '当前画质：${VideoQuality.fromCode(Pref.defaultVideoQa).desc}',
     onTap: _showVideoQaDialog,
   ),
   NormalModel(
-    title: '蜂窝网络画质',
+    title: '全屏蜂窝网络画质',
     leading: const Icon(Icons.video_settings_outlined),
     getSubtitle: () =>
         '当前画质：${VideoQuality.fromCode(Pref.defaultVideoQaCellular).desc}',
@@ -242,13 +266,34 @@ Future<void> _showVideoQaDialog(
   final res = await showDialog<int>(
     context: context,
     builder: (context) => SelectDialog<int>(
-      title: '默认画质',
+      title: '全屏默认画质',
       value: Pref.defaultVideoQa,
       values: VideoQuality.values.map((e) => (e.code, e.desc)).toList(),
     ),
   );
   if (res != null) {
     await GStorage.setting.put(SettingBoxKey.defaultVideoQa, res);
+    setState();
+  }
+}
+
+Future<void> showVideoQaHalfScreenDialog(
+  BuildContext context,
+  VoidCallback setState,
+) async {
+  final res = await showDialog<int>(
+    context: context,
+    builder: (context) => SelectDialog<int>(
+      title: '半屏默认画质',
+      value: Pref.defaultVideoQaHalfScreen ?? -1,
+      values: [
+        (-1, '跟随全屏画质'),
+        ...VideoQuality.values.map((e) => (e.code, e.desc)),
+      ],
+    ),
+  );
+  if (res != null) {
+    await GStorage.setting.put(SettingBoxKey.defaultVideoQaHalfScreen, res);
     setState();
   }
 }
@@ -260,7 +305,7 @@ Future<void> _showVideoCellularQaDialog(
   final res = await showDialog<int>(
     context: context,
     builder: (context) => SelectDialog<int>(
-      title: '蜂窝网络画质',
+      title: '全屏蜂窝网络画质',
       value: Pref.defaultVideoQaCellular,
       values: VideoQuality.values.map((e) => (e.code, e.desc)).toList(),
     ),
