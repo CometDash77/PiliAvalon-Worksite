@@ -576,11 +576,7 @@ LlmLegacyMapping llmLegacyMappingFor(
 }) {
   final route = resolved.effectiveProtocol;
   if (!route.screenable) {
-    return const LlmLegacyMapping(
-      null,
-      '该路线不参与评论/视频筛选，请改用 OpenAI Chat Completions 或'
-      ' Anthropic Messages',
-    );
+    return LlmLegacyMapping(null, LlmPresetIssue.routeNotScreenable.message);
   }
   final endpoint = resolved.chatEndpoint;
   if (endpoint == null) {
@@ -609,7 +605,11 @@ LlmLegacyMapping llmLegacyMappingFor(
       protocol: isAnthropic
           ? LlmProtocol.anthropicCompatible
           : LlmProtocol.openAICompatible,
-      baseUrl: endpoint.substring(0, endpoint.length - suffix.length),
+      // v1 消费的是版本化 base（#139 base-before-version）；路径字面量里
+      // 协议尾段（/chat/completions 或 /v1/messages）之外的部分（如 DeepSeek
+      // 的 /anthropic）原样保留。anthropic 字面路径以 /v1/messages 收尾时，
+      // 版本段来自版本化 base，不能被尾段剥掉。
+      baseUrl: _mappingBaseUrl(resolved, route, suffix),
       model: resolved.account.model,
       confirmed: confirmed,
       httpInsecureConfirmed: resolved.account.httpInsecureConfirmed,
@@ -618,4 +618,26 @@ LlmLegacyMapping llmLegacyMappingFor(
     ),
     null,
   );
+}
+/// 映射后的 v1 base：版本化 base + 路径中间段（协议尾段之外的部分）。
+String _mappingBaseUrl(
+  LlmResolvedProvider resolved,
+  LlmRouteProtocol route,
+  String suffix,
+) {
+  final versionedBase =
+      llmVersionedBase(resolved.baseUrl, resolved.baseIncludesV1);
+  final chatPath = resolved.preset.chatPath(route, resolved.baseIncludesV1);
+  var middle =
+      chatPath == null ? '' : chatPath.substring(0, chatPath.length - suffix.length);
+  // 与 [llmJoinEndpoint] 对称的去重：版本段已在版本化 base 里时，
+  // 路径字面量自带的 /v1（整段或前缀）不再重复。
+  if (versionedBase.toLowerCase().endsWith('/v1')) {
+    if (middle.toLowerCase() == '/v1') {
+      middle = '';
+    } else if (middle.toLowerCase().startsWith('/v1/')) {
+      middle = middle.substring(3);
+    }
+  }
+  return '$versionedBase$middle';
 }

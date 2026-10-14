@@ -233,7 +233,9 @@ void main() {
         }) => completion.future,
       ),
     );
-    await tester.tap(find.text('OpenRouter'));
+    await tester.tap(
+      find.byKey(const ValueKey('jev-provider-openrouter')),
+    );
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('jev-api-key')),
@@ -268,7 +270,9 @@ void main() {
         validator: JevKeyValidator(),
         catalog: catalog,
       );
-      await tester.tap(find.text('OpenRouter'));
+      await tester.tap(
+      find.byKey(const ValueKey('jev-provider-openrouter')),
+    );
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('jev-model')),
@@ -322,7 +326,9 @@ void main() {
         validator: JevKeyValidator(),
         catalog: catalog,
       );
-      await tester.tap(find.text('OpenRouter'));
+      await tester.tap(
+      find.byKey(const ValueKey('jev-provider-openrouter')),
+    );
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('jev-model')),
@@ -368,7 +374,9 @@ void main() {
         validator: JevKeyValidator(),
         messages: [],
       );
-      await tester.tap(find.text('OpenRouter'));
+      await tester.tap(
+      find.byKey(const ValueKey('jev-provider-openrouter')),
+    );
       await tester.pumpAndSettle();
       expect(find.text('模型 ID'), findsOneWidget);
       expect(find.text('保存模型'), findsOneWidget);
@@ -552,14 +560,16 @@ void main() {
       messages: messages,
     );
 
-    await tester.tap(find.text('OpenRouter'));
+    await tester.tap(
+      find.byKey(const ValueKey('jev-provider-openrouter')),
+    );
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('jev-api-key')),
       'plain-key',
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, '保存密钥'));
+    await tester.tap(find.byKey(const ValueKey('jev-save-key')));
     await tester.pumpAndSettle();
 
     expect(credentials.stored, 'plain-key');
@@ -567,7 +577,7 @@ void main() {
     expect(find.text('密钥已保存在系统安全存储'), findsOneWidget);
     expect(box.values.toString().contains('plain-key'), isFalse);
 
-    await tester.tap(find.widgetWithText(TextButton, '清除密钥'));
+    await tester.tap(find.byKey(const ValueKey('jev-clear-key')));
     await tester.pumpAndSettle();
     expect(credentials.deleteCount, 1);
     expect(credentials.stored, isNull);
@@ -674,7 +684,9 @@ void main() {
       messages: messages,
     );
 
-    await tester.tap(find.text('OpenRouter'));
+    await tester.tap(
+      find.byKey(const ValueKey('jev-provider-openrouter')),
+    );
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('jev-api-key')),
@@ -711,7 +723,9 @@ void main() {
       messages: <String>[],
     );
 
-    await tester.tap(find.text('OpenRouter'));
+    await tester.tap(
+      find.byKey(const ValueKey('jev-provider-openrouter')),
+    );
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('jev-api-key')),
@@ -758,7 +772,7 @@ void main() {
         'sk-or-k',
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(TextButton, '保存密钥'));
+      await tester.tap(find.byKey(const ValueKey('llm-save-key')));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('llm-model')),

@@ -681,6 +681,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     ),
     for (final provider in JevProvider.values)
       custom.ListTile(
+        key: ValueKey('jev-provider-${provider.id}'),
         leading: Icon(
           _settings.provider == provider
               ? Icons.radio_button_checked
@@ -818,6 +819,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
                     _selection.canValidate
                 ? _saveKey
                 : null,
+            key: const ValueKey('jev-save-key'),
             child: const Text('保存密钥'),
           ),
           const SizedBox(width: 8),
@@ -833,7 +835,11 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
             child: Text(_busy ? '验证中…' : '验证'),
           ),
           const SizedBox(width: 8),
-          TextButton(onPressed: _deleteKey, child: const Text('清除密钥')),
+          TextButton(
+            key: const ValueKey('jev-clear-key'),
+            onPressed: _deleteKey,
+            child: const Text('清除密钥'),
+          ),
         ],
       ),
     ),
@@ -921,6 +927,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       child: TextField(
         key: const ValueKey('llm-base-url'),
         controller: _llmBaseUrlController,
+        onChanged: (_) => setState(() {}),
         decoration: InputDecoration(
           labelText: '服务地址 Base URL',
           border: const OutlineInputBorder(),
@@ -989,8 +996,16 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Wrap(
         children: [
-          TextButton(onPressed: _saveProvKey, child: const Text('保存密钥')),
-          TextButton(onPressed: _deleteProvKey, child: const Text('清除密钥')),
+          TextButton(
+            key: const ValueKey('llm-save-key'),
+            onPressed: _saveProvKey,
+            child: const Text('保存密钥'),
+          ),
+          TextButton(
+            key: const ValueKey('llm-clear-key'),
+            onPressed: _deleteProvKey,
+            child: const Text('清除密钥'),
+          ),
         ],
       ),
     ),
@@ -1013,6 +1028,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
           child: TextField(
             key: const ValueKey('llm-model-search'),
             controller: _llmSearchController,
+            onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
               labelText: '搜索模型',
               border: OutlineInputBorder(),
@@ -1169,6 +1185,32 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
             issue != LlmPresetIssue.catalogUnavailable)
         .toList();
     if (blocking.isNotEmpty) {
+      // 清洗式保存：被阻塞的维度回退默认（路线清空回主路线、不安全地址
+      // 清空回预设默认），其余字段照常落盘；提示原因。记录必须存在，
+      // 否则用户的模型/地址草稿会静默丢失。
+      var sanitized = account;
+      final stripRoute = blocking.any((issue) =>
+          issue == LlmPresetIssue.routeNotScreenable ||
+          issue == LlmPresetIssue.unsupportedRoute);
+      final stripBase = blocking.any((issue) =>
+          issue == LlmPresetIssue.insecureBaseUrl ||
+          issue == LlmPresetIssue.missingBaseUrl ||
+          issue == LlmPresetIssue.invalidBaseUrl);
+      if (stripRoute) sanitized = sanitized.copyWith(protocolSet: false);
+      if (stripBase) {
+        sanitized = sanitized.copyWith(baseUrl: '', httpInsecureConfirmed: false);
+      }
+      try {
+        await _provStore.save(sanitized);
+      } catch (error) {
+        _toast('提供方配置保存失败：$error');
+        return;
+      }
+      if (!mounted) return;
+      setState(() {
+        _provAccount = sanitized;
+        _provGeneration++;
+      });
       _toast(blocking.first.message);
       return;
     }
@@ -1243,6 +1285,10 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     setState(() {
       _provCatalogBusy = false;
       _provCatalogResult = result;
+      if (result.error != null) {
+        // 目录失败：目录态草稿不可信，输入框回退到已保存模型。
+        _llmModelController.text = _provAccount.model ?? '';
+      }
     });
   }
 
