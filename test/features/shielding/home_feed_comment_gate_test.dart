@@ -29,14 +29,15 @@ LoadingState<MainListReply> _visible() =>
 
 class _SemanticScreening extends JevCommentScreening {
   int calls = 0;
+  bool ready = true;
   @override
-  Future<bool> isEnabled() async => true;
+  Future<bool> isEnabled() async => ready;
   @override
   Future<JevCommentResult> filter(List<ReplyInfo> replies, {
     List<String?>? parents, Duration? timeout, bool screenLog = true,
   }) async {
     calls++;
-    return const JevCommentResult(replies: [], cacheable: true);
+    return JevCommentResult(replies: ready ? [] : replies, cacheable: ready);
   }
 }
 
@@ -83,6 +84,26 @@ void main() {
     last.complete(_visible());
     expect(await pending, [1, 3]);
     expect(screening.calls, 1); // No new semantic work after the switch.
+  });
+
+  test('LLM readiness recovery cannot persist a paid gate decision', () async {
+    final screening = _SemanticScreening()..ready = false;
+    await screening.modes.save(ScreeningEngineMode.llm);
+    var recover = true;
+    Future<List<int>> run() => HomeFeedCommentGate.filter<int>(
+      [1], config: _guardOn, ruleSet: ShieldRuleSet(),
+      getAid: (item) => item, commentScreening: screening,
+      loader: ({required oid, required type, required mode, required offset, required cursorNext}) async {
+        screening.ready = recover;
+        return _visible();
+      },
+    );
+    expect(await run(), isEmpty);
+    expect(HomeFeedCommentGate.decisionCacheEntryCount, 0);
+    screening.ready = recover = false;
+    expect(await run(), [1]);
+    expect(screening.calls, 2);
+    await screening.modes.save(ScreeningEngineMode.decision);
   });
 
   group('HomeFeedCommentGate', () {

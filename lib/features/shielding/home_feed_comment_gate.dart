@@ -113,7 +113,8 @@ abstract final class HomeFeedCommentGate {
           loader: loader,
           timeout: timeout,
           screening: screening,
-          cacheResults: !semanticEnabled,
+          // LLM readiness can recover during loading; never persist its gate verdicts.
+          cacheResults: !semanticEnabled && mode.mode != ScreeningEngineMode.llm,
           mode: mode,
         );
         // 没有判定（失败 / 超时）→ 保留条目（fail-open）。

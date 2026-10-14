@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:PiliPlus/features/jev/jev_comment_screening.dart';
+import 'package:PiliPlus/features/jev/jev_comment_migration.dart';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -192,6 +193,25 @@ void main() {
     expect((await shared.filter(replies)).replies, replies);
     expect(decisionCalls, 0);
     expect(stub.calls, hasLength(1));
+  });
+
+  test('LLM-first comments migrate retired criteria and surface before screening', () async {
+    final box = await _readyBox();
+    await JevRuleStore(box: box).save(const JevRuleConfig());
+    box.map.remove(JevSettingsStore.surfaceKey(JevSurface.comment));
+    box.map[JevSettingsStore.commentEnabledKey] = true;
+    box.map[JevSettingsStore.commentCriteriaKey] = '隐藏旧规则广告';
+    JevCommentCriteriaMigration.resetForTest();
+    final stub = _Stub((_, _, _) async => _openaiOk(_llmJson([])));
+    final shared = JevCommentScreening(
+      settings: JevSettingsStore(box: box), rules: JevRuleStore(box: box),
+      llmScreening: _screening(box, stub),
+    );
+    await shared.filter([reply('a')], screenLog: false);
+    expect(stub.calls, hasLength(1));
+    expect(_userOf(stub.calls.single), contains('隐藏旧规则广告'));
+    expect(box.map.containsKey(JevSettingsStore.commentCriteriaKey), isFalse);
+    expect((await shared.modes.load()).mode, ScreeningEngineMode.llm);
   });
 
   test('no active comment rules: nothing is sent', () async {
