@@ -200,6 +200,16 @@ abstract final class JevRequest {
   };
 }
 
+/// Issue #144: persisted key-value seam shared by the settings layer and any
+/// feature-scoped store (LLM provider configs, …). Pure interface: the Hive
+/// implementation ([HiveJevSettingsBox]) stays in jev_settings.dart so that
+/// consumers of the interface alone do not compile the UI dependency chain.
+abstract interface class JevSettingsBox {
+  Object? get(String key, {Object? defaultValue});
+  Future<void> put(String key, Object? value);
+  Future<void> delete(String key);
+}
+
 /// Answer-side field names, parsed leniently: a Noul answer carries 'noul',
 /// a Choice/Score answer additionally carries 'confidence' (issue #31, gap
 /// G-04). Anything unreadable fails open in the evaluator.
@@ -208,3 +218,4 @@ abstract final class JevResponse {
   static const String noulField = 'noul';
   static const String confidenceField = 'confidence';
 }
+

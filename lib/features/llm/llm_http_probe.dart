@@ -1,4 +1,5 @@
 import 'package:PiliPlus/features/llm/llm_contract.dart';
+import 'package:PiliPlus/features/llm/llm_provider_presets.dart';
 import 'package:PiliPlus/features/llm/llm_response.dart';
 import 'package:PiliPlus/features/llm/llm_settings.dart';
 import 'package:dio/dio.dart';
@@ -96,7 +97,7 @@ class LlmHttpProbe {
           followRedirects: false,
           headers: <String, String>{
             'content-type': 'application/json',
-            if (apiKey.isNotEmpty) ...protocol.authHeaders(apiKey),
+            if (apiKey.isNotEmpty) ...config.authHeaders(apiKey),
           },
           sendTimeout: LlmLimits.requestTimeout,
           receiveTimeout: LlmLimits.requestTimeout,
@@ -126,6 +127,84 @@ class LlmHttpProbe {
       );
     }
   }
+
+  /// Issue #145: 按提供方预设的真实端点与鉴权做探活。
+  ///
+  /// 与 [call] 的差别只在配置来源：端点与鉴权头取自 [resolved]（预设形态，
+  /// 例如家族根路径、Bearer-on-Anthropic），请求体仍按解析出的路线协议构造。
+  /// 结构缺失（未选模型、路线不支持等）不发包：[LlmProbeResult.outcome]
+  /// 为 null，原因在 [detail]。
+  Future<LlmProbeResult> callResolved({
+    required LlmResolvedProvider resolved,
+    required String apiKey,
+  }) async {
+    final blocking = resolved.issues;
+    if (blocking.isNotEmpty) {
+      return LlmProbeResult(null, detail: blocking.first.message);
+    }
+    final route = resolved.effectiveProtocol;
+    final effectiveModel = resolved.account.model;
+    try {
+      final response = await _dio.post<Object?>(
+        resolved.chatEndpoint!,
+        data: switch (route) {
+          LlmRouteProtocol.anthropicMessages => <String, Object?>{
+            'model': effectiveModel,
+            'max_tokens': 16,
+            'messages': const <Map<String, String>>[
+              {'role': 'user', 'content': _probePrompt},
+            ],
+          },
+          _ => <String, Object?>{
+            'model': effectiveModel,
+            'messages': const <Map<String, String>>[
+              {'role': 'user', 'content': _probePrompt},
+            ],
+            'max_tokens': 16,
+            'stream': false,
+          },
+        },
+        options: Options(
+          followRedirects: false,
+          headers: <String, String>{
+            'content-type': 'application/json',
+            if (apiKey.isNotEmpty) ...resolved.authHeaders(apiKey),
+          },
+          sendTimeout: LlmLimits.requestTimeout,
+          receiveTimeout: LlmLimits.requestTimeout,
+        ),
+      );
+      final status = response.statusCode ?? 0;
+      if (status < 200 || status >= 300) {
+        return LlmProbeResult(
+          _outcomeForResponse(status, response.data),
+          detail: _describeResponse(status, response.data),
+        );
+      }
+      if (LlmResponseText.extract(_legacyProtocol(route), response.data) ==
+          null) {
+        return LlmProbeResult(
+          LlmProbeOutcome.malformedResponse,
+          detail: _describeResponse(status, response.data),
+        );
+      }
+      return const LlmProbeResult(LlmProbeOutcome.ok);
+    } on DioException catch (error) {
+      return LlmProbeResult(
+        _outcomeForError(error),
+        detail: _describeResponse(
+          error.response?.statusCode,
+          error.response?.data,
+        ),
+      );
+    }
+  }
+
+  static LlmProtocol _legacyProtocol(LlmRouteProtocol route) =>
+      switch (route) {
+        LlmRouteProtocol.anthropicMessages => LlmProtocol.anthropicCompatible,
+        _ => LlmProtocol.openAICompatible,
+      };
 
   static LlmProbeOutcome _outcomeForResponse(int status, Object? data) {
     final text =

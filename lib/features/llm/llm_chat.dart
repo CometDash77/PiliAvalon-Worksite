@@ -89,7 +89,7 @@ class LlmChatClient {
       final data = await _transport(
         endpoint: config.chatEndpoint!,
         headers: <String, String>{
-          ...protocol.authHeaders(apiKey),
+          ...config.authHeaders(apiKey),
           'content-type': 'application/json',
         },
         body: requestBody(

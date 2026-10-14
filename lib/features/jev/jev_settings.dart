@@ -2,6 +2,10 @@ import 'package:PiliPlus/features/jev/jev_contract.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:flutter/foundation.dart' show immutable, setEquals, mapEquals;
 
+// Issue #144: JevSettingsBox itself moved to the pure-interface
+// jev_contract.dart; re-exported here so existing importers are unaffected.
+export 'package:PiliPlus/features/jev/jev_contract.dart' show JevSettingsBox;
+
 /// Persisted, non-secret Jev configuration (issues #32/#35).
 @immutable
 class JevSettings {
@@ -113,11 +117,8 @@ class JevSettings {
 }
 
 /// Storage seam so tests never touch Hive.
-abstract interface class JevSettingsBox {
-  Object? get(String key, {Object? defaultValue});
-  Future<void> put(String key, Object? value);
-  Future<void> delete(String key);
-}
+// JevSettingsBox lives in jev_contract.dart (issue #144); only the Hive
+// implementation stays here.
 
 class HiveJevSettingsBox implements JevSettingsBox {
   HiveJevSettingsBox(this._box);

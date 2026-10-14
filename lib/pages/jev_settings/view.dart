@@ -28,6 +28,7 @@ class JevSettingsPage extends StatefulWidget {
     this.llmCredentials,
     this.llmCatalog,
     this.llmProbe,
+    this.llmProviderStore,
     this.preferenceStore,
     this.onMessage,
   });
@@ -43,6 +44,9 @@ class JevSettingsPage extends StatefulWidget {
   final LlmCredentialStore? llmCredentials;
   final LlmModelCatalog? llmCatalog;
   final LlmHttpProbe? llmProbe;
+
+  // Issue #145: provider-aware store (v2 accounts + per-provider keys).
+  final LlmProviderConfigStore? llmProviderStore;
 
   /// The local negative-feedback profile surface (issue #33).
   final JevPreferenceStore? preferenceStore;
@@ -75,17 +79,33 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   late final LlmModelCatalog _llmCatalog =
       widget.llmCatalog ?? LlmModelCatalog();
   late final LlmHttpProbe _llmProbe = widget.llmProbe ?? LlmHttpProbe();
-  LlmProviderConfig _llmConfig = LlmProviderConfig.empty;
-  bool _llmHasStoredKey = false;
-  bool _llmCatalogBusy = false;
-  int _llmCatalogGeneration = 0;
-  LlmModelCatalogResult? _llmCatalogResult;
-  LlmProbeResult? _llmProbeResult;
-  bool _llmBusy = false;
+  // Issue #145: provider-aware section. The v1 store/credentials stay the
+  // single write target for the screening line: probe success maps the saved
+  // account through llmLegacyMappingFor and writes through, so screening only
+  // ever consumes a configuration the probe actually exercised.
+  late final LlmProviderConfigStore _provStore =
+      widget.llmProviderStore ?? createDefaultLlmProviderConfigStore();
+  String _provId = kLlmProviderPresets.first.id;
+  LlmProviderAccount _provAccount = LlmProviderAccount(
+    providerId: kLlmProviderPresets.first.id,
+  );
+  // Draft overrides (null = follow the preset default). Nothing here is
+  // persisted until 保存配置.
+  LlmRouteProtocol? _provDraftProtocol;
+  bool? _provDraftIncludesV1;
+  bool _provInsecureConfirmed = false;
+  bool _provCatalogBusy = false;
+  bool _provBusy = false;
+  bool _provKeyStored = false;
   bool _llmObscureKey = true;
+  int _provGeneration = 0;
+  LlmModelCatalogResult? _provCatalogResult;
+  LlmProbeResult? _llmProbeResult;
+  String? _provMappingError;
   final TextEditingController _llmBaseUrlController = TextEditingController();
   final TextEditingController _llmModelController = TextEditingController();
   final TextEditingController _llmKeyController = TextEditingController();
+  final TextEditingController _llmSearchController = TextEditingController();
   final TextEditingController _modelController = TextEditingController();
   int _generation = 0;
   int _catalogGeneration = 0;
@@ -130,6 +150,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     _llmBaseUrlController.dispose();
     _llmModelController.dispose();
     _llmKeyController.dispose();
+    _llmSearchController.dispose();
     super.dispose();
   }
 
@@ -164,19 +185,18 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         storedKey = null;
       }
     }
-    // Issue #131: the generic-line config is independent of the Jev settings;
-    // a broken box or credential store keeps the section at its defaults.
-    LlmProviderConfig llmConfig = LlmProviderConfig.empty;
-    String? llmStoredKey;
+    // Issue #145: provider-aware hydration is independent of the Jev
+    // settings; a broken store keeps the section at its preset defaults.
+    var providerId = kLlmProviderPresets.first.id;
+    LlmProviderAccount? providerAccount;
+    String? providerKey;
     try {
-      llmConfig = await _llmStore.load();
-      final llmProtocol = llmConfig.protocol;
-      if (llmProtocol != null &&
-          await _llmCredentials.status(llmProtocol) ==
-              JevKeyStoreStatus.available) {
-        llmStoredKey = await _llmCredentials.read(llmProtocol);
-      }
+      providerId = await _provStore.activeProvider() ?? providerId;
+      providerAccount = await _provStore.load(providerId);
+      providerKey = await _provStore.readKey(providerId);
     } catch (_) {}
+    LlmProviderPreset providerPreset =
+        kLlmProviderPresets.firstWhere((p) => p.id == providerId);
     if (!mounted) return;
     if (status == JevKeyStoreStatus.unavailable && settings.enabled) {
       // Issue #32: without a usable credential store Jev stays disabled.
@@ -199,12 +219,19 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       if (storedKey != null) {
         _keyController.text = storedKey;
       }
-      _llmConfig = llmConfig;
-      _llmHasStoredKey = llmStoredKey != null;
-      _llmBaseUrlController.text = llmConfig.baseUrl;
-      _llmModelController.text = llmConfig.model;
-      if (llmStoredKey != null) {
-        _llmKeyController.text = llmStoredKey;
+      _provId = providerId;
+      _provAccount =
+          providerAccount ?? LlmProviderAccount(providerId: providerId);
+      _provDraftProtocol = _provAccount.protocol;
+      _provDraftIncludesV1 = _provAccount.includesV1Override;
+      _provInsecureConfirmed = _provAccount.httpInsecureConfirmed;
+      _provKeyStored = (providerKey ?? '').isNotEmpty;
+      _llmBaseUrlController.text = _provAccount.baseUrl.isEmpty
+          ? providerPreset.baseUrl
+          : _provAccount.baseUrl;
+      _llmModelController.text = _provAccount.model;
+      if (providerKey != null) {
+        _llmKeyController.text = providerKey;
       }
       _selection = JevSelectionState(
         provider: _settings.provider,
@@ -829,50 +856,91 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       ),
   ];
 
-  // Issue #131: the generic-line provider section (通用模型). Mirrors the Jev
-  // sections structurally: structural issues surface as tiles, secrets stay in
-  // the credential store, and the confirmed latch only flips after a probe
-  // succeeds — never on save.
+  // Issue #145: provider-aware section (通用模型). Presets own the wire
+  // shape; the draft (base URL / route / model) is only persisted by 保存配置,
+  // and the confirmed latch only flips after a probe against the saved
+  // account succeeds — never on catalog success.
+  LlmProviderPreset get _provPreset =>
+      kLlmProviderPresets.firstWhere((p) => p.id == _provId);
+
+  LlmResolvedProvider _provResolved(LlmProviderAccount account) =>
+      LlmResolvedProvider(preset: _provPreset, account: account);
+
+  LlmProviderAccount get _provDraftAccount => LlmProviderAccount(
+        providerId: _provId,
+        protocol: _provDraftProtocol,
+        baseUrl: _llmBaseUrlController.text.trim(),
+        model: _llmModelController.text.trim(),
+        includesV1Override: _provDraftIncludesV1,
+        confirmed: _provAccount.confirmed,
+        httpInsecureConfirmed: _provInsecureConfirmed,
+      );
 
   List<Widget> _buildLlmSection(Color errorColor) => [
     const Padding(
       padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Text('通用模型（OpenAI / Anthropic 兼容协议）'),
+      child: Text('通用模型（提供方预设）'),
     ),
-    for (final protocol in LlmProtocol.values)
+    for (final preset in kLlmProviderPresets)
       custom.ListTile(
+        key: ValueKey('llm-provider-${preset.id}'),
         leading: Icon(
-          _llmConfig.protocol == protocol
+          _provId == preset.id
               ? Icons.radio_button_checked
               : Icons.radio_button_unchecked,
         ),
-        title: Text(protocol.label),
+        title: Text(preset.displayName),
         subtitle: Text(
-          protocol == LlmProtocol.openAICompatible
-              ? '兼容 OpenAI Chat Completions 接口'
-              : '兼容 Anthropic Messages 接口',
+          preset.isCustom ? '自定义 OpenAI / Anthropic 兼容端点' : preset.baseUrl,
         ),
-        onTap: () => _selectLlmProtocol(protocol),
+        onTap: () => _selectLlmProvider(preset.id),
       ),
+    if (_provPreset.selectableProtocols.length > 1)
+      for (final route in _provPreset.selectableProtocols)
+        custom.ListTile(
+          key: ValueKey('llm-route-${route.id}'),
+          dense: true,
+          leading: Icon(
+            _provDraftProtocol == route ||
+                    (_provDraftProtocol == null &&
+                        route == _provPreset.primaryProtocol)
+                ? Icons.radio_button_checked
+                : Icons.radio_button_unchecked,
+          ),
+          title: Text(route.label),
+          onTap: () => setState(() {
+            _provDraftProtocol =
+                route == _provPreset.primaryProtocol ? null : route;
+            _provGeneration++;
+            _provCatalogResult = null;
+            _llmProbeResult = null;
+          }),
+        ),
     Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: TextField(
         key: const ValueKey('llm-base-url'),
         controller: _llmBaseUrlController,
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           labelText: '服务地址 Base URL',
-          border: OutlineInputBorder(),
-          helperText: '例如 https://api.example.com/v1；改动后点「保存地址」',
+          border: const OutlineInputBorder(),
+          helperText: '预设默认 ${_provPreset.baseUrl}；改动后随「保存配置」提交',
         ),
-        onChanged: (_) => setState(() {
-          _llmConfig = _llmConfig.copyWith(
-            baseUrl: _llmBaseUrlController.text.trim(),
-          );
-        }),
       ),
     ),
+    if (_provPreset.isCustom)
+      SwitchListTile(
+        secondary: const Icon(Icons.looks_one_outlined),
+        title: const Text('地址已包含 /v1 版本段'),
+        subtitle: const Text('关闭时自动补 /v1；仅自定义提供方需要调整'),
+        value: _provDraftIncludesV1 ?? _provPreset.baseIncludesV1,
+        onChanged: (value) => setState(() {
+          _provDraftIncludesV1 = value;
+          _provGeneration++;
+        }),
+      ),
     if (_llmBaseUrlController.text.trim().toLowerCase().startsWith('http://') &&
-        !_llmConfig.httpInsecureConfirmed)
+        !_provInsecureConfirmed)
       custom.ListTile(
         leading: Icon(Icons.warning_amber_outlined, color: errorColor),
         title: Text(
@@ -881,14 +949,10 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         ),
         subtitle: const Text('仅建议本机或内网地址使用；确认后才能保存该地址。'),
         trailing: TextButton(
-          onPressed: _confirmLlmInsecure,
+          onPressed: () => setState(() => _provInsecureConfirmed = true),
           child: const Text('确认使用 HTTP'),
         ),
       ),
-    Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: TextButton(onPressed: _saveLlmBaseUrl, child: const Text('保存地址')),
-    ),
     Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: TextField(
@@ -896,10 +960,12 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         controller: _llmKeyController,
         obscureText: _llmObscureKey,
         decoration: InputDecoration(
-          labelText: '通用模型 API Key（你自己的密钥）',
+          labelText: '提供方 API Key（你自己的密钥）',
           border: const OutlineInputBorder(),
           helperMaxLines: 2,
-          helperText: '只保存在系统安全存储，按协议隔离；不进 Hive、备份或日志',
+          helperText: _provPreset.keyRequired
+              ? '只保存在系统安全存储，按提供方隔离；不进 Hive、备份或日志'
+              : '该提供方可匿名调用，密钥可留空',
           suffixIcon: IconButton(
             tooltip: _llmObscureKey ? '显示' : '隐藏',
             onPressed: () => setState(() => _llmObscureKey = !_llmObscureKey),
@@ -914,17 +980,17 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     ),
     custom.ListTile(
       leading: Icon(
-        _llmHasStoredKey ? Icons.check_circle_outline : Icons.help_outline,
+        _provKeyStored ? Icons.check_circle_outline : Icons.help_outline,
       ),
-      title: Text(_llmHasStoredKey ? '通用模型密钥已按协议保存' : '尚未保存通用模型密钥'),
-      subtitle: const Text('密钥按协议隔离存放：切换协议不会带走密钥，也不会读另一个协议的密钥'),
+      title: Text(_provKeyStored ? '该提供方的密钥已保存' : '尚未保存该提供方的密钥'),
+      subtitle: const Text('密钥按提供方隔离存放：切换提供方不会带走密钥，也不会读另一个提供方的密钥'),
     ),
     Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Wrap(
         children: [
-          TextButton(onPressed: _saveLlmKey, child: const Text('保存通用密钥')),
-          TextButton(onPressed: _deleteLlmKey, child: const Text('清除通用密钥')),
+          TextButton(onPressed: _saveProvKey, child: const Text('保存密钥')),
+          TextButton(onPressed: _deleteProvKey, child: const Text('清除密钥')),
         ],
       ),
     ),
@@ -934,44 +1000,80 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         key: const ValueKey('llm-model'),
         controller: _llmModelController,
         decoration: const InputDecoration(
-          labelText: '通用模型 ID',
+          labelText: '提供方模型 ID',
           border: OutlineInputBorder(),
-          helperText: '手动填写或从目录选择（选择只回填，保存后生效）',
+          helperText: '手动填写或从目录选择；字符原样保留（/、~ 等），保存配置后才生效',
         ),
       ),
     ),
+    if (_provCatalogResult case final result?)
+      if (result.error == null && result.models.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: TextField(
+            key: const ValueKey('llm-model-search'),
+            controller: _llmSearchController,
+            decoration: const InputDecoration(
+              labelText: '搜索模型',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+        ),
     Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Wrap(
         children: [
-          TextButton(onPressed: _saveLlmModel, child: const Text('保存通用模型')),
+          TextButton(onPressed: _provBusy ? null : _saveProvConfig, child: const Text('保存配置')),
           TextButton(
-            onPressed: _llmCatalogBusy ? null : _loadLlmModels,
-            child: Text(_llmCatalogBusy ? '获取中…' : '获取通用模型目录'),
+            onPressed: _provCatalogBusy || !_provPreset.hasCatalog
+                ? null
+                : _loadProvModels,
+            child: Text(_provCatalogBusy ? '获取中…' : '获取模型目录'),
           ),
           TextButton(
-            onPressed: _llmBusy ? null : _probeLlm,
-            child: Text(_llmBusy ? '测试中…' : '测试连接'),
+            onPressed: _provBusy ? null : _probeProv,
+            child: Text(_provBusy ? '测试中…' : '测试连接'),
           ),
         ],
       ),
     ),
-    if (_llmCatalogResult case final result?) ...[
+    if (!_provPreset.hasCatalog) ...[
+      const custom.ListTile(
+        dense: true,
+        leading: Icon(Icons.info_outline),
+        title: Text('该提供方没有可用的模型目录，请手动填写模型或改用其 OpenAI 兼容地址'),
+      ),
+      for (final model in _provPreset.verifiedDefaultModels)
+        custom.ListTile(
+          dense: true,
+          leading: const Icon(Icons.verified_outlined),
+          title: Text(model),
+          subtitle: const Text('已验证的默认模型（点击回填，保存配置后生效）'),
+          onTap: () => setState(() => _llmModelController.text = model),
+        ),
+    ],
+    if (_provCatalogResult case final result?) ...[
       if (result.error != null || result.models.isEmpty)
         custom.ListTile(
           title: Text(result.error ?? '目录为空，可重试或手动填写；现有配置已保留'),
           trailing: TextButton(
-            onPressed: _loadLlmModels,
+            onPressed: _provCatalogBusy ? null : _loadProvModels,
             child: const Text('重试目录'),
           ),
         ),
       for (final model in result.models)
-        custom.ListTile(
-          title: Text(model),
-          onTap: () => setState(() {
-            _llmModelController.text = model;
-          }),
-        ),
+        if (_llmSearchController.text.trim().isEmpty ||
+            model
+                .toLowerCase()
+                .contains(_llmSearchController.text.trim().toLowerCase()))
+          custom.ListTile(
+            dense: true,
+            title: Text(model),
+            onTap: () => setState(() {
+              _llmModelController.text = model;
+            }),
+          ),
     ],
     if (_llmProbeResult case final probe?)
       custom.ListTile(
@@ -982,8 +1084,17 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         ),
         title: Text(_llmProbeMessage(probe)),
       ),
-    if (_llmTouched)
-      for (final issue in _llmConfig.issues)
+    if (_provMappingError case final mappingError?)
+      custom.ListTile(
+        dense: true,
+        leading: Icon(Icons.error_outline, color: errorColor),
+        title: Text(
+          '筛选线切换受阻：$mappingError',
+          style: TextStyle(color: errorColor),
+        ),
+      ),
+    for (final issue in _provResolved(_provDraftAccount).issues)
+      if (issue != LlmPresetIssue.missingModel)
         custom.ListTile(
           dense: true,
           leading: Icon(Icons.error_outline, color: errorColor),
@@ -992,189 +1103,208 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     custom.ListTile(
       dense: true,
       leading: Icon(
-        _llmConfig.confirmed ? Icons.verified_outlined : Icons.info_outline,
+        _provAccount.confirmed ? Icons.verified_outlined : Icons.info_outline,
       ),
       title: Text(
-        _llmConfig.confirmed ? '通用线已生效：配置已通过测试连接确认' : '通用线未生效：配置需通过「测试连接」确认',
+        _provAccount.confirmed
+            ? '该提供方已通过测试并驱动筛选线'
+            : '该提供方尚未生效：需「测试连接」通过后才驱动筛选线',
       ),
-      subtitle: const Text('保存配置只落盘，不等于可用；测试通过才把确认锁存进设置'),
+      subtitle: const Text('目录成功只说明能拉到模型；保存配置只落盘；测试通过才锁存确认并写穿到筛选线'),
     ),
   ];
 
-  bool get _llmTouched =>
-      _llmConfig.protocol != null ||
-      _llmConfig.baseUrl.isNotEmpty ||
-      _llmConfig.model.isNotEmpty;
-
-  Future<void> _selectLlmProtocol(LlmProtocol protocol) async {
-    setState(() {
-      _llmConfig = _llmConfig.copyWith(protocol: protocol);
-      _llmCatalogGeneration++;
-      _llmCatalogBusy = false;
-      _llmCatalogResult = null;
-      _llmProbeResult = null;
-    });
-    await _saveLlmConfig(_llmConfig);
-    await _reloadLlmKeyState();
-  }
-
-  Future<bool> _saveLlmConfig(LlmProviderConfig next) async {
-    if (!mounted) return false;
-    final previous = _llmConfig;
-    setState(() => _llmConfig = next);
+  Future<void> _selectLlmProvider(String id) async {
+    if (id == _provId) return;
+    LlmProviderAccount account = LlmProviderAccount(providerId: id);
+    String? storedKey;
     try {
-      await _llmStore.save(next);
-      return true;
-    } catch (error) {
-      if (mounted) {
-        setState(() => _llmConfig = previous);
-      }
-      _toast('通用模型配置保存失败：$error');
-      return false;
-    }
-  }
-
-  Future<void> _reloadLlmKeyState() async {
-    final protocol = _llmConfig.protocol;
-    String? stored;
-    try {
-      if (protocol != null &&
-          await _llmCredentials.status(protocol) ==
-              JevKeyStoreStatus.available) {
-        stored = await _llmCredentials.read(protocol);
-      }
-    } catch (_) {
-      stored = null;
-    }
+      account = await _provStore.load(id) ?? account;
+      storedKey = await _provStore.readKey(id);
+    } catch (_) {}
     if (!mounted) return;
+    final preset = kLlmProviderPresets.firstWhere((p) => p.id == id);
     setState(() {
-      _llmHasStoredKey = stored != null;
-      _llmKeyController.text = stored ?? '';
+      _provId = id;
+      _provAccount = account;
+      _provDraftProtocol = account.protocol;
+      _provDraftIncludesV1 = account.includesV1Override;
+      _provInsecureConfirmed = account.httpInsecureConfirmed;
+      _provKeyStored = (storedKey ?? '').isNotEmpty;
+      _llmBaseUrlController.text =
+          account.baseUrl.isEmpty ? preset.baseUrl : account.baseUrl;
+      _llmModelController.text = account.model;
+      _llmKeyController.text = storedKey ?? '';
+      _llmSearchController.clear();
+      _provCatalogResult = null;
+      _llmProbeResult = null;
+      _provMappingError = null;
+      _provGeneration++;
+      _provCatalogBusy = false;
+      _provBusy = false;
     });
+    try {
+      await _provStore.setActive(id);
+    } catch (_) {}
   }
 
-  Future<void> _saveLlmBaseUrl() async {
-    final url = _llmBaseUrlController.text.trim();
-    final next = _llmConfig.copyWith(baseUrl: url);
-    // Model choice is not required to store an address; everything else in
-    // the structural issue list blocks the save (including unconfirmed http).
-    final blocking = next.issues
-        .where((issue) => issue != LlmConfigIssue.missingModel)
+  /// 显式保存：唯一的落盘动作。目录成功从不触碰账号；confirmed 随上游变更
+  /// 由存储层强制失效。
+  Future<void> _saveProvConfig() async {
+    final preset = _provPreset;
+    final base = _llmBaseUrlController.text.trim();
+    final account = LlmProviderAccount(
+      providerId: _provId,
+      protocol: _provDraftProtocol,
+      baseUrl: base == preset.baseUrl ? '' : base,
+      model: _llmModelController.text.trim(),
+      includesV1Override: _provDraftIncludesV1,
+      confirmed: _provAccount.confirmed,
+      httpInsecureConfirmed: _provInsecureConfirmed,
+    );
+    // missingModel 允许先存地址；catalogUnavailable 只是没有目录可拉取。
+    final blocking = _provResolved(account).issues
+        .where((issue) =>
+            issue != LlmPresetIssue.missingModel &&
+            issue != LlmPresetIssue.catalogUnavailable)
         .toList();
     if (blocking.isNotEmpty) {
       _toast(blocking.first.message);
       return;
     }
-    final saved = await _saveLlmConfig(next);
-    if (saved) _toast('通用服务地址已保存');
-  }
-
-  Future<void> _confirmLlmInsecure() async {
-    final saved = await _saveLlmConfig(
-      _llmConfig.copyWith(httpInsecureConfirmed: true),
-    );
-    if (saved) _toast('已确认使用 HTTP 地址，仍建议改用 https');
-  }
-
-  Future<void> _saveLlmKey() async {
-    final protocol = _llmConfig.protocol;
-    if (protocol == null) {
-      _toast('请先选择协议类型');
-      return;
-    }
-    final key = _llmKeyController.text.trim();
-    if (key.isEmpty) {
-      _toast('通用模型密钥不能为空');
-      return;
-    }
     try {
-      await _llmCredentials.write(protocol, key);
+      await _provStore.save(account);
     } catch (error) {
-      _toast('通用密钥保存失败：$error');
+      _toast('提供方配置保存失败：$error');
       return;
     }
     if (!mounted) return;
-    setState(() => _llmHasStoredKey = true);
-    _toast('通用模型密钥已按协议保存');
-  }
-
-  Future<void> _deleteLlmKey() async {
-    final protocol = _llmConfig.protocol;
-    if (protocol != null) {
-      try {
-        await _llmCredentials.delete(protocol);
-      } catch (error) {
-        _toast('清除通用密钥失败：$error');
-        return;
-      }
-    }
-    _llmKeyController.clear();
-    if (!mounted) return;
-    setState(() => _llmHasStoredKey = false);
-    _toast('已清除通用密钥');
-  }
-
-  Future<void> _saveLlmModel() async {
-    final model = _llmModelController.text.trim();
-    if (model.isEmpty) {
-      _toast('通用模型 ID 不能为空');
-      return;
-    }
-    final saved = await _saveLlmConfig(_llmConfig.copyWith(model: model));
-    if (saved) _toast('通用模型已保存');
-  }
-
-  Future<String?> _readLlmKey() async {
-    final protocol = _llmConfig.protocol;
-    if (protocol == null) return null;
-    try {
-      return await _llmCredentials.read(protocol);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<void> _loadLlmModels() async {
-    final generation = ++_llmCatalogGeneration;
     setState(() {
-      _llmCatalogBusy = true;
-      _llmCatalogResult = null;
-    });
-    final apiKey = await _readLlmKey() ?? '';
-    final result = await _llmCatalog.load(config: _llmConfig, apiKey: apiKey);
-    if (!mounted || generation != _llmCatalogGeneration) return;
-    setState(() {
-      _llmCatalogBusy = false;
-      _llmCatalogResult = result;
-    });
-  }
-
-  Future<void> _probeLlm() async {
-    setState(() {
-      _llmBusy = true;
+      _provAccount = account;
+      _provMappingError = null;
+      _provCatalogResult = null;
       _llmProbeResult = null;
+      _provGeneration++;
     });
-    final apiKey = await _readLlmKey() ?? '';
-    final model = _llmModelController.text.trim();
-    final result = await _llmProbe.call(
-      config: _llmConfig,
-      apiKey: apiKey,
-      model: model.isEmpty ? null : model,
-    );
+    _toast('提供方配置已保存（测试连接通过后才驱动筛选线）');
+  }
+
+  Future<void> _saveProvKey() async {
+    final key = _llmKeyController.text.trim();
+    try {
+      if (key.isEmpty) {
+        await _provStore.deleteKey(_provId);
+      } else {
+        await _provStore.writeKey(_provId, key);
+      }
+      final account = await _provStore.load(_provId);
+      if (!mounted) return;
+      setState(() {
+        if (account != null) _provAccount = account;
+        _provKeyStored = key.isNotEmpty;
+      });
+      _toast(key.isEmpty ? '已清除该提供方的密钥' : '密钥已保存在系统安全存储');
+    } catch (error) {
+      _toast('密钥保存失败：$error');
+    }
+  }
+
+  Future<void> _deleteProvKey() async {
+    try {
+      await _provStore.deleteKey(_provId);
+      final account = await _provStore.load(_provId);
+      if (!mounted) return;
+      setState(() {
+        if (account != null) _provAccount = account;
+        _provKeyStored = false;
+      });
+      _llmKeyController.clear();
+      _toast('已清除该提供方的密钥');
+    } catch (error) {
+      _toast('清除密钥失败：$error');
+    }
+  }
+
+  String _provSavedKey() {
+    return _provKeyStored ? _llmKeyController.text.trim() : '';
+  }
+
+  Future<void> _loadProvModels() async {
+    final resolved = _provResolved(_provAccount);
+    final key = _provSavedKey();
+    final generation = ++_provGeneration;
+    setState(() {
+      _provCatalogBusy = true;
+      _provCatalogResult = null;
+    });
+    final result =
+        await _llmCatalog.loadResolved(resolved: resolved, apiKey: key);
+    if (!mounted || generation != _provGeneration) return;
+    setState(() {
+      _provCatalogBusy = false;
+      _provCatalogResult = result;
+    });
+  }
+
+  Future<void> _probeProv() async {
+    final resolved = _provResolved(_provAccount);
+    final key = _provSavedKey();
+    final generation = ++_provGeneration;
+    setState(() {
+      _provBusy = true;
+      _llmProbeResult = null;
+      _provMappingError = null;
+    });
+    final result = await _llmProbe.callResolved(resolved: resolved, apiKey: key);
+    if (!mounted || generation != _provGeneration) return;
+    if (!result.succeeded) {
+      setState(() {
+        _provBusy = false;
+        _llmProbeResult = result;
+      });
+      _toast(_llmProbeMessage(result));
+      return;
+    }
+    // 探活通过 → 把已保存账号映射进筛选线（v1）并写穿。目录/保存都不写穿；
+    // 筛选线单一写入方是本页，且写入的配置与探活发出请求的配置同源。
+    final mapping = llmLegacyMappingFor(resolved, confirmed: true);
+    if (mapping.config == null) {
+      setState(() {
+        _provBusy = false;
+        _llmProbeResult = result;
+        _provMappingError = mapping.error;
+      });
+      _toast('上游可连通，但筛选线切换受阻：${mapping.error}');
+      return;
+    }
+    final legacy = mapping.config!;
+    try {
+      await _llmStore.save(legacy);
+      if (key.isEmpty) {
+        await _llmCredentials.delete(legacy.protocol!);
+      } else {
+        await _llmCredentials.write(legacy.protocol!, key);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _provBusy = false;
+        _llmProbeResult = result;
+      });
+      _toast('筛选线切换失败：$error');
+      return;
+    }
+    try {
+      await _provStore.save(_provAccount.copyWith(confirmed: true));
+      final reloaded = await _provStore.load(_provId);
+      if (reloaded != null) _provAccount = reloaded;
+    } catch (_) {}
     if (!mounted) return;
     setState(() {
-      _llmBusy = false;
+      _provBusy = false;
       _llmProbeResult = result;
     });
-    if (result.succeeded) {
-      // The confirmed latch only flips on a successful probe (spec 1):
-      // saving a config is not the same as confirming it works.
-      await _saveLlmConfig(_llmConfig.copyWith(confirmed: true));
-      if (!mounted) return;
-      _toast('测试通过，通用线已生效');
-    } else {
-      _toast(_llmProbeMessage(result));
-    }
+    _toast('测试通过，筛选线已切换到该提供方');
   }
 
   String _llmProbeMessage(LlmProbeResult probe) {

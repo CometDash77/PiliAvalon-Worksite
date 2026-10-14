@@ -1,6 +1,8 @@
 import 'package:PiliPlus/features/jev/jev_credential_store.dart'
     show JevCredentialException, JevKeyStoreStatus;
 import 'package:PiliPlus/features/llm/llm_contract.dart';
+
+// Issue #144: per-provider credential boundary (v2 line).
 import 'package:flutter/services.dart'
     show MissingPluginException, PlatformException;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -74,6 +76,91 @@ class SecureLlmCredentialStore implements LlmCredentialStore {
   Future<void> delete(LlmProtocol protocol) async {
     try {
       await _storage.delete(key: entryKey(protocol));
+    } on PlatformException catch (error) {
+      throw JevCredentialException('无法清除安全存储（${error.code}）');
+    } on MissingPluginException {
+      throw const JevCredentialException('当前平台没有可用的安全存储');
+    }
+  }
+}
+
+// Issue #144: one credential slot per provider (not per protocol), so
+// switching providers never carries a key across domains. Same red lines
+// as the v1 store: secure storage only, never Hive, never logs/export.
+abstract interface class LlmProviderCredentialStore {
+  Future<JevKeyStoreStatus> status(String providerId);
+
+  Future<String?> read(String providerId);
+
+  Future<void> write(String providerId, String apiKey);
+
+  Future<void> delete(String providerId);
+}
+
+class SecureLlmProviderCredentialStore implements LlmProviderCredentialStore {
+  SecureLlmProviderCredentialStore({FlutterSecureStorage? storage})
+    : _storage = storage ?? const FlutterSecureStorage();
+
+  // One namespaced entry per provider id.
+  static String entryKey(String providerId) =>
+      'piliavalon.llm.v2.api_key.$providerId';
+
+  // Trust boundary: provider ids end up in storage entry keys, so restrict
+  // them to a conservative charset before they reach the platform API.
+  static final RegExp _providerIdPattern = RegExp(r'^[a-z0-9][a-z0-9_-]*$');
+
+  final FlutterSecureStorage _storage;
+
+  void _guard(String providerId) {
+    if (!_providerIdPattern.hasMatch(providerId)) {
+      throw JevCredentialException('提供方 ID 非法：$providerId');
+    }
+  }
+
+  @override
+  Future<JevKeyStoreStatus> status(String providerId) async {
+    _guard(providerId);
+    try {
+      await _storage.read(key: entryKey(providerId));
+      return JevKeyStoreStatus.available;
+    } on PlatformException {
+      return JevKeyStoreStatus.unavailable;
+    } on MissingPluginException {
+      return JevKeyStoreStatus.unavailable;
+    }
+  }
+
+  @override
+  Future<String?> read(String providerId) async {
+    _guard(providerId);
+    try {
+      final value = await _storage.read(key: entryKey(providerId));
+      final trimmed = value?.trim();
+      return (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+    } on PlatformException catch (error) {
+      throw JevCredentialException('无法读取安全存储（${error.code}）');
+    } on MissingPluginException {
+      throw const JevCredentialException('当前平台没有可用的安全存储');
+    }
+  }
+
+  @override
+  Future<void> write(String providerId, String apiKey) async {
+    _guard(providerId);
+    try {
+      await _storage.write(key: entryKey(providerId), value: apiKey.trim());
+    } on PlatformException catch (error) {
+      throw JevCredentialException('无法写入安全存储（${error.code}）');
+    } on MissingPluginException {
+      throw const JevCredentialException('当前平台没有可用的安全存储');
+    }
+  }
+
+  @override
+  Future<void> delete(String providerId) async {
+    _guard(providerId);
+    try {
+      await _storage.delete(key: entryKey(providerId));
     } on PlatformException catch (error) {
       throw JevCredentialException('无法清除安全存储（${error.code}）');
     } on MissingPluginException {

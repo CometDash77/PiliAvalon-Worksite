@@ -32,6 +32,7 @@ class LlmProviderConfig {
     this.model = '',
     this.confirmed = false,
     this.httpInsecureConfirmed = false,
+    this.bearerAuth = false,
   });
 
   final LlmProtocol? protocol;
@@ -48,6 +49,12 @@ class LlmProviderConfig {
   // http base URLs are rejected until the user explicitly confirms (spec 1:
   // https-only default, http needs an explicit UI confirmation).
   final bool httpInsecureConfirmed;
+
+  // Issue #145: Anthropic-compatible services that expect a Bearer header
+  // instead of the protocol-default x-api-key (e.g. DeepSeek's /anthropic
+  // facade). Only changes which headers are sent; the wire body shape stays
+  // Anthropic so the provider answers with the documented response shape.
+  final bool bearerAuth;
 
   static const LlmProviderConfig empty = LlmProviderConfig();
 
@@ -90,6 +97,17 @@ class LlmProviderConfig {
     return result;
   }
 
+  // Headers actually sent with this configuration. Empty when no key is
+  // stored (anonymous endpoints) or the protocol is unset.
+  Map<String, String> authHeaders(String apiKey) {
+    final p = protocol;
+    if (p == null || apiKey.isEmpty) return const {};
+    if (bearerAuth && p == LlmProtocol.anthropicCompatible) {
+      return {'authorization': 'Bearer $apiKey'};
+    }
+    return p.authHeaders(apiKey);
+  }
+
   // Full chat endpoint, or null when protocol or base URL is unusable.
   String? get chatEndpoint => _endpoint(protocol?.chatPath);
 
@@ -108,12 +126,14 @@ class LlmProviderConfig {
     String? model,
     bool? confirmed,
     bool? httpInsecureConfirmed,
+    bool? bearerAuth,
   }) => LlmProviderConfig(
     protocol: protocol ?? this.protocol,
     baseUrl: baseUrl ?? this.baseUrl,
     model: model ?? this.model,
     confirmed: confirmed ?? this.confirmed,
     httpInsecureConfirmed: httpInsecureConfirmed ?? this.httpInsecureConfirmed,
+    bearerAuth: bearerAuth ?? this.bearerAuth,
   );
 
   @override
@@ -123,7 +143,8 @@ class LlmProviderConfig {
       other.baseUrl == baseUrl &&
       other.model == model &&
       other.confirmed == confirmed &&
-      other.httpInsecureConfirmed == httpInsecureConfirmed;
+      other.httpInsecureConfirmed == httpInsecureConfirmed &&
+      other.bearerAuth == bearerAuth;
 
   @override
   int get hashCode => Object.hash(
@@ -132,6 +153,7 @@ class LlmProviderConfig {
     model,
     confirmed,
     httpInsecureConfirmed,
+    bearerAuth,
   );
 }
 
@@ -157,6 +179,7 @@ class LlmSettingsStore {
   static const String confirmedKey = 'piliavalon.llm.v1.confirmed';
   static const String insecureConfirmedKey =
       'piliavalon.llm.v1.http_insecure_confirmed';
+  static const String bearerAuthKey = 'piliavalon.llm.v1.bearer_auth';
 
   static LlmProviderConfig? _cache;
 
@@ -179,6 +202,7 @@ class LlmSettingsStore {
       model: _string(_box.get(modelKey)) ?? '',
       confirmed: _flag(_box.get(confirmedKey)),
       httpInsecureConfirmed: _flag(_box.get(insecureConfirmedKey)),
+      bearerAuth: _flag(_box.get(bearerAuthKey)),
     );
     _cache = config;
     return config;
@@ -195,6 +219,7 @@ class LlmSettingsStore {
     await _box.put(modelKey, config.model);
     await _box.put(confirmedKey, config.confirmed);
     await _box.put(insecureConfirmedKey, config.httpInsecureConfirmed);
+    await _box.put(bearerAuthKey, config.bearerAuth);
     _cache = config;
   }
 }

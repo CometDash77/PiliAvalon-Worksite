@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/llm/llm.dart';
+import 'package:PiliPlus/features/llm/llm_credential_store.dart';
+import 'package:PiliPlus/features/llm/llm_provider_config_store.dart';
+import 'package:PiliPlus/features/llm/llm_provider_presets.dart';
 import 'package:PiliPlus/pages/jev_settings/view.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart' hide ListTile;
@@ -109,6 +112,65 @@ class _FakeLlmProbe extends LlmHttpProbe {
   }) async => result;
 }
 
+class _FakeLlmProviderCredentials implements LlmProviderCredentialStore {
+  final keys = <String, String>{};
+  final deleted = <String>[];
+
+  @override
+  Future<JevKeyStoreStatus> status(String providerId) async =>
+      JevKeyStoreStatus.available;
+
+  @override
+  Future<String?> read(String providerId) async => keys[providerId];
+
+  @override
+  Future<void> write(String providerId, String apiKey) async {
+    keys[providerId] = apiKey;
+  }
+
+  @override
+  Future<void> delete(String providerId) async {
+    keys.remove(providerId);
+    deleted.add(providerId);
+  }
+}
+
+class _FakeLlmResolvedCatalog extends LlmModelCatalog {
+  final calls = <LlmResolvedProvider>[];
+  final _completers = <Completer<LlmModelCatalogResult>>[];
+
+  Completer<LlmModelCatalogResult> next() {
+    final completer = Completer<LlmModelCatalogResult>();
+    _completers.add(completer);
+    return completer;
+  }
+
+  @override
+  Future<LlmModelCatalogResult> loadResolved({
+    required LlmResolvedProvider resolved,
+    required String apiKey,
+  }) {
+    calls.add(resolved);
+    return _completers.removeAt(0).future;
+  }
+}
+
+class _FakeLlmResolvedProbe extends LlmHttpProbe {
+  _FakeLlmResolvedProbe(this.result);
+
+  final LlmProbeResult result;
+  final calls = <LlmResolvedProvider>[];
+
+  @override
+  Future<LlmProbeResult> callResolved({
+    required LlmResolvedProvider resolved,
+    required String apiKey,
+  }) {
+    calls.add(resolved);
+    return Future.value(result);
+  }
+}
+
 void main() {
   setUp(() {
     JevSettingsStore.resetCache();
@@ -127,6 +189,7 @@ void main() {
     LlmCredentialStore? llmCredentials,
     LlmModelCatalog? llmCatalog,
     LlmHttpProbe? llmProbe,
+    LlmProviderConfigStore? llmProviderStore,
     double height = 3200,
   }) async {
     tester.view.physicalSize = Size(1400, height);
@@ -144,6 +207,7 @@ void main() {
           llmCredentials: llmCredentials,
           llmCatalog: llmCatalog,
           llmProbe: llmProbe,
+          llmProviderStore: llmProviderStore,
         ),
       ),
     );
@@ -662,11 +726,16 @@ void main() {
   });
 
   testWidgets(
-    'generic line saves protocol, address, model, key, and confirms via probe',
+    'provider flow saves config, key, and switches screening via probe',
     (tester) async {
-      final llmBox = _MemoryBox();
-      final llmStore = LlmSettingsStore(box: llmBox);
-      final llmCredentials = _FakeLlmCredentials();
+      final v1Store = LlmSettingsStore(box: _MemoryBox());
+      final v1Credentials = _FakeLlmCredentials();
+      final provStore = LlmProviderConfigStore(
+        box: _MemoryBox(),
+        credentials: _FakeLlmProviderCredentials(),
+      );
+      final probe =
+          _FakeLlmResolvedProbe(const LlmProbeResult(LlmProbeOutcome.ok));
       final messages = <String>[];
 
       await pumpPage(
@@ -675,66 +744,56 @@ void main() {
         credentials: _FakeCredentialStore(),
         validator: JevKeyValidator(),
         messages: messages,
-        llmStore: llmStore,
-        llmCredentials: llmCredentials,
-        llmProbe: _FakeLlmProbe(const LlmProbeResult(LlmProbeOutcome.ok)),
-        height: 6400,
+        llmStore: v1Store,
+        llmCredentials: v1Credentials,
+        llmProbe: probe,
+        llmProviderStore: provStore,
+        height: 9600,
       );
 
-      await tester.tap(find.text('OpenAI Compatible'));
+      await tester.tap(find.byKey(const ValueKey('llm-provider-openrouter')));
       await tester.pumpAndSettle();
-      expect(llmBox.values[LlmSettingsStore.protocolKey], 'openai_compatible');
-
-      await tester.enterText(
-        find.byKey(const ValueKey('llm-base-url')),
-        'https://api.example.com/v1',
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(TextButton, '保存地址'));
-      await tester.pumpAndSettle();
-      expect((await llmStore.load()).baseUrl, 'https://api.example.com/v1');
-      expect(messages.last, '通用服务地址已保存');
-
-      await tester.enterText(
-        find.byKey(const ValueKey('llm-model')),
-        'llm-model-x',
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(TextButton, '保存通用模型'));
-      await tester.pumpAndSettle();
-      expect((await llmStore.load()).model, 'llm-model-x');
-      expect(messages.last, '通用模型已保存');
-
       await tester.enterText(
         find.byKey(const ValueKey('llm-api-key')),
-        'sk-llm-secret',
+        'sk-or-k',
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(TextButton, '保存通用密钥'));
+      await tester.tap(find.widgetWithText(TextButton, '保存密钥'));
       await tester.pumpAndSettle();
-      expect(llmCredentials.writeCount, 1);
-      expect(
-        llmCredentials.stored[LlmProtocol.openAICompatible],
-        'sk-llm-secret',
+      await tester.enterText(
+        find.byKey(const ValueKey('llm-model')),
+        'm/or',
       );
-      expect(llmBox.values.toString().contains('sk-llm-secret'), isFalse);
-      expect(find.text('通用模型密钥已按协议保存'), findsOneWidget);
-      expect(messages.last, '通用模型密钥已按协议保存');
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, '保存配置'));
+      await tester.pumpAndSettle();
+      expect((await provStore.load('openrouter'))!.model, 'm/or');
 
       await tester.tap(find.widgetWithText(TextButton, '测试连接'));
       await tester.pumpAndSettle();
-      expect((await llmStore.load()).confirmed, isTrue);
-      expect(LlmSettingsStore.snapshot.confirmed, isTrue);
-      expect(find.text('通用线已生效：配置已通过测试连接确认'), findsOneWidget);
-      expect(messages.last, '测试通过，通用线已生效');
+      expect(
+        probe.calls.single.chatEndpoint,
+        'https://openrouter.ai/api/v1/chat/completions',
+      );
+      final legacy = await v1Store.load();
+      expect(legacy.protocol, LlmProtocol.openAICompatible);
+      expect(legacy.baseUrl, 'https://openrouter.ai/api/v1');
+      expect(legacy.model, 'm/or');
+      expect(legacy.confirmed, isTrue);
+      expect(v1Credentials.stored[LlmProtocol.openAICompatible], 'sk-or-k');
+      expect((await provStore.load('openrouter'))!.confirmed, isTrue);
+      expect(messages.last, '测试通过，筛选线已切换到该提供方');
     },
   );
 
   testWidgets(
-    'generic catalog fills the draft and the selection saves after clicking save',
+    'catalog states keep the saved model on failure and fill drafts on tap',
     (tester) async {
-      final llmStore = LlmSettingsStore(box: _MemoryBox());
-      final catalog = _FakeLlmCatalog();
+      final provStore = LlmProviderConfigStore(
+        box: _MemoryBox(),
+        credentials: _FakeLlmProviderCredentials(),
+      );
+      final catalog = _FakeLlmResolvedCatalog();
 
       await pumpPage(
         tester,
@@ -742,52 +801,173 @@ void main() {
         credentials: _FakeCredentialStore(),
         validator: JevKeyValidator(),
         messages: <String>[],
-        llmStore: llmStore,
-        llmCredentials: _FakeLlmCredentials(),
         llmCatalog: catalog,
-        height: 6400,
+        llmProviderStore: provStore,
+        height: 9600,
       );
 
-      await tester.tap(find.text('OpenAI Compatible'));
+      // 保存一个带特殊字符的模型；目录的任何状态都不得清掉它。
+      await tester.enterText(
+        find.byKey(const ValueKey('llm-model')),
+        '~/x/y',
+      );
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(TextButton, '获取通用模型目录'));
+      await tester.tap(find.widgetWithText(TextButton, '保存配置'));
+      await tester.pumpAndSettle();
+
+      // 成功态：列出目录并按搜索词过滤。
+      final ok = catalog.next();
+      await tester.tap(find.widgetWithText(TextButton, '获取模型目录'));
       await tester.pump();
       expect(find.text('获取中…'), findsOneWidget);
-      catalog.response.complete(const LlmModelCatalogResult(['llm-candidate']));
+      ok.complete(
+        const LlmModelCatalogResult(['m/deepseek-chat', 'm/reasoner']),
+      );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('llm-candidate'));
+      expect(find.text('m/deepseek-chat'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('llm-model-search')),
+        'reasoner',
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('m/deepseek-chat'), findsNothing);
+      // 点选只回填草稿，不落盘。
+      await tester.tap(find.text('m/reasoner'));
       await tester.pumpAndSettle();
       expect(
         tester
             .widget<TextField>(find.byKey(const ValueKey('llm-model')))
             .controller!
             .text,
-        'llm-candidate',
+        'm/reasoner',
       );
-      await tester.tap(find.widgetWithText(TextButton, '保存通用模型'));
+      expect((await provStore.load('deepseek'))!.model, '~/x/y');
+
+      // 失败态：错误提示 + 已存模型原样。
+      catalog.next().complete(
+        const LlmModelCatalogResult(
+          [],
+          error: '目录请求失败（HTTP 500），可重试或手动填写',
+        ),
+      );
+      await tester.tap(find.widgetWithText(TextButton, '获取模型目录'));
       await tester.pumpAndSettle();
-      expect((await llmStore.load()).model, 'llm-candidate');
+      expect(find.textContaining('目录请求失败（HTTP 500）'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('llm-model')))
+            .controller!
+            .text,
+        '~/x/y',
+      );
+      expect((await provStore.load('deepseek'))!.model, '~/x/y');
+
+      // 空目录态。
+      catalog.next().complete(const LlmModelCatalogResult([]));
+      await tester.tap(find.widgetWithText(TextButton, '重试目录'));
+      await tester.pumpAndSettle();
+      expect(find.text('目录为空，可重试或手动填写；现有配置已保留'),
+          findsOneWidget);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('llm-model')))
+            .controller!
+            .text,
+        '~/x/y',
+      );
     },
   );
 
   testWidgets(
-    'an http address stays blocked until the user confirms it explicitly',
+    'stale catalog responses from a previous provider never land',
     (tester) async {
-      final llmStore = LlmSettingsStore(box: _MemoryBox());
-      final messages = <String>[];
+      final provStore = LlmProviderConfigStore(
+        box: _MemoryBox(),
+        credentials: _FakeLlmProviderCredentials(),
+      );
+      final catalog = _FakeLlmResolvedCatalog();
+      final stale = catalog.next();
 
       await pumpPage(
         tester,
         store: JevSettingsStore(box: _MemoryBox()),
         credentials: _FakeCredentialStore(),
         validator: JevKeyValidator(),
-        messages: messages,
-        llmStore: llmStore,
-        llmCredentials: _FakeLlmCredentials(),
-        height: 6400,
+        messages: <String>[],
+        llmCatalog: catalog,
+        llmProviderStore: provStore,
+        height: 9600,
       );
 
-      await tester.tap(find.text('OpenAI Compatible'));
+      await tester.tap(find.widgetWithText(TextButton, '获取模型目录'));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('llm-provider-openrouter')));
+      await tester.pumpAndSettle();
+      stale.complete(const LlmModelCatalogResult(['stale-model']));
+      await tester.pumpAndSettle();
+      expect(find.text('stale-model'), findsNothing);
+
+      final fresh = catalog.next();
+      await tester.tap(find.widgetWithText(TextButton, '获取模型目录'));
+      await tester.pump();
+      fresh.complete(const LlmModelCatalogResult(['or-model']));
+      await tester.pumpAndSettle();
+      expect(find.text('or-model'), findsOneWidget);
+      expect(catalog.calls.map((r) => r.preset.id).toList(),
+          ['deepseek', 'openrouter']);
+    },
+  );
+
+  testWidgets(
+    'shape none providers never fetch and list verified defaults',
+    (tester) async {
+      final catalog = _FakeLlmResolvedCatalog();
+
+      await pumpPage(
+        tester,
+        store: JevSettingsStore(box: _MemoryBox()),
+        credentials: _FakeCredentialStore(),
+        validator: JevKeyValidator(),
+        messages: <String>[],
+        llmCatalog: catalog,
+        llmProviderStore: LlmProviderConfigStore(
+          box: _MemoryBox(),
+          credentials: _FakeLlmProviderCredentials(),
+        ),
+        height: 9600,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('llm-provider-xiaomimimo')));
+      await tester.pumpAndSettle();
+      expect(find.text(LlmPresetIssue.catalogUnavailable.message),
+          findsOneWidget);
+      expect(find.text('mimo-v2.6-pro'), findsOneWidget);
+      expect(find.text('mimo-v2.6-flash'), findsOneWidget);
+      expect(catalog.calls, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'an http address stays blocked until the user confirms it explicitly',
+    (tester) async {
+      final provStore = LlmProviderConfigStore(
+        box: _MemoryBox(),
+        credentials: _FakeLlmProviderCredentials(),
+      );
+
+      await pumpPage(
+        tester,
+        store: JevSettingsStore(box: _MemoryBox()),
+        credentials: _FakeCredentialStore(),
+        validator: JevKeyValidator(),
+        messages: <String>[],
+        llmProviderStore: provStore,
+        height: 9600,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('llm-provider-custom-openai')),
+      );
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('llm-base-url')),
@@ -796,17 +976,62 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('HTTP 地址不加密，请求会明文经过网络'), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(TextButton, '保存地址'));
+      await tester.tap(find.widgetWithText(TextButton, '保存配置'));
       await tester.pumpAndSettle();
-      expect(messages.last, 'HTTP 地址不安全，需在设置中显式确认后才能使用');
-      expect((await llmStore.load()).baseUrl, isEmpty);
+      expect((await provStore.load('custom-openai'))!.baseUrl, isEmpty);
 
       await tester.tap(find.widgetWithText(TextButton, '确认使用 HTTP'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(TextButton, '保存地址'));
+      await tester.tap(find.widgetWithText(TextButton, '保存配置'));
       await tester.pumpAndSettle();
-      expect((await llmStore.load()).baseUrl, 'http://127.0.0.1:8080');
-      expect((await llmStore.load()).httpInsecureConfirmed, isTrue);
+      final saved = (await provStore.load('custom-openai'))!;
+      expect(saved.baseUrl, 'http://127.0.0.1:8080');
+      expect(saved.httpInsecureConfirmed, isTrue);
+    },
+  );
+
+  testWidgets(
+    'a non-screenable route is flagged and blocks the save',
+    (tester) async {
+      final v1Store = LlmSettingsStore(box: _MemoryBox());
+      final provStore = LlmProviderConfigStore(
+        box: _MemoryBox(),
+        credentials: _FakeLlmProviderCredentials(),
+      );
+      final probe = _FakeLlmResolvedProbe(
+        const LlmProbeResult(
+          null,
+          detail: '该请求路线暂不支持语义筛选，请改用 OpenAI Chat Completions 或 Anthropic Messages',
+        ),
+      );
+      final messages = <String>[];
+
+      await pumpPage(
+        tester,
+        store: JevSettingsStore(box: _MemoryBox()),
+        credentials: _FakeCredentialStore(),
+        validator: JevKeyValidator(),
+        messages: messages,
+        llmStore: v1Store,
+        llmProbe: probe,
+        llmProviderStore: provStore,
+        height: 9600,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('llm-provider-openrouter')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('llm-route-openai_responses')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('llm-model')),
+        'm/or',
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('暂不支持语义筛选'), findsOneWidget);
+      await tester.tap(find.widgetWithText(TextButton, '保存配置'));
+      await tester.pumpAndSettle();
+      expect(messages, isNotEmpty);
+      expect((await provStore.load('openrouter'))!.protocol, isNull);
     },
   );
 
