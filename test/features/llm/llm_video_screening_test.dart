@@ -8,7 +8,7 @@ import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/jev/jev_evaluator.dart';
 import 'package:PiliPlus/features/jev/jev_final_screen.dart';
 import 'package:PiliPlus/features/jev/jev_settings.dart';
-import 'package:PiliPlus/features/jev/jev_contract.dart' show JevSurface, JevCandidate;
+import 'package:PiliPlus/features/jev/jev_contract.dart' show JevSurface;
 import 'package:PiliPlus/features/llm/llm.dart';
 
 class _FakeBox implements JevSettingsBox {

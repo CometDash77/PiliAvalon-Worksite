@@ -296,16 +296,15 @@ class JevEvaluator {
     // of scope this round (issue #124); a config-read failure keeps today's
     // behavior (no cache).
     final cacheEnabled = _cacheEnabled(surface);
-    final generation = cacheEnabled
-        ? '${mode.generation}|' + _generationKey(
-            provider: provider,
-            model: settings.modelFor(provider),
-            builtin: builtin,
-            activeRules: activeRules,
-            state: state,
-            surface: surface,
-          )
-        : null;
+    final policy = _generationKey(
+      provider: provider,
+      model: settings.modelFor(provider),
+      builtin: builtin,
+      activeRules: activeRules,
+      state: state,
+      surface: surface,
+    );
+    final generation = cacheEnabled ? '${mode.generation}|$policy' : null;
 
     // Cache identity per slot; served slots are answered locally.
     final identities = List<String?>.filled(candidates.length, null);
@@ -501,7 +500,27 @@ class JevEvaluator {
       }
     }
 
-    if (!mode.isCurrent) {
+    var policyCurrent = false;
+    try {
+      final current = await _settings.load();
+      final currentRules = await _rules.load();
+      final currentBuiltin = currentRules.builtinEnabled(target);
+      policyCurrent = current.isSurfaceEnabled(surface) &&
+          current.provider == provider && current.providerConfirmed &&
+          policy == _generationKey(
+            provider: provider,
+            model: current.modelFor(provider),
+            builtin: currentBuiltin,
+            activeRules: currentRules.activeFor(target),
+            state: currentBuiltin
+                ? (await _preferences.load()).statePayload()
+                : <String, Object?>{},
+            surface: surface,
+          );
+    } catch (_) {
+      // Unreadable policy cannot validate an old verdict: fail open.
+    }
+    if (!mode.isCurrent || !policyCurrent) {
       return JevScreening(
         status: JevScreenStatus.disabled,
         hidden: List<bool>.filled(candidates.length, false),
