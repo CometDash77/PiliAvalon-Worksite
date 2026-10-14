@@ -91,7 +91,9 @@ class JevFinalScreen<T> {
           ]);
           hidden = llm.hidden;
       }
-      if (!mode.isCurrent || hidden.length != candidates.length) return items;
+      final current = await _effectiveEvaluator.settings.load();
+      if (!mode.isCurrent || !current.isSurfaceEnabled(surface) ||
+          hidden.length != candidates.length) return items;
       final keep = List<bool>.filled(items.length, true);
       final kind = T == ReplyInfo ? JevScreenLogKind.comment : JevScreenLogKind.video;
       final blocked = <JevScreenLogEntry>[];

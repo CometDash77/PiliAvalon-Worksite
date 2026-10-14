@@ -292,7 +292,8 @@ class LlmCommentScreening {
         final views = LlmCommentRuleView.of(
           ruleConfig.activeFor(JevRuleTarget.comment),
         );
-        if (views.isNotEmpty &&
+        final settings = await JevSettingsStore(box: _settings.box).load().timeout(remaining);
+        if (!settings.isSurfaceEnabled(JevSurface.comment) ||
             initialFingerprint != _fingerprint(config, views)) {
           // Decisions compiled under a stale policy are void.
           failure ??= 'drift';
@@ -304,7 +305,7 @@ class LlmCommentScreening {
           return LlmCommentResult(replies: replies, cacheable: false);
         }
       } catch (_) {
-        cacheable = false;
+        return LlmCommentResult(replies: replies, cacheable: false);
       }
     }
     if (!mode.isCurrent) {
@@ -630,8 +631,7 @@ class LlmVideoScreening {
       final config = await _settings.load().timeout(remaining);
       final rulesNow = (await _rules.load().timeout(remaining))
           .activeVideoTextRules();
-      if (rulesNow.isNotEmpty &&
-          _fingerprint(config, rulesNow) != fingerprint) {
+      if (_fingerprint(config, rulesNow) != fingerprint) {
         return done(
           List<bool>.filled(candidates.length, false),
           modelId: modelId,
