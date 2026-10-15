@@ -34,19 +34,28 @@ void main() {
     expect(parse('{"hits":["not a map"]}').valid, isFalse);
   });
 
-  test('unknown ids and blank reasons drop the hit and poison the pass', () {
+  test('unknown ids and blank reasons invalidate the whole response', () {
+    for (final payload in [
+      '{"hits":[{"rule_id":"ghost","reason":"x"},{"rule_id":"r1","reason":"ok"}]}',
+      '{"hits":[{"rule_id":"r1","reason":"  "}]}',
+    ]) {
+      final v = parse(payload);
+      expect(v.valid, isFalse, reason: payload);
+      expect(v.hits, isEmpty);
+    }
+  });
+
+  test('duplicate rule ids invalidate the response', () {
     final v = parse(
-      '{"hits":[{"rule_id":"ghost","reason":"x"},{"rule_id":"r1","reason":"  "}]}',
+      '{"hits":[{"rule_id":"r1","reason":"a"},{"rule_id":"r1","reason":"b"}]}',
     );
-    expect(v.valid, isTrue);
+    expect(v.valid, isFalse);
     expect(v.hits, isEmpty);
-    expect(v.droppedHits, isTrue);
   });
 
   test('a kept reason is preserved verbatim', () {
     final v = parse('{"hits":[{"rule_id":"r1","reason":" ok "}]}');
     expect(v.valid, isTrue);
-    expect(v.droppedHits, isFalse);
     expect(v.hits.single.reason, ' ok ');
   });
 
@@ -57,10 +66,9 @@ void main() {
     expect(v.hits.single.reason.runes.length, LlmLimits.maxReasonRunes);
   });
 
-  test('lenient extraction tolerates prose around the JSON', () {
-    final v = parse('判定如下 {"hits":[{"rule_id":"r2","reason":"ok"}]} 以上');
-    expect(v.valid, isTrue);
-    expect(v.hits.single.ruleId, 'r2');
+  test('prose around JSON is invalid', () {
+    expect(parse('判定如下 {"hits":[]}').valid, isFalse);
+    expect(parse('{"hits":[]} 以上').valid, isFalse);
   });
 
   test('multiple hits keep their order', () {
@@ -70,10 +78,25 @@ void main() {
     expect(v.hits.map((h) => h.ruleId).toList(), ['r2', 'r1']);
   });
 
+  test('canonical verdict requires a valid qualitative band', () {
+    final ok = LlmVerdictParser.parseCanonical(
+      '{"hits":[{"rule_id":"r1","reason":"ok","band":"high"}]}',
+      known,
+    );
+    expect(ok.valid, isTrue);
+    expect(ok.hits.single.band, LlmConfidenceBand.high);
+    expect(
+      LlmVerdictParser.parseCanonical(
+        '{"hits":[{"rule_id":"r1","reason":"ok"}]}',
+        known,
+      ).valid,
+      isFalse,
+    );
+  });
+
   test('an empty hits list is valid and means keep everything', () {
     final v = parse('{"hits":[]}');
     expect(v.valid, isTrue);
     expect(v.hits, isEmpty);
-    expect(v.droppedHits, isFalse);
   });
 }

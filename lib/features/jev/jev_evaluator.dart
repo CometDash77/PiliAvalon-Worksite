@@ -229,6 +229,10 @@ class JevEvaluator {
   final JevRuleStore _rules;
   final JevVerdictCache _verdictCache;
 
+  /// 设置存储出口：终审屏借它的 box 落全局模式键（issue #142），
+  /// 保证模式键与评测器设置同库、测试可整链注入。
+  JevSettingsStore get settings => _settings;
+
   /// Screens [candidates] for [surface]. When [passTimeout] is set (dual-
   /// input; callers drop the hidden entries before render and before
   /// exposure recording.

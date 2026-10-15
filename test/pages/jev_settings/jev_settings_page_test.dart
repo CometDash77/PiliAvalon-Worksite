@@ -6,6 +6,7 @@ import 'package:PiliPlus/features/llm/llm.dart';
 import 'package:PiliPlus/features/llm/llm_credential_store.dart';
 import 'package:PiliPlus/features/llm/llm_provider_config_store.dart';
 import 'package:PiliPlus/features/llm/llm_provider_presets.dart';
+import 'package:PiliPlus/features/screening/screening_mode.dart';
 import 'package:PiliPlus/pages/jev_settings/view.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart' hide ListTile;
@@ -169,10 +170,18 @@ void main() {
     LlmHttpProbe? llmProbe,
     LlmProviderConfigStore? llmProviderStore,
     double height = 3200,
+    double width = 1400,
   }) async {
-    tester.view.physicalSize = Size(1400, height);
+    tester.view.physicalSize = Size(width, height);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
+    final mode = llmProviderStore != null ||
+            llmStore != null ||
+            llmCatalog != null ||
+            llmProbe != null
+        ? ScreeningEngineMode.llm
+        : ScreeningEngineMode.decision;
+    await store.box.put(ScreeningModeStore.modeKey, mode.id);
     await tester.pumpWidget(
       MaterialApp(
         home: JevSettingsPage(
@@ -393,14 +402,15 @@ void main() {
     expect(box.values[JevSettingsStore.enabledKey], isFalse);
     expect(credentials.writeCount, 0);
     expect(probes, isEmpty);
-    final master = tester.widget<SwitchListTile>(
-      find.byType(SwitchListTile).first,
+    expect(
+      tester.widget<RadioListTile<ScreeningEngineMode>>(
+        find.byKey(const ValueKey('screening-mode-decision')),
+      ).groupValue,
+      ScreeningEngineMode.decision,
     );
-    expect(master.value, isFalse);
-    expect(master.onChanged, isNull);
   });
 
-  testWidgets('per-surface switches need the master switch', (tester) async {
+  testWidgets('Decision surfaces can be configured independently', (tester) async {
     final box = _MemoryBox();
     await pumpPage(
       tester,
@@ -419,20 +429,9 @@ void main() {
     final surfaces = tester
         .widgetList<SwitchListTile>(find.byType(SwitchListTile))
         .toList();
-    // 母开关 + 判定缓存开关(issue #123) + 各生效入口；评论过滤开关区块已随
-    // issue #122 移除，不再计入。
-    expect(surfaces.length, JevSurface.values.length + 2);
-    for (final tile in surfaces.skip(1)) {
-      expect(tile.onChanged, isNull);
-      expect(tile.value, isFalse);
-    }
-
-    await tester.tap(find.text('启用 LLM 语义筛选'));
-    await tester.pumpAndSettle();
-    final enabled = tester
-        .widgetList<SwitchListTile>(find.byType(SwitchListTile))
-        .toList();
-    final wired = enabled.skip(1).where((tile) => tile.subtitle == null);
+    // Cache plus each wired surface. No second engine-wide master switch.
+    expect(surfaces.length, JevSurface.values.length + 1);
+    final wired = surfaces.where((tile) => tile.subtitle == null);
     expect(wired.length, JevSurface.values.length - 1);
     for (final tile in wired) {
       expect(tile.onChanged, isNotNull);
@@ -440,13 +439,11 @@ void main() {
     // A surface with no call site says so and cannot be switched on.
     // 判定缓存开关(issue #123)自带副标题但不是生效入口，按 key 排除。
     for (final tile
-        in enabled
-            .skip(1)
-            .where(
-              (tile) =>
-                  tile.subtitle != null &&
-                  tile.key != const ValueKey('jev-verdict-cache-enabled'),
-            )) {
+        in surfaces.where(
+          (tile) =>
+              tile.subtitle != null &&
+              tile.key != const ValueKey('jev-verdict-cache-enabled'),
+        )) {
       expect(tile.onChanged, isNull);
       expect(tile.value, isFalse);
     }
@@ -1039,9 +1036,11 @@ void main() {
       validator: JevKeyValidator(),
       messages: [],
     );
-    final tile = find.text('视频屏蔽规则');
-    await tester.ensureVisible(tile);
-    await tester.tap(tile);
+    final hub = find.text('判断规则').first;
+    await tester.ensureVisible(hub);
+    await tester.tap(hub);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('视频文本规则'));
     await tester.pumpAndSettle();
     // 进入通用线视频规则页并完成一次创建。
     expect(find.text('添加规则'), findsOneWidget);
@@ -1056,6 +1055,59 @@ void main() {
     final saved = await JevRuleStore(box: store.box).load();
     expect(saved.videoTextRules.single.text, '屏蔽标题含有剧透的视频');
   });
+  testWidgets('narrow settings layout remains scrollable without overflow', (
+    tester,
+  ) async {
+    await pumpPage(
+      tester,
+      store: JevSettingsStore(box: _MemoryBox()),
+      credentials: _FakeCredentialStore(),
+      validator: JevKeyValidator(),
+      messages: <String>[],
+      width: 360,
+      height: 800,
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('筛选模式'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('隐私说明'),
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('隐私说明'), findsOneWidget);
+  });
+
+  testWidgets('mode selection keeps only the active engine configuration visible', (
+    tester,
+  ) async {
+    final box = _MemoryBox();
+    final store = JevSettingsStore(box: box);
+    await pumpPage(
+      tester,
+      store: store,
+      credentials: _FakeCredentialStore(),
+      validator: JevKeyValidator(),
+      messages: <String>[],
+    );
+
+    expect(find.text('Jev（专用模型）'), findsOneWidget);
+    expect(find.text('通用模型（提供方预设）'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('screening-mode-llm')));
+    await tester.pumpAndSettle();
+    expect(find.text('Jev（专用模型）'), findsNothing);
+    expect(find.text('通用模型（提供方预设）'), findsOneWidget);
+    expect(box.values[ScreeningModeStore.modeKey], 'llm');
+
+    await tester.tap(find.byKey(const ValueKey('screening-mode-off')));
+    await tester.pumpAndSettle();
+    expect(find.text('Jev（专用模型）'), findsNothing);
+    expect(find.text('通用模型（提供方预设）'), findsNothing);
+    expect(find.text('语义筛选已关闭'), findsOneWidget);
+    expect(box.values[ScreeningModeStore.modeKey], 'off');
+  });
+
   // 评论过滤标准区块已在 issue #122 中随双轨合并移除：独立开关与标准文本
   // 不复存在，评论面只消费「判断规则」页的评论规则。
 }

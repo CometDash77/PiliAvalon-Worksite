@@ -4,10 +4,10 @@ import 'package:PiliPlus/common/widgets/flutter/list_tile.dart' as custom;
 import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/llm/llm.dart';
+import 'package:PiliPlus/features/screening/screening_mode.dart';
 import 'package:PiliPlus/pages/jev_settings/jev_filter_log_section.dart';
-import 'package:PiliPlus/pages/jev_settings/jev_rules_page.dart';
+import 'package:PiliPlus/pages/jev_settings/jev_rules_hub_page.dart';
 import 'package:PiliPlus/pages/jev_settings/jev_screen_log_page.dart';
-import 'package:PiliPlus/pages/jev_settings/llm_video_rules_page.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:material_ui/material_ui.dart' hide ListTile;
@@ -121,6 +121,9 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   final TextEditingController _keyController = TextEditingController();
 
   late JevSettings _settings = JevSettingsStore.snapshot;
+  late final ScreeningModeStore _modeStore = ScreeningModeStore(box: _store.box);
+  ScreeningEngineMode _mode = ScreeningEngineMode.decision;
+  String? _migrationNotice;
   JevSelectionState _selection = const JevSelectionState();
   JevPreferenceProfile _profile = JevPreferenceProfile.empty;
   JevKeyStoreStatus _keyStoreStatus = JevKeyStoreStatus.available;
@@ -165,6 +168,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
 
   Future<void> _load() async {
     final settings = await _store.load();
+    final mode = await _modeStore.load();
+    final notice = await _modeStore.readNotice();
     final profile = await _preferences.load();
     final status = await _credentials.status();
     // Issue #123: verdict-cache bounds live in the settings box; reads are
@@ -205,6 +210,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     }
     setState(() {
       _settings = JevSettingsStore.snapshot;
+      _mode = mode;
+      _migrationNotice = notice;
       _profile = profile;
       _cacheEnabled = cacheEnabled;
       _cacheEntries = JevVerdictCache.cachedEntryCount;
@@ -444,7 +451,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     final showAppBar = widget.showAppBar;
     final errorColor = ColorScheme.of(context).error;
     return Scaffold(
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       appBar: showAppBar ? AppBar(title: const Text('LLM 语义筛选')) : null,
       body: ListView(
         padding: EdgeInsets.only(
@@ -453,35 +460,49 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
           bottom: padding.bottom + 100,
         ),
         children: [
-          ..._buildSwitchSection(),
-          ..._buildCacheSection(),
-          const Divider(height: 1),
+          ..._buildModeSection(),
+          if (_mode == ScreeningEngineMode.decision) ...[
+            ..._buildSwitchSection(),
+            ..._buildCacheSection(),
+            const Divider(height: 1),
+          ],
           custom.ListTile(
             leading: const Icon(Icons.rule_outlined),
             title: const Text('判断规则'),
-            subtitle: const Text(
-              '分别管理视频、评论、直播间的问题、隐藏答案和执行阈值；评论过滤只使用这里的评论规则（issue #122）',
-            ),
+            subtitle: const Text('统一入口：按场景编辑结构化规则或视频文本规则，规则保存在本机'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push<void>(
               MaterialPageRoute(
-                builder: (_) =>
-                    JevRulesPage(store: JevRuleStore(box: _store.box)),
+                builder: (_) => JevRulesHubPage(
+                  store: JevRuleStore(box: _store.box),
+                ),
               ),
             ),
           ),
-          custom.ListTile(
-            leading: const Icon(Icons.block_outlined),
-            title: const Text('视频屏蔽规则'),
-            subtitle: const Text('通用模型线的自然语言视频规则：不走阈值，命中即屏蔽并给出理由（issue #136）'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push<void>(
-              MaterialPageRoute(
-                builder: (_) =>
-                    LlmVideoRulesPage(store: JevRuleStore(box: _store.box)),
-              ),
+          // Issue #131: the renamed page keeps the Jev-only config as its own
+          // labeled group; the generic line gets a fresh section below.
+          if (_mode == ScreeningEngineMode.decision) ...[
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Text('Jev（专用模型）'),
             ),
-          ),
+            ..._buildProviderSection(errorColor),
+            const Divider(height: 1),
+            ..._buildModelSection(),
+            const Divider(height: 1),
+            ..._buildKeySection(errorColor),
+          ],
+          if (_mode == ScreeningEngineMode.llm) ...[
+            ..._buildLlmSection(errorColor),
+          ],
+          if (_mode != ScreeningEngineMode.off) ...[
+            const Divider(height: 1),
+            ..._buildComplianceSection(),
+          ],
+          if (_mode == ScreeningEngineMode.decision) ...[
+            ..._buildProfileSection(),
+            const Divider(height: 1),
+          ],
           custom.ListTile(
             leading: const Icon(Icons.receipt_long_outlined),
             title: const Text('筛选日志'),
@@ -493,42 +514,90 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
           ),
           JevFilterLogSection(log: _filterLog),
           const Divider(height: 1),
-          ..._buildProfileSection(),
-          const Divider(height: 1),
-          // Issue #131: the renamed page keeps the Jev-only config as its own
-          // labeled group; the generic line gets a fresh section below.
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Text('Jev（专用模型）'),
-          ),
-          ..._buildProviderSection(errorColor),
-          const Divider(height: 1),
-          ..._buildModelSection(),
-          const Divider(height: 1),
-          ..._buildKeySection(errorColor),
-          const Divider(height: 1),
-          ..._buildLlmSection(errorColor),
-          const Divider(height: 1),
-          ..._buildComplianceSection(),
           _buildPrivacySection(),
         ],
       ),
     );
   }
 
-  List<Widget> _buildSwitchSection() => [
-    SwitchListTile(
-      secondary: const Icon(Icons.psychology_outlined),
-      title: const Text('启用 LLM 语义筛选'),
-      subtitle: const Text('在所有更便宜的过滤之后，对幸存候选做最后一次语义判断'),
-      value: _settings.enabled,
-      onChanged: _keyStoreStatus == JevKeyStoreStatus.unavailable
-          ? null
-          : (value) => _saveSettings(_settings.copyWith(enabled: value)),
+  List<Widget> _buildModeSection() => [
+    const Padding(
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Text('筛选模式'),
     ),
+    for (final mode in ScreeningEngineMode.values)
+      RadioListTile<ScreeningEngineMode>(
+        key: ValueKey('screening-mode-${mode.id}'),
+        dense: true,
+        title: Text(_modeLabel(mode)),
+        subtitle: Text(_modeDescription(mode)),
+        value: mode,
+        groupValue: _mode,
+        onChanged: (value) => value == null ? null : _saveMode(value),
+      ),
+    custom.ListTile(
+      dense: true,
+      leading: Icon(_mode == ScreeningEngineMode.off
+          ? Icons.pause_circle_outline
+          : Icons.verified_outlined),
+      title: Text(_mode == ScreeningEngineMode.off
+          ? '语义筛选已关闭'
+          : '当前模式：${_modeLabel(_mode)}'),
+      subtitle: Text(_modeSummary()),
+    ),
+    if (_migrationNotice case final notice?)
+      custom.ListTile(
+        dense: true,
+        leading: const Icon(Icons.info_outline),
+        title: Text(notice),
+        trailing: IconButton(
+          tooltip: '关闭提示',
+          icon: const Icon(Icons.close),
+          onPressed: () async {
+            await _modeStore.saveNotice(null);
+            if (mounted) setState(() => _migrationNotice = null);
+          },
+        ),
+      ),
+  ];
+
+  String _modeLabel(ScreeningEngineMode mode) => switch (mode) {
+    ScreeningEngineMode.off => '关闭',
+    ScreeningEngineMode.decision => 'Decision 判断',
+    ScreeningEngineMode.llm => 'LLM 语义判断',
+  };
+
+  String _modeDescription(ScreeningEngineMode mode) => switch (mode) {
+    ScreeningEngineMode.off => '不调用任一语义筛选后端，候选保持可见',
+    ScreeningEngineMode.decision => '使用 Jev 结构化规则与模型验证',
+    ScreeningEngineMode.llm => '使用通用模型的视频文本规则',
+  };
+
+  String _modeSummary() {
+    if (_mode == ScreeningEngineMode.off) return '未启用 Decision 或 LLM 上游请求';
+    if (_mode == ScreeningEngineMode.decision) {
+      final provider = _settings.provider?.label ?? '未选择提供方';
+      final model = _settings.provider == null
+          ? '未设置模型'
+          : _settings.modelFor(_settings.provider!);
+      return '主配置：$provider / $model；验证状态：${_validation?.validated == true || _settings.providerConfirmed ? '已确认' : '待验证'}';
+    }
+    final model = _provAccount.model.trim().isEmpty ? '未设置模型' : _provAccount.model;
+    return '主配置：${_provPreset.displayName} / $model；验证状态：${_provAccount.confirmed ? '已确认' : '待测试连接'}';
+  }
+
+  Future<void> _saveMode(ScreeningEngineMode mode) async {
+    if (mode == _mode) return;
+    await _modeStore.save(mode);
+    if (!mounted) return;
+    setState(() => _mode = mode);
+    _toast('已切换为${_modeLabel(mode)}；另一模式配置保留');
+  }
+
+  List<Widget> _buildSwitchSection() => [
     const Padding(
       padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Text('生效入口（各自的开关）'),
+      child: Text('Decision 生效入口（各自的开关）'),
     ),
     for (final surface in JevSurface.values)
       SwitchListTile(
@@ -537,7 +606,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         title: Text(surface.label),
         subtitle: surface.screeningWired ? null : const Text('尚未接线：本版本打开也不会生效'),
         value: surface.screeningWired && _settings.surfaces.contains(surface),
-        onChanged: _settings.enabled && surface.screeningWired
+        onChanged: _keyStoreStatus == JevKeyStoreStatus.available &&
+                surface.screeningWired
             ? (value) =>
                   _saveSettings(_settings.withSurface(surface, value: value))
             : null,
@@ -557,13 +627,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       secondary: const Icon(Icons.cached_outlined),
       title: const Text('缓存判定结果'),
       subtitle: const Text('同一视频在有效期内复用上次的判定，不再重复请求上游；规则、模型或偏好档变化时整批作废'),
-      // 总开关关闭时 Jev 整体失效，缓存开关随其余开关一起显示为关。
-      value: _settings.enabled && _cacheEnabled,
-      // 与其余开关一致：总开关关闭时缓存开关不可用（页面既有契约，测试
-      // per-surface switches need the master switch 校验）。
-      onChanged: _settings.enabled
-          ? (value) => _saveCacheConfig(enabled: value)
-          : null,
+      value: _cacheEnabled,
+      onChanged: (value) => _saveCacheConfig(enabled: value),
     ),
     Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),

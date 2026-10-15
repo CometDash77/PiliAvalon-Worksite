@@ -40,17 +40,25 @@ String videoRuleVersion(List<LlmVideoRule> activeRules) => ruleVersion(
 /// typed 判断规则 remain the single comment config source; the generic line
 /// extends on top and never edits them).
 ///
-/// Rendering is deliberately threshold-free: a generic chat model returns a
-/// qualitative hit with a reason, not a calibrated probability, so the typed
-/// threshold has no faithful translation here.
+/// The threshold remains typed-rule data; the generic model returns a
+/// qualitative band and the consumer compares its lower bound locally.
 class LlmCommentRuleView {
-  const LlmCommentRuleView({required this.id, required this.criteria});
+  const LlmCommentRuleView({
+    required this.id,
+    required this.criteria,
+    this.threshold = .95,
+  });
   final String id;
   final String criteria;
+  final double threshold;
 
   static List<LlmCommentRuleView> of(List<JevRule> activeCommentRules) => [
     for (final rule in activeCommentRules)
-      LlmCommentRuleView(id: rule.id, criteria: _render(rule)),
+      LlmCommentRuleView(
+         id: rule.id,
+         criteria: _render(rule),
+         threshold: rule.threshold,
+       ),
   ];
 
   static String _render(JevRule rule) {
@@ -70,6 +78,7 @@ class LlmCommentRuleView {
   /// Canonical content of the ACTIVE comment rules as the generic line sees
   /// them — the basis of the shared comment rule_version.
   static String canonicalJson(List<LlmCommentRuleView> views) => jsonEncode([
-    for (final v in views) {'id': v.id, 'criteria': v.criteria},
+    for (final v in views)
+      {'id': v.id, 'criteria': v.criteria, 'threshold': v.threshold},
   ]);
 }

@@ -173,7 +173,7 @@ void main() {
   });
 
   group('LlmCommentRuleView', () {
-    test('noul rendering carries question and meanings, drops threshold', () {
+    test('noul rendering carries question and meanings separately from threshold', () {
       final views = LlmCommentRuleView.of([
         _noulRule(yes: '包含购买链接', no: '普通讨论'),
       ]);

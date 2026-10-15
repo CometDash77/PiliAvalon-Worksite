@@ -15,6 +15,12 @@ import 'package:PiliPlus/features/llm/llm_verdict_cache.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo;
 
+double _bandLowerBound(LlmConfidenceBand band) => switch (band) {
+  LlmConfidenceBand.high => .95,
+  LlmConfidenceBand.medium => .80,
+  LlmConfidenceBand.low => 0,
+};
+
 /// Resolved context of one generic-line pass: provider config + credential.
 class _LlmPassContext {
   const _LlmPassContext({required this.config, required this.apiKey});
@@ -205,6 +211,14 @@ class LlmCommentScreening {
                 LlmPrompt.commentRuleId(LlmPrompt.candidateKey(b), views[r].id):
                     b,
           };
+          final thresholds = <String, double>{
+            for (var b = 0; b < batch.length; b++)
+              for (final rule in views)
+                LlmPrompt.commentRuleId(
+                  LlmPrompt.candidateKey(b),
+                  rule.id,
+                ): rule.threshold,
+          };
           final remaining = budget - watch.elapsed;
           final outcome = await _client
               .call(
@@ -221,7 +235,7 @@ class LlmCommentScreening {
             cacheable = false;
             continue;
           }
-          final verdict = LlmVerdictParser.parse(
+          final verdict = LlmVerdictParser.parseCanonical(
             outcome.text,
             knownIds.keys.toSet(),
           );
@@ -234,13 +248,17 @@ class LlmCommentScreening {
             final b = knownIds[hit.ruleId];
             if (b == null) continue; // unreachable: parser drops unknown ids
             final index = batch[b];
+            final band = hit.band;
+            final threshold = thresholds[hit.ruleId];
+            if (band == null || threshold == null ||
+                _bandLowerBound(band) < threshold) {
+              continue;
+            }
             hidden[index] = true;
             hiddenByRule[index] = hit.ruleId;
             hiddenReasons[index] = hit.reason;
           }
-          if (verdict.droppedHits) {
-            cacheable = false;
-          } else if (cacheOn) {
+          if (cacheOn) {
             for (var b = 0; b < batch.length; b++) {
               final identity = _commentIdentity(replies[batch[b]]);
               if (identity == null) continue;
@@ -278,8 +296,7 @@ class LlmCommentScreening {
         final views = LlmCommentRuleView.of(
           ruleConfig.activeFor(JevRuleTarget.comment),
         );
-        if (views.isNotEmpty &&
-            initialFingerprint != _fingerprint(config, views)) {
+        if (initialFingerprint != _fingerprint(config, views)) {
           // Decisions compiled under a stale policy are void.
           failure ??= 'drift';
           _recordPassFailure(
@@ -556,7 +573,7 @@ class LlmVideoScreening {
           final remaining = budget - watch.elapsed;
           final outcome = await _client
               .call(
-                system: llmSystemPrompt,
+                system: llmVideoSystemPrompt,
                 user: LlmPrompt.videoUserMessage(
                   rules: rules,
                   title: title,
@@ -581,7 +598,7 @@ class LlmVideoScreening {
             ruleIds[i] = verdict.hits.first.ruleId;
             reasons[i] = verdict.hits.first.reason;
           }
-          if (!verdict.droppedHits && cacheOn) {
+          if (cacheOn) {
             final identity = _videoIdentity(candidate);
             if (identity != null) {
               _cache.put(fingerprint, identity, hide: hidden[i]);
@@ -604,8 +621,7 @@ class LlmVideoScreening {
       final config = await _settings.load().timeout(remaining);
       final rulesNow = (await _rules.load().timeout(remaining))
           .activeVideoTextRules();
-      if (rulesNow.isNotEmpty &&
-          _fingerprint(config, rulesNow) != fingerprint) {
+      if (_fingerprint(config, rulesNow) != fingerprint) {
         return done(
           List<bool>.filled(candidates.length, false),
           modelId: modelId,
