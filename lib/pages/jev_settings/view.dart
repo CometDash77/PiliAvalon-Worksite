@@ -1390,7 +1390,6 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     final legacy = mapping.config!;
     try {
       await _llmStore.save(legacy);
-      if (mounted) setState(() => _activeLlm = legacy);
       if (key.isEmpty) {
         await _llmCredentials.delete(legacy.protocol!);
       } else {
