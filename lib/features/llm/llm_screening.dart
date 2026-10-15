@@ -544,6 +544,7 @@ class LlmVideoScreening {
       final fingerprint = _fingerprint(context.config, rules);
       final knownIds = {for (final rule in rules) rule.id};
       final cacheOn = _cache.enabled;
+      final pendingCache = <String, bool>{};
       final resolved = List<bool>.filled(candidates.length, false);
       if (cacheOn) {
         for (var i = 0; i < candidates.length; i++) {
@@ -601,7 +602,7 @@ class LlmVideoScreening {
           if (cacheOn) {
             final identity = _videoIdentity(candidate);
             if (identity != null) {
-              _cache.put(fingerprint, identity, hide: hidden[i]);
+              pendingCache[identity] = hidden[i];
             }
           }
         } catch (e) {
@@ -627,6 +628,9 @@ class LlmVideoScreening {
           modelId: modelId,
           failure: failure ?? 'drift',
         );
+      }
+      for (final entry in pendingCache.entries) {
+        _cache.put(fingerprint, entry.key, hide: entry.value);
       }
       return done(
         hidden,

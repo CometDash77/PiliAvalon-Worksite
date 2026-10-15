@@ -6,6 +6,7 @@ import 'package:PiliPlus/features/jev/jev_comment_screening.dart';
 import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/jev/jev_screen_log.dart';
 import 'package:PiliPlus/features/llm/llm.dart';
+import 'package:PiliPlus/features/screening/screening_mode.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart';
 import 'package:PiliPlus/models/model_hot_video_item.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
@@ -526,6 +527,7 @@ void main() {
         toCandidate: (item) =>
             JevCandidate(title: item.title, tags: [item.tname ?? '']),
         evaluator: Harness(surfaces: {JevSurface.hot}).evaluator(capture),
+        modeStore: ScreeningModeStore(box: box),
         videoScreening: _FakeVideoScreening(
           const LlmVideoScreenOutcome(
             hidden: [true, false],
@@ -537,6 +539,7 @@ void main() {
         ),
       );
 
+      await ScreeningModeStore(box: box).save(ScreeningEngineMode.llm);
       final result = await screen.screen([hot('a'), hot('b', bvid: 'BV2')]);
       await pumpEventQueue();
 
@@ -566,6 +569,7 @@ void main() {
         surface: JevSurface.hot,
         toCandidate: (item) => JevCandidate(title: item.title),
         evaluator: Harness(surfaces: {JevSurface.hot}).evaluator(capture),
+        modeStore: ScreeningModeStore(box: box),
         videoScreening: _FakeVideoScreening(
           const LlmVideoScreenOutcome(
             hidden: [false, false],
@@ -576,6 +580,7 @@ void main() {
         ),
       );
 
+      await ScreeningModeStore(box: box).save(ScreeningEngineMode.llm);
       final result = await screen.screen([hot('a'), hot('b', bvid: 'BV2')]);
       await pumpEventQueue();
 

@@ -452,7 +452,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(box.values[JevSettingsStore.surfaceKey(JevSurface.related)], isTrue);
     expect(
-      JevSettingsStore.snapshot.isSurfaceEnabled(JevSurface.related),
+      JevSettingsStore.snapshot.surfaces.contains(JevSurface.related),
       isTrue,
     );
 
@@ -1074,6 +1074,8 @@ void main() {
       find.text('隐私说明'),
       400,
       scrollable: find.byType(Scrollable).first,
+      maxScrolls: 100,
+      continuous: true,
     );
     expect(find.text('隐私说明'), findsOneWidget);
   });
