@@ -1,0 +1,24 @@
+﻿Analyzing PiliAvalon-Worksite...                                
+
+   info - 'alpha' is deprecated and shouldn't be used. Use (*.a * 255.0).round().clamp(0, 255). Try replacing the use of the deprecated member with the replacement - lib\pages\dynamics\widgets\vote_decoration.dart:114:20 - deprecated_member_use
+   info - Unnecessary duplication of receiver. Try using a cascade to avoid the duplication - test\features\shielding\upstream_reply_selection_test.dart:65:7 - cascade_invocations
+   info - Unnecessary duplication of receiver. Try using a cascade to avoid the duplication - tool\bench\shield_matcher_bench.dart:131:3 - cascade_invocations
+   info - Unnecessary duplication of receiver. Try using a cascade to avoid the duplication - tool\probe\login_field_probe.dart:128:3 - cascade_invocations
+   info - Unnecessary duplication of receiver. Try using a cascade to avoid the duplication - tool\probe\login_field_probe.dart:203:3 - cascade_invocations
+   info - Unnecessary duplication of receiver. Try using a cascade to avoid the duplication - tool\probe\login_field_probe.dart:234:3 - cascade_invocations
+   info - Unnecessary duplication of receiver. Try using a cascade to avoid the duplication - tool\probe\login_field_probe.dart:266:3 - cascade_invocations
+   info - Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' - tool\probe\login_field_probe.dart:302:5 - use_null_aware_elements
+   info - Unnecessary duplication of receiver. Try using a cascade to avoid the duplication - tool\probe\login_field_probe.dart:321:3 - cascade_invocations
+   info - Unnecessary duplication of receiver. Try using a cascade to avoid the duplication - tool\probe\login_field_probe.dart:335:5 - cascade_invocations
+   info - Unnecessary duplication of receiver. Try using a cascade to avoid the duplication - tool\probe\login_field_probe.dart:341:5 - cascade_invocations
+   info - Unnecessary duplication of receiver. Try using a cascade to avoid the duplication - tool\probe\login_field_probe.dart:367:7 - cascade_invocations
+   info - Unnecessary duplication of receiver. Try using a cascade to avoid the duplication - tool\probe\login_field_probe.dart:380:5 - cascade_invocations
+   info - Unnecessary duplication of receiver. Try using a cascade to avoid the duplication - tool\probe\login_field_probe.dart:384:3 - cascade_invocations
+
+flutter.bat : 14 issues found. (ran in 13.7s)
+所在位置 行:1 字符: 347
++ ... _test.dart; & D:\flutter-sdk\flutter\bin\flutter.bat analyze --no-pub ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (14 issues found. (ran in 13.7s):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

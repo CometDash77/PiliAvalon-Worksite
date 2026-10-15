@@ -1,7 +1,11 @@
+import 'dart:async';
+
+import 'package:PiliPlus/features/jev/jev_evaluator.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo, DetailListReply, Mode;
 import 'package:PiliPlus/grpc/reply.dart';
 import 'package:PiliPlus/http/loading_state.dart';
+import 'package:PiliPlus/models_new/dynamic/dyn_mention/item.dart';
 import 'package:PiliPlus/pages/common/publish/publish_route.dart';
 import 'package:PiliPlus/pages/common/reply_controller.dart';
 import 'package:PiliPlus/pages/video/reply_new/view.dart';
@@ -23,6 +27,10 @@ class VideoReplyReplyController extends ReplyController
     required this.rpid,
     required this.dialog,
     required this.replyType,
+    this.isVideoDetail = false,
+    this.parentBody,
+    this.jevEvaluator,
+    this.initialRoot,
   });
   final int? dialog;
   int? id;
@@ -33,7 +41,13 @@ class VideoReplyReplyController extends ReplyController
   int replyType;
 
   bool hasRoot = false;
+  final bool isVideoDetail;
+  final String? parentBody;
+  final JevEvaluator? jevEvaluator;
+  final ReplyInfo? initialRoot;
   final firstFloor = Rxn<ReplyInfo>();
+  ReplyInfo? _screenedFirstFloor;
+  bool _hasPendingFirstFloor = false;
 
   final index = RxnInt();
 
@@ -76,21 +90,86 @@ class VideoReplyReplyController extends ReplyController
     // reply2Reply // isDialogue.not
     if (data is DetailListReply) {
       count.value = data.root.count.toInt();
-      if (isRefresh && !hasRoot) {
-        firstFloor.value ??= applyFirstFloorShielding(data.root);
-      }
     }
 
     return false;
   }
 
   @override
-  void handleListResponse(List<ReplyInfo> dataList) {
-    if (id != null) {
-      setIndexById(Int64(id!), dataList);
-      id = null;
+  Future<void> beforeListResponse(bool isRefresh, response) async {
+    if (isRefresh && (response is DetailListReply || initialRoot != null)) {
+      // Children are screened by the list pipeline. Screen only the root here.
+      final source = initialRoot ?? (response as DetailListReply).root;
+      _screenedFirstFloor = ReplyInfo.fromBuffer(source.writeToBuffer())
+        ..replies.clear();
+      _hasPendingFirstFloor = true;
     }
-    super.handleListResponse(dataList);
+  }
+
+  @override
+  Future<void> prepareListResponse(List<ReplyInfo> dataList) async {
+    if (!_hasPendingFirstFloor) {
+      // Video-detail pages defer the target jump until after comment
+      // screening so it lands on the screened visible index; other pages
+      // keep the synchronous pre-shielding jump in handleListResponse.
+      final targetId = isVideoDetail ? id : null;
+      if (isVideoDetail) {
+        id = null;
+      }
+      await super.prepareListResponse(dataList);
+      if (isClosed) return;
+      if (targetId != null) {
+        setIndexById(Int64(targetId), dataList);
+      }
+      return;
+    }
+    final root = _screenedFirstFloor!;
+    // Children were detached from the root for first-floor screening; hand
+    // the merged comment pipeline their parent context explicitly. The
+    // target-jump is deferred until after comment screening so it lands on
+    // the final visible index.
+    final targetId = id;
+    id = null;
+    await handleListResponse(dataList);
+    final visible = await screenComments(
+      [...applyShielding([root]), ...dataList],
+      parentBodies: {
+        for (final child in dataList) child: parentBody ?? root.content.message,
+      },
+    );
+    if (isClosed) return;
+    _screenedFirstFloor = visible.any((r) => identical(r, root)) ? root : null;
+    dataList
+      ..clear()
+      ..addAll(visible.where((r) => !identical(r, root)));
+    if (targetId != null) {
+      setIndexById(Int64(targetId), dataList);
+    }
+  }
+
+  @override
+  void afterListResponse(bool isRefresh, response) {
+    if (_hasPendingFirstFloor && isRefresh) {
+      _screenedFirstFloor?.replies.addAll(getDataList(response) ?? []);
+      firstFloor.value = _screenedFirstFloor;
+      _screenedFirstFloor = null;
+      _hasPendingFirstFloor = false;
+    }
+  }
+
+  @override
+  Future<void> handleListResponse(List<ReplyInfo> dataList) async {
+    // Baseline contract: target lookup jumps on the raw list index here,
+    // before any filtering. Video-detail pages instead defer the jump until
+    // after comment screening (prepareListResponse captures id first, so
+    // this jump is suppressed there and the screened-index jump supersedes
+    // it); other pages and direct callers keep the synchronous raw jump.
+    final targetId = id;
+    id = null;
+    if (targetId != null) {
+      setIndexById(Int64(targetId), dataList);
+    }
+    await super.handleListResponse(dataList);
   }
 
   ReplyInfo? applyFirstFloorShielding(ReplyInfo reply) {
@@ -162,6 +241,7 @@ class VideoReplyReplyController extends ReplyController
     int? oid,
     int? replyType,
     int? index,
+    MentionItem? mentionItem,
   }) {
     assert(replyItem != null && index != null);
 
@@ -197,14 +277,23 @@ class VideoReplyReplyController extends ReplyController
             },
           ),
         )
-        .then((replyInfo) {
+        .then((replyInfo) async {
           if (replyInfo is ReplyInfo) {
             savedReplies.remove(key);
 
             count.value += 1;
-            loadingState
-              ..value.dataOrNull?.insert(index! + 1, replyInfo)
-              ..refresh();
+            final visible = await screenComments(applyShielding([replyInfo]));
+            if (visible.isEmpty) {
+              if (enableCommAntifraud) {
+                onCheckReply(replyInfo, isManual: false);
+              }
+              return;
+            }
+            final replies = loadingState.value.dataOrNull;
+            if (replies != null) {
+              replies.insert((index! + 1).clamp(0, replies.length), replyInfo);
+            }
+            loadingState.refresh();
             if (enableCommAntifraud) {
               onCheckReply(replyInfo, isManual: false);
             }
@@ -216,6 +305,6 @@ class VideoReplyReplyController extends ReplyController
   void onClose() {
     _controller?.dispose();
     _controller = null;
-    super.dispose();
+    super.onClose();
   }
 }

@@ -57,14 +57,10 @@ abstract final class ShieldingAdapters {
       reason: reason,
       uid: _string(owner?['mid'] ?? args?['up_id'] ?? item.owner.mid),
       authorName: authorName,
-      authorTokens: _tokens([authorName]),
+      authorTokensProvider: () => _tokens([authorName]),
       category: category,
       tags: tags,
-      tokens: _tokens([
-        item.title,
-        reason,
-        ...tags,
-      ]),
+      tokensProvider: () => _tokens([item.title, reason, ...tags]),
       durationSeconds: durationSeconds,
       playbackCount: playbackCount,
       danmakuCount: danmakuCount,
@@ -110,10 +106,10 @@ abstract final class ShieldingAdapters {
       body: reply.hasContent() ? reply.content.message : null,
       uid: uid,
       authorName: reply.hasMember() ? reply.member.name : null,
-      authorTokens: _tokens([
+      authorTokensProvider: () => _tokens([
         if (reply.hasMember()) reply.member.name,
       ]),
-      tokens: _tokens([
+      tokensProvider: () => _tokens([
         if (reply.hasContent()) reply.content.message,
       ]),
       avatarPendantValues: pendantValues,
@@ -129,12 +125,9 @@ abstract final class ShieldingAdapters {
     title: item.title,
     uid: item.owner.mid?.toString(),
     authorName: item.owner.name,
-    authorTokens: _tokens([item.owner.name]),
+    authorTokensProvider: () => _tokens([item.owner.name]),
     category: item.tname,
-    tokens: _tokens([
-      item.title,
-      item.tname,
-    ]),
+    tokensProvider: () => _tokens([item.title, item.tname]),
     durationSeconds: item.duration > 0 ? item.duration : null,
     playbackCount: item.stat.view,
     danmakuCount: item.stat.danmu,
@@ -201,16 +194,26 @@ abstract final class ShieldingAdapters {
     }
     if (raw is String && raw.trim().isNotEmpty) {
       return raw
-          .split(RegExp(r'[,，\s]+'))
+          .split(_tagSeparators)
           .where((tag) => tag.trim().isNotEmpty)
           .toList();
     }
     return const [];
   }
 
+  /// Separators between tags in a comma/whitespace joined tag string.
+  static final RegExp _tagSeparators = RegExp(r'[,，\s]+');
+
+  /// Separators used for candidate token splitting.
+  ///
+  /// Deliberately different from the matcher's own split: adapters keep
+  /// `_` and `-` inside a token, so this class must not reuse
+  /// `ShieldMatcher`'s separators.
+  static final RegExp _tokenSeparators = RegExp(r'[\s,，。！？!?:：;；]+');
+
   static List<String> _tokens(Iterable<String?> values) => values
       .whereType<String>()
-      .expand((value) => value.split(RegExp(r'[\s,，。！？!?:：;；]+')))
+      .expand((value) => value.split(_tokenSeparators))
       .where((value) => value.trim().isNotEmpty)
       .toList();
 }

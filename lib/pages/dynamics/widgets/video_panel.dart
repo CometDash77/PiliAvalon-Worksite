@@ -6,7 +6,47 @@ import 'package:PiliPlus/common/widgets/svg/play_icon.dart';
 import 'package:PiliPlus/models/common/badge_type.dart';
 import 'package:PiliPlus/models/dynamics/result.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
+import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:material_ui/material_ui.dart';
+
+/// Zen (spec #42 R16) reduced dynamics video card: cover, duration, title and
+/// play count only — no author block, body, interaction row, badge, danmaku
+/// count or play overlay. It shares `videoSeasonWidget` with the normal card
+/// so both stay in step, and keeps the original tap target.
+class DynamicsVideoCard extends StatelessWidget {
+  const DynamicsVideoCard({super.key, required this.item});
+
+  final DynamicItemModel item;
+
+  @override
+  Widget build(BuildContext context) {
+    final DynamicMajorModel? major = item.modules.moduleDynamic?.major;
+    final bool hasVideoMajor = switch (item.type) {
+      'DYNAMIC_TYPE_AV' => major?.archive != null,
+      'DYNAMIC_TYPE_UGC_SEASON' => major?.ugcSeason != null,
+      'DYNAMIC_TYPE_PGC' || 'DYNAMIC_TYPE_PGC_UNION' => major?.pgc != null,
+      'DYNAMIC_TYPE_COURSES_SEASON' => major?.courses != null,
+      // Anything else (forwards, articles, live, opus…) has no video surface
+      // to reduce, so it renders nothing rather than a half-card.
+      _ => false,
+    };
+    if (!hasVideoMajor) {
+      return const SizedBox.shrink();
+    }
+
+    final Widget card = videoSeasonWidget(
+      context,
+      floor: 1,
+      theme: Theme.of(context),
+      item: item,
+      isSave: false,
+      isDetail: false,
+      zen: true,
+    );
+
+    return InkWell(onTap: () => PageUtils.pushDynDetail(item), child: card);
+  }
+}
 
 Widget videoSeasonWidget(
   BuildContext context, {
@@ -15,6 +55,7 @@ Widget videoSeasonWidget(
   required DynamicItemModel item,
   required bool isSave,
   required bool isDetail,
+  bool zen = false,
 }) {
   // type archive  ugcSeason
   // archive 视频/显示发布人
@@ -57,7 +98,8 @@ Widget videoSeasonWidget(
                   quality: 40,
                 ),
               ),
-              if (video.badge?.text case final badge?)
+              // R16: the badge overlay is hidden while zen is on.
+              if (video.badge?.text case final badge? when !zen)
                 PBadge(
                   text: badge,
                   top: 8.0,
@@ -77,17 +119,19 @@ Widget videoSeasonWidget(
                   height: 70,
                   alignment: Alignment.bottomLeft,
                   padding: const EdgeInsets.fromLTRB(10, 0, 8, 8),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black54,
-                      ],
-                    ),
-                    borderRadius: .vertical(bottom: Style.imgRadius),
-                  ),
+                  decoration: zen
+                      ? null
+                      : const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black54,
+                            ],
+                          ),
+                          borderRadius: .vertical(bottom: Style.imgRadius),
+                        ),
                   child: DefaultTextStyle.merge(
                     style: TextStyle(
                       fontSize: theme.textTheme.labelMedium!.fontSize,
@@ -108,11 +152,15 @@ Widget videoSeasonWidget(
                         ],
                         if (video.stat case final stat?) ...[
                           Text('${NumUtils.numFormat(stat.play)}播放'),
-                          const SizedBox(width: 6),
-                          Text('${NumUtils.numFormat(stat.danmu)}弹幕'),
+                          // R16: the danmaku count is hidden while zen is on.
+                          if (!zen) ...[
+                            const SizedBox(width: 6),
+                            Text('${NumUtils.numFormat(stat.danmu)}弹幕'),
+                          ],
                         ],
                         const Spacer(),
-                        const PlayIcon(size: 50),
+                        // R16: the big play overlay is hidden while zen is on.
+                        if (!zen) const PlayIcon(size: 50),
                       ],
                     ),
                   ),

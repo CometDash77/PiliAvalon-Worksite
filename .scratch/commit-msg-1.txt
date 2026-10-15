@@ -1,0 +1,18 @@
+perf(shielding): cache compiled rule/rule-set/candidate work in ShieldMatcher (#52)
+
+Compile each ShieldRule once via Expando<_CompiledRule>: lowercased pattern,
+empty-pattern flag, enum normalization, compiled RegExp and parsed range.
+Failures are cached too and rethrown with the same error, so a bad rule still
+reports the same message on every match. Cache the applicable-rule list per
+(ruleSet instance, scope), and memoize per-match candidate values, lowercasing,
+enum normalization and tokens in _MatchContext.
+
+ShieldCandidate gains optional tokensProvider / authorTokensProvider, so the six
+eager _tokens([...]) call sites in shielding_adapters.dart become lazy. Regexes
+are hoisted to static final.
+
+Semantics are unchanged: the full rule traversal is kept because the original
+collects every rule error, so no early return is taken once block+allow is
+found. The new exit for an empty applicable-rule list is provably equivalent.
+Keys are object identities over deeply immutable models, so no cache can go
+stale. Equivalence and timings come from the harness in the next commit.

@@ -1,39 +1,49 @@
 // ignore_for_file: prefer_const_declarations
 
 import 'package:PiliPlus/features/shielding/shielding.dart';
-import 'package:PiliPlus/utils/recommend_filter.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+/// 旧过滤配置的零值基线：等价于旧测试 setUp 里重置后的 RecommendFilter 静态量。
+RecommendationFilterConfig zeroConfig({
+  RegExp? rcmdRegExp,
+  int minDurationForRcmd = 0,
+  int minPlayForRcmd = 0,
+  int minLikeRatioForRecommend = 0,
+  bool exemptFilterForFollowed = false,
+  bool applyFilterToRelatedVideos = false,
+}) {
+  return RecommendationFilterConfig(
+    rcmdRegExp: rcmdRegExp,
+    minDurationForRcmd: minDurationForRcmd,
+    minPlayForRcmd: minPlayForRcmd,
+    minLikeRatioForRecommend: minLikeRatioForRecommend,
+    exemptFilterForFollowed: exemptFilterForFollowed,
+    applyFilterToRelatedVideos: applyFilterToRelatedVideos,
+  );
+}
 
 void main() {
   group('RecommendFilterAnalyzer', () {
-    setUp(() {
-      // 重置 RecommendFilter 到默认值，避免访问 Hive Pref
-      RecommendFilter.rcmdRegExp = RegExp('', caseSensitive: false);
-      RecommendFilter.minDurationForRcmd = 0;
-      RecommendFilter.minPlayForRcmd = 0;
-      RecommendFilter.minLikeRatioForRecommend = 0;
-      RecommendFilter.exemptFilterForFollowed = false;
-      RecommendFilter.applyFilterToRelatedVideos = false;
-    });
-
     test('all-zero config produces no direct migration rules', () {
-      // setUp 已重置为零值
-      final report = RecommendFilterAnalyzer.analyze();
+      final report = RecommendFilterAnalyzer.analyze(zeroConfig());
 
       // All zero-value settings should have suggestedRule == null
       for (final candidate in report.candidates) {
         if (candidate.confidence == 0.0) {
-          expect(candidate.suggestedRule, isNull,
-              reason: '${candidate.oldSettingKey} should have no suggested rule');
+          expect(
+            candidate.suggestedRule,
+            isNull,
+            reason: '${candidate.oldSettingKey} should have no suggested rule',
+          );
           expect(candidate.toBeApplied(), isNull);
         }
       }
     });
 
     test('pipe-separated ban words produce one keyword rule per word', () {
-      RecommendFilter.rcmdRegExp = RegExp('猫|狗|鱼', caseSensitive: false);
-
-      final report = RecommendFilterAnalyzer.analyze();
+      final report = RecommendFilterAnalyzer.analyze(
+        zeroConfig(rcmdRegExp: RegExp('猫|狗|鱼', caseSensitive: false)),
+      );
       final banCandidates = report.candidates
           .where((c) => c.oldSettingKey == 'banWordForRecommend')
           .toList();
@@ -56,15 +66,16 @@ void main() {
       }
 
       // Each word is a separate rule
-      expect(banCandidates.map((c) => c.suggestedRule!.pattern),
-          containsAll(['猫', '狗', '鱼']));
+      expect(
+        banCandidates.map((c) => c.suggestedRule!.pattern),
+        containsAll(['猫', '狗', '鱼']),
+      );
     });
 
     test('complex regex ban word produces single regex rule', () {
-      RecommendFilter.rcmdRegExp =
-          RegExp(r'测试\d{3,}', caseSensitive: false);
-
-      final report = RecommendFilterAnalyzer.analyze();
+      final report = RecommendFilterAnalyzer.analyze(
+        zeroConfig(rcmdRegExp: RegExp(r'测试\d{3,}', caseSensitive: false)),
+      );
       final banCandidates = report.candidates
           .where((c) => c.oldSettingKey == 'banWordForRecommend')
           .toList();
@@ -78,11 +89,12 @@ void main() {
     });
 
     test('duration threshold is unsupported and has no suggested rule', () {
-      RecommendFilter.minDurationForRcmd = 60;
-
-      final report = RecommendFilterAnalyzer.analyze();
-      final durCandidate = report.candidates
-          .firstWhere((c) => c.oldSettingKey == 'minDurationForRcmd');
+      final report = RecommendFilterAnalyzer.analyze(
+        zeroConfig(minDurationForRcmd: 60),
+      );
+      final durCandidate = report.candidates.firstWhere(
+        (c) => c.oldSettingKey == 'minDurationForRcmd',
+      );
 
       expect(durCandidate.feasibility, MigrationFeasibility.unsupported);
       expect(durCandidate.suggestedRule, isNull);
@@ -90,69 +102,76 @@ void main() {
     });
 
     test('play count threshold is unsupported', () {
-      RecommendFilter.minPlayForRcmd = 100;
-
-      final report = RecommendFilterAnalyzer.analyze();
-      final playCandidate = report.candidates
-          .firstWhere((c) => c.oldSettingKey == 'minPlayForRcmd');
+      final report = RecommendFilterAnalyzer.analyze(
+        zeroConfig(minPlayForRcmd: 100),
+      );
+      final playCandidate = report.candidates.firstWhere(
+        (c) => c.oldSettingKey == 'minPlayForRcmd',
+      );
 
       expect(playCandidate.feasibility, MigrationFeasibility.unsupported);
       expect(playCandidate.suggestedRule, isNull);
     });
 
     test('like ratio threshold is unsupported', () {
-      RecommendFilter.minLikeRatioForRecommend = 2;
-
-      final report = RecommendFilterAnalyzer.analyze();
-      final likeCandidate = report.candidates
-          .firstWhere((c) => c.oldSettingKey == 'minLikeRatioForRecommend');
+      final report = RecommendFilterAnalyzer.analyze(
+        zeroConfig(minLikeRatioForRecommend: 2),
+      );
+      final likeCandidate = report.candidates.firstWhere(
+        (c) => c.oldSettingKey == 'minLikeRatioForRecommend',
+      );
 
       expect(likeCandidate.feasibility, MigrationFeasibility.unsupported);
       expect(likeCandidate.suggestedRule, isNull);
     });
 
     test('exemptFollowed is partial and notes mention isFollowed gap', () {
-      RecommendFilter.exemptFilterForFollowed = true;
-
-      final report = RecommendFilterAnalyzer.analyze();
-      final exemptCandidate = report.candidates
-          .firstWhere((c) => c.oldSettingKey == 'exemptFilterForFollowed');
+      final report = RecommendFilterAnalyzer.analyze(
+        zeroConfig(exemptFilterForFollowed: true),
+      );
+      final exemptCandidate = report.candidates.firstWhere(
+        (c) => c.oldSettingKey == 'exemptFilterForFollowed',
+      );
 
       expect(exemptCandidate.feasibility, MigrationFeasibility.partial);
       expect(exemptCandidate.notes, contains('isFollowed'));
     });
 
     test('applyToRelatedVideos notes Phase 1 behavior', () {
-      RecommendFilter.applyFilterToRelatedVideos = true;
-
-      final report = RecommendFilterAnalyzer.analyze();
-      final relatedCandidate = report.candidates
-          .firstWhere((c) => c.oldSettingKey == 'applyFilterToRelatedVideos');
+      final report = RecommendFilterAnalyzer.analyze(
+        zeroConfig(applyFilterToRelatedVideos: true),
+      );
+      final relatedCandidate = report.candidates.firstWhere(
+        (c) => c.oldSettingKey == 'applyFilterToRelatedVideos',
+      );
 
       expect(relatedCandidate.feasibility, MigrationFeasibility.partial);
       expect(relatedCandidate.notes, contains('Phase 1'));
     });
 
-    test('tag capability analysis reports ready state regardless of config', () {
-      // setUp 已重置
-      final report = RecommendFilterAnalyzer.analyze();
-      final tagCandidate = report.candidates
-          .firstWhere((c) => c.oldSettingKey == 'tag');
+    test(
+      'tag capability analysis reports ready state regardless of config',
+      () {
+        final report = RecommendFilterAnalyzer.analyze(zeroConfig());
+        final tagCandidate = report.candidates.firstWhere(
+          (c) => c.oldSettingKey == 'tag',
+        );
 
-      expect(tagCandidate.feasibility, MigrationFeasibility.direct);
-      expect(tagCandidate.suggestedRule, isNull); // no old data to map
-      expect(tagCandidate.notes, contains('ShieldRuleType.tag'));
-    });
+        expect(tagCandidate.feasibility, MigrationFeasibility.direct);
+        expect(tagCandidate.suggestedRule, isNull); // no old data to map
+        expect(tagCandidate.notes, contains('ShieldRuleType.tag'));
+      },
+    );
 
     test('report aggregates counts correctly', () {
-      RecommendFilter.rcmdRegExp = RegExp('猫|狗', caseSensitive: false);
-      RecommendFilter.minDurationForRcmd = 60;
-      RecommendFilter.minPlayForRcmd = 100;
-      RecommendFilter.minLikeRatioForRecommend = 2;
-      RecommendFilter.exemptFilterForFollowed = false;
-      RecommendFilter.applyFilterToRelatedVideos = false;
-
-      final report = RecommendFilterAnalyzer.analyze();
+      final report = RecommendFilterAnalyzer.analyze(
+        zeroConfig(
+          rcmdRegExp: RegExp('猫|狗', caseSensitive: false),
+          minDurationForRcmd: 60,
+          minPlayForRcmd: 100,
+          minLikeRatioForRecommend: 2,
+        ),
+      );
 
       // 2 ban words → 2 direct + tag direct
       expect(report.directCount, greaterThanOrEqualTo(2));

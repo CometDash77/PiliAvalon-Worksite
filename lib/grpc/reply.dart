@@ -5,6 +5,7 @@ import 'package:PiliPlus/grpc/grpc_req.dart';
 import 'package:PiliPlus/grpc/url.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
+import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:fixnum/fixnum.dart';
 
@@ -16,7 +17,14 @@ abstract final class ReplyGrpc {
   );
   static bool enableFilter = replyRegExp.pattern.isNotEmpty;
   static bool useLegacyTextFilter = false;
-  static ShieldRuleSet Function()? shieldRuleSetProvider;
+
+  /// 兼容转发：与 `RecommendFilter.shieldRuleSetProvider` 指向同一个槽位。
+  static ShieldRuleSet Function()? get shieldRuleSetProvider =>
+      ShieldingRuntime.shieldRuleSetProvider;
+
+  static set shieldRuleSetProvider(ShieldRuleSet Function()? provider) {
+    ShieldingRuntime.shieldRuleSetProvider = provider;
+  }
 
   // static Future replyInfo({required int rpid}) {
   //   return _request(
@@ -40,9 +48,14 @@ abstract final class ReplyGrpc {
   }
 
   static bool needRemoveGrpc(ReplyInfo reply) {
-    final ruleSet =
-        shieldRuleSetProvider?.call() ?? ShieldSettingsStore().snapshot();
+    final ruleSet = ShieldingRuntime.instance.ruleSet();
     final commentShieldingEnabled = ruleSet.isScopeEnabled(ShieldScope.comment);
+    // ponytail: mid==0 short-circuit keeps needRemoveGrpc storage-free in unit tests;
+    // network replies always carry real mids so UP blackMids semantics are unchanged.
+    if (reply.mid.toInt() != 0 &&
+        GlobalData().blackMids.contains(reply.mid.toInt())) {
+      return true;
+    }
     return (commentShieldingEnabled &&
             useLegacyTextFilter &&
             enableFilter &&

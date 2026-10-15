@@ -1,14 +1,13 @@
 import 'dart:convert';
 
 import 'package:PiliPlus/common/constants.dart';
-import 'package:PiliPlus/features/exposure_tracker/exposure_tracker.dart';
-import 'package:PiliPlus/features/shielding/home_feed_comment_gate.dart';
+import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
-import 'package:PiliPlus/features/shielding/shielding_recommend_tag_enricher.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo;
 import 'package:PiliPlus/http/api.dart';
 import 'package:PiliPlus/http/browser_ua.dart';
+import 'package:PiliPlus/http/constants.dart';
 import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/login.dart';
@@ -36,7 +35,6 @@ import 'package:PiliPlus/utils/app_sign.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
-import 'package:PiliPlus/utils/recommend_filter.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
@@ -49,10 +47,6 @@ import 'package:protobuf/protobuf.dart';
 
 /// view层根据 status 判断渲染逻辑
 abstract final class VideoHttp {
-  static RegExp zoneRegExp = RegExp(Pref.banWordForZone, caseSensitive: false);
-  static bool enableFilter = zoneRegExp.pattern.isNotEmpty;
-  static bool useLegacyZoneTextFilter = false;
-
   // 首页推荐视频
   static Future<LoadingState<List<RcmdVideoItemModel>>> rcmdVideoList({
     required int ps,
@@ -71,45 +65,36 @@ abstract final class VideoHttp {
       }),
     );
     if (res.data['code'] == 0) {
-      final shieldRuleSet = ShieldSettingsStore().snapshot();
-      final List<RcmdVideoItemModel> survivors = <RcmdVideoItemModel>[];
-      for (final i in res.data['data']['item']) {
-        //过滤掉live与ad，以及拉黑用户
-        if (i['goto'] == 'av' &&
-            (i['owner'] != null &&
-                !GlobalData().blackMids.contains(i['owner']['mid']))) {
-          RcmdVideoItemModel videoItem = RcmdVideoItemModel.fromJson(i);
-          final visible = ShieldingAdapters.isVisible(
-            ShieldingAdapters.fromRecommendationJson(
-              videoItem,
-              (i as Map).cast<String, dynamic>(),
+      final pipeline =
+          RecommendationPipeline<RecommendationFeedEntry<RcmdVideoItemModel>>(
+            supplyBatch: ShieldingRuntime.instance.batch,
+            surface: RecommendationSurfaces.homeFeed(
+              jevSurface: JevSurface.homeWeb,
             ),
-            shieldRuleSet,
+            candidateSource: (batch) {
+              final candidates =
+                  <RecommendationFeedEntry<RcmdVideoItemModel>>[];
+              for (final i in res.data['data']['item']) {
+                //过滤掉live与ad，以及拉黑用户
+                if (i['goto'] == 'av' &&
+                    (i['owner'] != null &&
+                        !GlobalData().blackMids.contains(i['owner']['mid']))) {
+                  RcmdVideoItemModel videoItem = RcmdVideoItemModel.fromJson(i);
+                  candidates.add(
+                    RecommendationFeedEntry(
+                      item: videoItem,
+                      candidate: ShieldingAdapters.fromRecommendationJson(
+                        videoItem,
+                        (i as Map).cast<String, dynamic>(),
+                      ),
+                    ),
+                  );
+                }
+              }
+              return candidates;
+            },
           );
-          if (!RecommendFilter.filter(videoItem) && visible) {
-            survivors.add(videoItem);
-          }
-        }
-      }
-      final enricher = RecommendationTagEnricher();
-      final list = await enricher.enrichAndFilter(
-        survivors,
-        shieldRuleSet,
-        getBvid: (item) => item.bvid,
-        getCid: (item) => item.cid,
-      );
-      final gatedList = await HomeFeedCommentGate.filter(
-        list,
-        config: CommentShieldingStore().snapshot(),
-        ruleSet: shieldRuleSet,
-        getAid: (item) => item.aid,
-      );
-      return Success(
-        ExposureTracker.instance.filterAndRecord(
-          gatedList,
-          getBvid: (item) => item.bvid,
-        ),
-      );
+      return Success((await pipeline.run()).feedItems);
     } else {
       return Error(res.data['message']);
     }
@@ -120,23 +105,23 @@ abstract final class VideoHttp {
     required int freshIdx,
   }) async {
     final params = {
-      'build': 2001100,
+      'build': 8430300,
       'c_locale': 'zh_CN',
       'channel': 'master',
-      'column': 4,
-      'device': 'pad',
+      'column': 2,
+      'device': 'phone',
       'device_name': 'android',
       'device_type': 0,
       'disable_rcmd': 0,
-      'flush': 5,
+      'flush': 8,
       'fnval': 976,
       'fnver': 0,
       'force_host': 2, //使用https
       'fourk': 1,
-      'guidance': 0,
-      'https_url_req': 0,
+      'guidance': 1,
+      'https_url_req': 1,
       'idx': freshIdx,
-      'mobi_app': 'android_hd',
+      'mobi_app': 'android_i',
       'network': 'wifi',
       'platform': 'android',
       'player_net': 1,
@@ -145,7 +130,7 @@ abstract final class VideoHttp {
       'recsys_mode': 0,
       's_locale': 'zh_CN',
       'splash_id': '',
-      'statistics': Constants.statistics,
+      'statistics': Constants.statisticsApp,
       'voice_balance': 0,
     };
     final res = await Request().get(
@@ -168,54 +153,44 @@ abstract final class VideoHttp {
       ),
     );
     if (res.data['code'] == 0) {
-      final shieldRuleSet = ShieldSettingsStore().snapshot();
-      final List<RcmdVideoItemAppModel> survivors = <RcmdVideoItemAppModel>[];
-      for (final i in res.data['data']['items']) {
-        // 屏蔽推广和拉黑用户
-        if (i['card_goto'] != 'ad_av' &&
-            i['card_goto'] != 'ad_web_s' &&
-            i['ad_info'] == null &&
-            i['can_play'] == 1 &&
-            (i['args'] != null &&
-                !GlobalData().blackMids.contains(i['args']['up_id']))) {
-          if (useLegacyZoneTextFilter &&
-              enableFilter &&
-              i['args']?['tname'] != null &&
-              zoneRegExp.hasMatch(i['args']['tname'])) {
-            continue;
-          }
-          RcmdVideoItemAppModel videoItem = RcmdVideoItemAppModel.fromJson(i);
-          final visible = ShieldingAdapters.isVisible(
-            ShieldingAdapters.fromRecommendationJson(
-              videoItem,
-              (i as Map).cast<String, dynamic>(),
+      final pipeline =
+          RecommendationPipeline<
+            RecommendationFeedEntry<RcmdVideoItemAppModel>
+          >(
+            supplyBatch: ShieldingRuntime.instance.batch,
+            surface: RecommendationSurfaces.homeFeed(
+              jevSurface: JevSurface.homeApp,
             ),
-            shieldRuleSet,
+            candidateSource: (batch) {
+              final candidates =
+                  <RecommendationFeedEntry<RcmdVideoItemAppModel>>[];
+              for (final i in res.data['data']['items']) {
+                // 屏蔽推广和拉黑用户
+                if (i['card_goto'] != 'ad_av' &&
+                    i['card_goto'] != 'ad_web_s' &&
+                    i['ad_info'] == null &&
+                    i['can_play'] == 1 &&
+                    (i['args'] != null &&
+                        !GlobalData().blackMids.contains(i['args']['up_id']))) {
+                  RcmdVideoItemAppModel videoItem =
+                      RcmdVideoItemAppModel.fromJson(
+                        i,
+                      );
+                  candidates.add(
+                    RecommendationFeedEntry(
+                      item: videoItem,
+                      candidate: ShieldingAdapters.fromRecommendationJson(
+                        videoItem,
+                        (i as Map).cast<String, dynamic>(),
+                      ),
+                    ),
+                  );
+                }
+              }
+              return candidates;
+            },
           );
-          if (!RecommendFilter.filter(videoItem) && visible) {
-            survivors.add(videoItem);
-          }
-        }
-      }
-      final enricher = RecommendationTagEnricher();
-      final list = await enricher.enrichAndFilter(
-        survivors,
-        shieldRuleSet,
-        getBvid: (item) => item.bvid,
-        getCid: (item) => item.cid,
-      );
-      final gatedList = await HomeFeedCommentGate.filter(
-        list,
-        config: CommentShieldingStore().snapshot(),
-        ruleSet: shieldRuleSet,
-        getAid: (item) => item.aid,
-      );
-      return Success(
-        ExposureTracker.instance.filterAndRecord(
-          gatedList,
-          getBvid: (item) => item.bvid,
-        ),
-      );
+      return Success((await pipeline.run()).feedItems);
     } else {
       return Error(res.data['message']);
     }
@@ -231,27 +206,33 @@ abstract final class VideoHttp {
       queryParameters: {'pn': pn, 'ps': ps},
     );
     if (res.data['code'] == 0) {
-      List<HotVideoItemModel> list = <HotVideoItemModel>[];
-      for (final i in res.data['data']['list']) {
-        if (!GlobalData().blackMids.contains(i['owner']['mid']) &&
-            !RecommendFilter.filterTitle(i['title']) &&
-            !RecommendFilter.filterLikeRatio(
-              i['stat']['like'],
-              i['stat']['view'],
-            )) {
-          if (useLegacyZoneTextFilter &&
-              enableFilter &&
-              i['tname'] != null &&
-              zoneRegExp.hasMatch(i['tname'])) {
-            continue;
+      final pipeline = RecommendationPipeline<HotVideoItemModel>(
+        supplyBatch: ShieldingRuntime.instance.batch,
+        surface: RecommendationSurfaces.hotAndRanking(
+          jevSurface: JevSurface.hot,
+        ),
+        candidateSource: (batch) {
+          final List<HotVideoItemModel> list = <HotVideoItemModel>[];
+          for (final i in res.data['data']['list']) {
+            if (!GlobalData().blackMids.contains(i['owner']['mid']) &&
+                !RecommendationFilter.filterTitle(
+                  batch.ruleSet,
+                  batch.config,
+                  i['title'],
+                ) &&
+                !RecommendationFilter.filterLikeRatio(
+                  batch.ruleSet,
+                  batch.config,
+                  i['stat']['like'],
+                  i['stat']['view'],
+                )) {
+              list.add(HotVideoItemModel.fromJson(i));
+            }
           }
-          list.add(HotVideoItemModel.fromJson(i));
-        }
-      }
-      final shieldRuleSet = ShieldSettingsStore().snapshot();
-      return Success(
-        ShieldingAdapters.filterRecommendationVideos(list, shieldRuleSet),
+          return list;
+        },
       );
+      return Success(await pipeline.run());
     } else {
       return Error(res.data['message']);
     }
@@ -383,27 +364,21 @@ abstract final class VideoHttp {
       queryParameters: {'bvid': bvid},
     );
     if (res.data['code'] == 0) {
-      final items = (res.data['data'] as List?)?.map(
-        (i) => HotVideoItemModel.fromJson(i),
+      final items = (res.data['data'] as List?)
+          ?.map((i) => HotVideoItemModel.fromJson(i))
+          .toList();
+      if (items == null) {
+        return const Success(null);
+      }
+      final pipeline = RecommendationPipeline<HotVideoItemModel>(
+        supplyBatch: ShieldingRuntime.instance.batch,
+        surface: RecommendationSurfaces.relatedVideos(
+          jevSurface: JevSurface.related,
+        ),
+        candidateSource: (batch) =>
+            RecommendationSurfaces.relatedVideoCandidates(items, batch),
       );
-      final list = RecommendFilter.applyFilterToRelatedVideos
-          ? items
-                ?.where(
-                  (i) =>
-                      !RecommendFilter.filterLikeRatio(
-                        i.stat.like,
-                        i.stat.view,
-                      ) &&
-                      !(i.duration > 0 &&
-                          i.duration < RecommendFilter.minDurationForRcmd),
-                )
-                .toList()
-          : items?.toList();
-      final shieldRuleSet = ShieldSettingsStore().snapshot();
-      final visibleList = list == null
-          ? null
-          : ShieldingAdapters.filterRelatedVideos(list, shieldRuleSet);
-      return Success(visibleList);
+      return Success(await pipeline.run());
     } else {
       return Error(res.data['message']);
     }
@@ -686,6 +661,11 @@ abstract final class VideoHttp {
     required int act,
     required int reSrc,
   }) async {
+    final isBlock = act == 5;
+    if (isBlock && !Accounts.main.isLogin) {
+      Pref.setBlackMid(mid);
+      return const Success(null);
+    }
     final res = await Request().post(
       Api.relationMod,
       queryParameters: {
@@ -716,7 +696,7 @@ abstract final class VideoHttp {
       ),
     );
     if (res.data['code'] == 0) {
-      if (act == 5) {
+      if (isBlock) {
         // block
         Pref.setBlackMid(mid);
       } else if (act == 6) {
@@ -926,19 +906,19 @@ abstract final class VideoHttp {
     return null;
   }
 
-  static bool _canAddRank(Map i) {
+  static bool _canAddRank(Map i, RecommendationBatch batch) {
     if (!GlobalData().blackMids.contains(i['owner']['mid']) &&
-        !RecommendFilter.filterTitle(i['title']) &&
-        !RecommendFilter.filterLikeRatio(
+        !RecommendationFilter.filterTitle(
+          batch.ruleSet,
+          batch.config,
+          i['title'],
+        ) &&
+        !RecommendationFilter.filterLikeRatio(
+          batch.ruleSet,
+          batch.config,
           i['stat']['like'],
           i['stat']['view'],
         )) {
-      if (useLegacyZoneTextFilter &&
-          enableFilter &&
-          i['tname'] != null &&
-          zoneRegExp.hasMatch(i['tname'])) {
-        return false;
-      }
       return true;
     }
     return false;
@@ -953,24 +933,30 @@ abstract final class VideoHttp {
       queryParameters: await WbiSign.makSign({'rid': rid, 'type': 'all'}),
     );
     if (res.data['code'] == 0) {
-      List<HotVideoItemModel> list = <HotVideoItemModel>[];
-      for (final i in res.data['data']['list']) {
-        if (_canAddRank(i)) {
-          list.add(HotVideoItemModel.fromJson(i));
-          // final List? others = i['others'];
-          // if (others != null && others.isNotEmpty) {
-          //   for (final j in others) {
-          //     if (_canAddRank(j)) {
-          //       list.add(HotVideoItemModel.fromJson(j));
-          //     }
-          //   }
-          // }
-        }
-      }
-      final shieldRuleSet = ShieldSettingsStore().snapshot();
-      return Success(
-        ShieldingAdapters.filterRecommendationVideos(list, shieldRuleSet),
+      final pipeline = RecommendationPipeline<HotVideoItemModel>(
+        supplyBatch: ShieldingRuntime.instance.batch,
+        surface: RecommendationSurfaces.hotAndRanking(
+          jevSurface: JevSurface.ranking,
+        ),
+        candidateSource: (batch) {
+          final List<HotVideoItemModel> list = <HotVideoItemModel>[];
+          for (final i in res.data['data']['list']) {
+            if (_canAddRank(i, batch)) {
+              list.add(HotVideoItemModel.fromJson(i));
+              // final List? others = i['others'];
+              // if (others != null && others.isNotEmpty) {
+              //   for (final j in others) {
+              //     if (_canAddRank(j, batch)) {
+              //       list.add(HotVideoItemModel.fromJson(j));
+              //     }
+              //   }
+              // }
+            }
+          }
+          return list;
+        },
       );
+      return Success(await pipeline.run());
     } else {
       return Error(res.data['message']);
     }
@@ -989,10 +975,11 @@ abstract final class VideoHttp {
       }),
     );
     if (res.data['code'] == 0) {
+      final list = (res.data['result']?['list'] as List?)
+          ?.map((e) => PgcRankItemModel.fromJson(e))
+          .toList();
       return Success(
-        (res.data['result']?['list'] as List?)
-            ?.map((e) => PgcRankItemModel.fromJson(e))
-            .toList(),
+        list == null ? null : await JevFinalScreen.pgcRank().screen(list),
       );
     } else {
       return Error(res.data['message']);
@@ -1012,10 +999,11 @@ abstract final class VideoHttp {
       }),
     );
     if (res.data['code'] == 0) {
+      final list = (res.data['data']?['list'] as List?)
+          ?.map((e) => PgcRankItemModel.fromJson(e))
+          .toList();
       return Success(
-        (res.data['data']?['list'] as List?)
-            ?.map((e) => PgcRankItemModel.fromJson(e))
-            .toList(),
+        list == null ? null : await JevFinalScreen.pgcRank().screen(list),
       );
     } else {
       return Error(res.data['message']);
@@ -1050,6 +1038,13 @@ abstract final class VideoHttp {
     final res = await Request().get(
       Api.popularSeriesList,
       queryParameters: await WbiSign.makSign({'web_location': 333.934}),
+      options: Options(
+        headers: const {
+          'user-agent': BrowserUa.pc,
+          'origin': HttpString.baseUrl,
+          'referer': 'https://www.bilibili.com/v/popular/weekly',
+        },
+      ),
     );
     if (res.data['code'] == 0) {
       return Success(
@@ -1073,9 +1068,22 @@ abstract final class VideoHttp {
         'number': number,
         'web_location': 333.934,
       }),
+      options: Options(
+        headers: {
+          'user-agent': BrowserUa.pc,
+          'origin': HttpString.baseUrl,
+          'referer': 'https://www.bilibili.com/v/popular/weekly?num=$number',
+        },
+      ),
     );
     if (res.data['code'] == 0) {
-      return Success(PopularSeriesOneData.fromJson(res.data['data']));
+      final data = PopularSeriesOneData.fromJson(res.data['data']);
+      if (data.list != null) {
+        data.list = await JevFinalScreen.hotVideo(
+          surface: JevSurface.hot,
+        ).screen(data.list!);
+      }
+      return Success(data);
     } else {
       return Error(res.data['message']);
     }
@@ -1091,9 +1099,22 @@ abstract final class VideoHttp {
         'page': page,
         'web_location': 333.934,
       }),
+      options: Options(
+        headers: const {
+          'user-agent': BrowserUa.pc,
+          'origin': HttpString.baseUrl,
+          'referer': 'https://www.bilibili.com/v/popular/history',
+        },
+      ),
     );
     if (res.data['code'] == 0) {
-      return Success(PopularPreciousData.fromJson(res.data['data']));
+      final data = PopularPreciousData.fromJson(res.data['data']);
+      if (data.list != null) {
+        data.list = await JevFinalScreen.hotVideo(
+          surface: JevSurface.hot,
+        ).screen(data.list!);
+      }
+      return Success(data);
     } else {
       return Error(res.data['message']);
     }

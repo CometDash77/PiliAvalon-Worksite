@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:PiliPlus/utils/android/bindings.g.dart';
@@ -89,6 +90,9 @@ abstract final class PiliAndroidHelper {
   );
 
   @pragma('vm:prefer-inline')
+  // ponytail: UP Java static isPipAvailable not ported to our deferred AndroidHelper.java; assume Android 8+
+  static bool get isPipAvailable => Platform.isAndroid;
+
   static void disableAutoEnterPip() =>
       AndroidHelper.disableAutoEnterPip(PlatformDispatcher.instance.engineId!);
 

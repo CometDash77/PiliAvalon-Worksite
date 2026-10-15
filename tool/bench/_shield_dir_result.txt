@@ -1,0 +1,350 @@
+﻿flutter.bat : Building flutter tool... 
+所在位置 行:3 字符: 1
++ & D:/flutter-sdk/flutter/bin/flutter.bat test test/features/shielding ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Building flutter tool... :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Running pub upgrade... 
+Resolving dependencies...
+Downloading packages...
+Got dependencies.
+Resolving dependencies...
+Downloading packages...
+  _fe_analyzer_shared 107.0.0 (108.0.0 available)
+  analyzer 14.3.0 (14.4.0 available)
+  android_file_picker 1.1.0 (2.0.0 available)
+  archive 4.2.0 (4.3.0 available)
+  battery_plus 7.1.1 (7.1.2 available)
+  built_collection 5.1.1 (5.1.2 available)
+! cached_network_image_ce 4.6.4 from git https://github.com/My-Responsitories/flutter_cached_network_image_ce.git at dacec4 in cached_network_image (overridden)
+  cli_util 0.4.2 (0.6.0 available)
+  code_assets 2.0.0 (2.1.0 available)
+  connectivity_plus 7.3.1 (7.3.2 available)
+  cross_file 0.3.5+5 (0.4.0 available)
+  cupertino_ui 1.0.2 (1.1.1 available)
+  dbus 0.7.15 (0.8.0 available)
+  device_info_plus 13.2.0 (13.3.0 available)
+  equatable 2.1.0 (3.0.0 available)
+  file_picker 12.2.0 (13.1.0 available)
+  file_picker_darwin 1.1.0 (2.1.2 available)
+  file_picker_linux 1.1.0 (2.0.1 available)
+  file_picker_platform_interface 3.3.0 (4.0.0 available)
+  file_picker_web 3.1.0 (4.0.0 available)
+! flutter_inappwebview_android 1.1.3 from git https://github.com/bggRGjQaUbCoE/flutter_inappwebview.git at 0bfa46 in flutter_inappwebview_android (overridden)
+! flutter_inappwebview_windows 0.6.0 from git https://github.com/bggRGjQaUbCoE/flutter_inappwebview.git at 0bfa46 in flutter_inappwebview_windows (overridden)
+  hive_ce 2.19.3 (2.20.1 available)
+  http2 2.3.1 (3.1.0 available)
+  image 4.9.2 (4.10.1 available)
+  image_picker_android 0.8.13+22 (0.8.13+25 available)
+  image_picker_ios 0.8.13+7 (0.8.13+9 available)
+  jni 1.0.3 (1.1.0 available)
+  jnigen 1.0.0 (1.0.1 available)
+  logger 2.7.0 (2.8.0 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  material_ui 1.1.1 (1.5.0 available)
+! media_kit 1.1.11 from git https://github.com/bggRGjQaUbCoE/media-kit.git at 08b7b9 in media_kit (overridden)
+! media_kit_libs_android_video 1.3.7 from git https://github.com/bggRGjQaUbCoE/media-kit.git at 08b7b9 in libs/android/media_kit_libs_android_video (overridden)
+! media_kit_libs_ios_video 1.1.4 from git https://github.com/bggRGjQaUbCoE/media-kit.git at 08b7b9 in libs/ios/media_kit_libs_ios_video (overridden)
+! media_kit_libs_video 1.0.5 from git https://github.com/bggRGjQaUbCoE/media-kit.git at 08b7b9 in libs/universal/media_kit_libs_video (overridden)
+! media_kit_libs_windows_video 1.0.10 from git https://github.com/bggRGjQaUbCoE/media-kit.git at 08b7b9 in libs/windows/media_kit_libs_windows_video (overridden)
+! media_kit_native_event_loop 1.0.9 from git https://github.com/bggRGjQaUbCoE/media-kit.git at 08b7b9 in media_kit_native_event_loop (overridden)
+! media_kit_video 1.2.5 from git https://github.com/bggRGjQaUbCoE/media-kit.git at 08b7b9 in media_kit_video (overridden)
+  nm 0.5.0 (0.6.0 available)
+  objective_c 9.6.0 (9.6.2 available)
+  octo_image 2.1.0 (2.1.2 available)
+  package_info_plus 10.2.1 (10.2.2 available)
+  permission_handler_apple 9.6.1 (9.6.2 available)
+  petitparser 7.0.2 (7.1.0 available)
+  platform 3.1.6 (3.2.0 available)
+  pointycastle 3.9.1 (4.0.0 available)
+  protobuf 6.0.0 (6.1.0 available)
+  qr 3.0.2 (4.0.0 available)
+  share_plus 13.3.0 (13.3.1 available)
+  synchronized 3.4.1+2 (3.4.2 available)
+  test_api 0.7.12 (0.7.14 available)
+  tray_manager 0.5.3 (0.7.0 available)
+  url_launcher 6.3.2 (6.3.3 available)
+  vector_math 2.4.2 (2.4.3 available)
+  wakelock_plus 1.8.0 (1.8.1 available)
+  windows_file_picker 1.2.0 (2.0.0 available)
+  xml 6.6.1 (7.1.0 available)
+Got dependencies!
+48 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_decoration_rule_test.dart
+00:00 +0: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_decoration_rule_test.dart: ShieldRuleType decoration avatarPendant round trips JSON by name
+00:00 +1: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_decoration_rule_test.dart: ShieldRuleType decoration garb round trips JSON by name
+00:00 +2: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_decoration_rule_test.dart: ShieldRuleType decoration avatar pendant exact matching blocks when pattern equals pendant image
+00:00 +3: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_decoration_rule_test.dart: ShieldRuleType decoration avatar pendant does not block when value does not match
+00:00 +4: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_decoration_rule_test.dart: ShieldRuleType decoration garb regex matching blocks when pattern matches card number
+00:00 +5: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_decoration_rule_test.dart: ShieldRuleType decoration garb does not block when no value matches
+00:00 +6: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_decoration_rule_test.dart: ShieldRuleType decoration empty avatarPendantValues are ignored
+00:00 +7: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_decoration_rule_test.dart: ShieldRuleType decoration empty garbValues are ignored
+00:00 +8: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_decoration_rule_test.dart: ShieldRuleType decoration decoration rules JSON round trip in ShieldRuleSet
+00:00 +9: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_reply_field_matrix_test.dart: Comment ReplyInfo field matrix proves all configured comment-side fields are accessible and typed
+00:00 +10: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: (setUpAll)
+00:00 +11: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: (setUpAll)
+00:00 +12: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: (setUpAll)
+00:00 +12: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:01 +13: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:01 +14: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:01 +15: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:01 +16: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:01 +17: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:01 +18: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:01 +19: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:01 +20: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions avatar pendant action appears and creates comment rule
+00:02 +21: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions garb action appears and creates comment rule
+00:02 +22: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: comment decoration quick actions decoration actions are hidden when data is absent
+00:02 +23: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_quick_action_decoration_test.dart: (tearDownAll)
+00:03 +23: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig defaults mean no filtering
+00:03 +24: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig round trips JSON
+00:03 +25: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig damaged config payload falls back safely
+00:03 +26: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig invalid numeric values from persisted JSON are ignored
+00:03 +27: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig missing home feed comment gate flag defaults off
+00:03 +28: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig persisted min greater than max clears both char bounds
+00:03 +29: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig null fields round trip as null
+00:03 +30: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig all list fields round trip with empty lists
+00:03 +31: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig copyWith creates updated instance
+00:03 +32: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingConfig equality is value-based
+00:03 +33: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingStore defaults to no-op config
+00:03 +34: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingStore save and load round trips
+00:03 +35: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingStore damaged payload falls back to default config
+00:03 +36: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingStore snapshot caches and updates after save
+00:03 +37: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_config_test.dart: CommentShieldingStore uses separate namespace key from ShieldSettingsStore
+00:04 +38: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher level threshold hides lower-level users
+00:04 +39: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher level threshold keeps equal level visible
+00:04 +40: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher level threshold keeps higher level visible
+00:04 +41: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher level threshold null threshold means no filter
+00:04 +42: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher level threshold 0 threshold means no filter
+00:04 +43: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher gender filter blocks selected raw sex value
+00:04 +44: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher gender filter does not block unselected values
+00:04 +45: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher gender filter empty gender filter means no filter
+00:04 +46: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher gender filter blocks when sex is empty string and empty is in filter
+00:04 +47: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher member filter blocks exact vip:type:status key
+00:04 +48: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher member filter keeps non-matching vip pair visible
+00:04 +49: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher member filter empty member filter means no filter
+00:04 +50: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher ip location filter strips Bilibili IP属地 prefix before matching
+00:04 +51: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher ip location filter matches raw location without prefix
+00:04 +52: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher ip location filter does not block unmatched location
+00:04 +53: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher ip location filter empty location is not blocked
+00:04 +54: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher min char count hides short comments
+00:04 +55: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher min char count keeps comments at the boundary visible
+00:04 +56: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher min char count null min char count means no filter
+00:04 +57: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher max char count hides long comments
+00:04 +58: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher max char count keeps comments at the boundary visible
+00:04 +59: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher max char count null max char count means no filter
+00:04 +60: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher like threshold hides replies below threshold
+00:04 +61: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher like threshold keeps equal like visible
+00:04 +62: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher like threshold null like threshold means no filter
+00:04 +63: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher like threshold 0 like threshold means no filter
+00:04 +64: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher picture toggle hides replies with content pictures when toggle is on
+00:04 +65: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher picture toggle keeps replies with pictures visible when toggle is off
+00:04 +66: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher picture toggle keeps replies without pictures visible
+00:04 +67: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher emote toggle hides replies with content emotes when toggle is on
+00:04 +68: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher emote toggle keeps replies with emotes visible when toggle is off
+00:04 +69: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher emote toggle keeps replies without emotes visible
+00:04 +70: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher default config keeps missing protobuf fields visible
+00:04 +71: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher multiple blocked returns first returns first blocked reason in settings page order
+00:04 +72: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher vipKey formats vip:type:status
+00:04 +73: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher canonicalIpLocation strips Chinese colon prefix
+00:04 +74: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/comment_shielding_matcher_test.dart: CommentShieldMatcher canonicalIpLocation strips English colon prefix
+00:04 +75: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics default disabled switches do not filter low derived metrics
+00:04 +76: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics default disabled switches do not filter low derived metrics
+00:04 +77: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics default disabled switches do not filter low derived metrics
+00:04 +78: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics default disabled switches do not filter low derived metrics
+00:04 +79: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics default disabled switches do not filter low derived metrics
+00:04 +80: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics interaction rate blocks below threshold and allows boundary
+00:04 +81: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics triple rate blocks below threshold and allows boundary
+00:04 +82: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics content value blocks below threshold and allows boundary
+00:04 +83: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics zero and null denominators pass through
+00:04 +84: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics null numerators are treated as zero
+00:04 +85: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics followed items are exempt when followed exemption is enabled
+00:04 +86: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics followed items are filtered when followed exemption is disabled
+00:04 +87: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics recommendation scene switch disables derived metrics
+00:04 +88: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/recommend_filter_derived_metrics_test.dart: RecommendFilter derived metrics web stat maps reply coin and favorite fields
+00:05 +89: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate switch off leaves items unchanged and does not fetch comments
+00:05 +90: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate switch on keeps item when at least one checked comment is visible
+00:05 +91: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate switch on hides item when all checked comments are cleaned
+00:05 +92: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate comment request failure fails open
+00:05 +93: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/home_feed_comment_gate_test.dart: HomeFeedCommentGate non-exhausted checked comments fail open
+00:06 +94: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher keyword contains block matches literal text contained in title
+00:06 +95: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher keyword exact does not match partial substring in title
+00:06 +96: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher keyword contains is case-insensitive substring, not regex
+00:06 +97: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher uid category and tag exact rules use equality instead of contains
+00:06 +98: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher matches comment body, uid, category, and tag fields
+00:06 +99: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher regex block records invalid regex without blocking other rules
+00:06 +100: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher token mode matches manual tokens without external services
+00:06 +101: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher generic keyword rules do not match UP names
+00:06 +102: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher user keyword regex blocks Chinese substring in recommendation author
+00:06 +103: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher user keyword token rules match split UP name tokens only
+00:06 +104: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher converted user keyword regex rules match UP name token boundaries
+00:06 +105: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher reason keyword rules match only recommendation reason
+00:06 +106: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher reason keyword token rules use reason tokens only
+00:06 +107: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher allow rule wins over same type block rule
+00:06 +108: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher disabled rules, scope mismatch, and global switch bypass matching
+00:06 +109: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher new explicit scopes match only exact same scope
+00:06 +110: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher both scope remains recommendation and comment only
+00:06 +111: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher global switch bypasses new scopes too
+00:06 +112: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode keyword contains matches 猫 in 可爱小猫合集
+00:06 +113: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode keyword exact does not match 猫 in 可爱小猫合集
+00:06 +114: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode empty pattern does not match non-empty candidates
+00:06 +115: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode keyword contains matches substring in title
+00:06 +116: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode keyword contains matches substring in body
+00:06 +117: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode keyword contains does not match when pattern is absent
+00:06 +118: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode uid contains matches substring in uid
+00:06 +119: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode category contains matches substring
+00:06 +120: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode tag contains matches substring
+00:06 +121: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode tag exact does not partially match
+00:06 +122: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode userKeyword contains matches substring in author name
+00:06 +123: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher contains match mode reasonKeyword contains matches substring in reason
+00:06 +124: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher range match mode duration range 60..300 matches value 180
+00:06 +125: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher range match mode duration range 60..300 does not match value 30
+00:06 +126: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher range match mode range supports open bounds and exact numeric values
+00:06 +127: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher range match mode multiple range rules on one numeric field block either edge
+00:06 +128: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher range match mode invalid range records error and does not match
+00:06 +129: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher range match mode missing numeric field is no-match for range rule
+00:06 +130: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher range match mode playbackCount range matches numeric candidate field
+00:06 +131: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher enum match mode commentMemberSex enum matches normalized value
+00:06 +132: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher enum match mode commentMemberSex enum does not match different value
+00:06 +133: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_core_test.dart: ShieldMatcher enum match mode missing enum field is no-match
+00:06 +134: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters maps web recommendation title, owner, category, tags, and reason
+00:06 +135: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters maps app recommendation args fields
+00:06 +136: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters web recommendation UP regex blocks owner name substring
+00:06 +137: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters app recommendation UP regex blocks args up_name substring
+00:06 +138: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters app recommendation UP name falls back to args uname
+00:06 +139: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters web recommendation UP name falls back to owner_name
+00:06 +140: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters reason keyword filters recommendation json reason only
+00:06 +141: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters maps comment content and member fields
+00:06 +142: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters maps decoration values from ReplyInfo pendant and garb fields
+00:06 +143: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters maps decoration values as empty when pendant and garb are missing
+00:06 +144: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters maps related video title owner and category fields
+00:06 +145: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters fromRelatedVideo accepts explicit video detail scope
+00:06 +146: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters filterList handles all-blocked list without requesting more data
+00:07 +147: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters filterList preserves original list when total switch is disabled
+00:07 +148: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters filterList applies comment-scoped rules to reply info lists
+00:07 +149: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters raw recommendation tags stay distinct from category
+00:07 +150: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters filterRecommendationVideos applies category rules to video lists
+00:07 +151: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters filterRecommendationVideos bypasses rules when recommendation is off
+00:07 +152: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters legacy recommendation filters obey recommendation scene switch
+00:07 +153: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters legacy title keyword path is disabled after merge into shielding
+00:07 +154: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters legacy numeric recommendation filters stay active
+00:07 +155: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters direct reply target lookup runs before comment shielding
+00:07 +156: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters web recommendation populates durationSeconds, playbackCount, danmakuCount from direct stat fields
+00:07 +157: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters web recommendation leaves durationSeconds null when duration is default -1
+00:07 +158: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters app recommendation populates durationSeconds, playbackCount, danmakuCount
+00:07 +159: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters web recommendation direct fields survive existing string-field mapping
+00:07 +160: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters duration range rule blocks web recommendation by durationSeconds
+00:07 +161: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters playbackCount range rule blocks web recommendation by stat view
+00:07 +162: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters playbackCount range rule blocks app recommendation by stat view from cover_left_text_1
+00:07 +163: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters danmakuCount range rule blocks app recommendation when danmakuCount is populated from cover_left_text_2
+00:07 +164: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: ShieldingAdapters fromRelatedVideo populates durationSeconds, playbackCount, danmakuCount
+00:07 +165: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 detail-introduction candidate fields fromRelatedVideo populates description, pubdate, isUpowerExclusive
+00:07 +166: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 detail-introduction candidate fields fromRelatedVideo isUpowerExclusive is false for non-charging badge
+00:07 +167: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 detail-introduction candidate fields fromRelatedVideo isUpowerExclusive is null when badge is null
+00:07 +168: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 detail-introduction candidate fields fromRelatedVideo staffNames is empty when source has no staff
+00:07 +169: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 detail-introduction candidate fields fromRelatedVideo populates staffNames from source staff
+00:07 +170: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 detail-introduction candidate fields fromRecommendationJson populates description and pubdate from web model
+00:07 +171: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 detail-introduction candidate fields fromRecommendationJson populates description from app model item.desc
+00:07 +172: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 detail-introduction candidate fields fromRecommendationJson isUpowerExclusive from charging_pay
+00:07 +173: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 filterRelatedVideos independent switch filterRelatedVideos uses relatedVideoEnabled, not recommendationEnabled
+00:07 +174: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 filterRelatedVideos independent switch filterRelatedVideos blocks when relatedVideoEnabled is true
+00:07 +175: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 filterRelatedVideos independent switch filterRecommendationVideos still uses recommendationEnabled (unchanged)
+00:07 +176: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 filterRelatedVideos independent switch duration range blocks related video through video detail scope
+00:07 +177: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 filterRelatedVideos independent switch playbackCount range blocks related video through video detail scope
+00:07 +178: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 filterRelatedVideos independent switch danmakuCount range blocks related video through video detail scope
+00:07 +179: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 filterRelatedVideos independent switch relatedVideoEnabled false disables video detail range rules
+00:07 +180: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 filterRelatedVideos independent switch recommendationEnabled false does not disable filterRelatedVideos
+00:07 +181: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 new rule type matching descriptionKeyword blocks when description contains keyword
+00:07 +182: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 new rule type matching descriptionKeyword allows when description does not contain keyword
+00:07 +183: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 new rule type matching publishTime range blocks candidate within range
+00:07 +184: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 new rule type matching publishTime allows candidate outside range
+00:07 +185: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 new rule type matching isUpowerExclusive enum blocks charged videos
+00:07 +186: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 new rule type matching isUpowerExclusive enum allows non-charged videos
+00:07 +187: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 new rule type matching staffKeyword blocks when staffName matches
+00:07 +188: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_adapters_test.dart: task-066 new rule type matching staffKeyword allows when no staffName matches
+00:07 +189: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer all-zero config produces no direct migration rules
+00:07 +190: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer pipe-separated ban words produce one keyword rule per word
+00:07 +191: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer complex regex ban word produces single regex rule
+00:07 +192: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer duration threshold is unsupported and has no suggested rule
+00:07 +193: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer play count threshold is unsupported
+00:07 +194: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer like ratio threshold is unsupported
+00:07 +195: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer exemptFollowed is partial and notes mention isFollowed gap
+00:07 +196: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer applyToRelatedVideos notes Phase 1 behavior
+00:07 +197: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer tag capability analysis reports ready state regardless of config
+00:07 +198: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: RecommendFilterAnalyzer report aggregates counts correctly
+00:07 +199: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: ShieldMigrationCandidate direct candidate toBeApplied returns suggestedRule
+00:07 +200: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_migration_test.dart: ShieldMigrationCandidate unsupported candidate toBeApplied returns null
+00:07 +201: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: (setUpAll)
+00:07 +201: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher only enriches survivors, not blocked first-pass items
+00:07 +202: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher does not fetch for items with null bvid
+00:07 +203: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher tag-only second pass blocks by detail tag
+00:07 +204: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher tag-only second pass does not re-run title/user/reason/category rules
+00:07 +205: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher fail-open: fetch timeout keeps item visible
+00:07 +206: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher fail-open: thrown error keeps item visible
+00:07 +207: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher fail-open: failed LoadingState keeps item visible
+00:07 +208: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher fail-open: empty tag list keeps item visible
+00:07 +209: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher fail-open: tags with only empty/whitespace names kept visible
+00:07 +210: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher no more than 5 fetches active at once
+00:08 +211: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher successful tag fetch result is cached and reused
+00:08 +212: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher failed tag fetch is not cached
+00:08 +213: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher successful fetch cached by first instance is reused by a second instance
+00:08 +214: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher cache clear resets estimated bytes
+00:08 +215: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher cache overflow is corrected by estimated byte limit
+00:08 +216: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher tag-only second pass uses ShieldScope.recommendation
+00:08 +217: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher passes cid to tag fetch function
+00:08 +218: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher empty survivor list returns empty without any fetch
+00:08 +219: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher default concurrency is 5
+00:08 +220: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher default timeout is 3 seconds
+00:08 +221: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher default cache max size is 10 MB
+00:08 +222: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher custom concurrency is read from settings and enforced
+00:08 +223: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher invalid concurrency value is clamped to defaults
+00:08 +224: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher invalid timeout value is clamped to defaults
+00:08 +225: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: RecommendationTagEnricher invalid cache max size is clamped to defaults
+00:08 +226: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_recommend_tag_enricher_test.dart: (tearDownAll)
+00:08 +226: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldRuleSet round trips JSON and preserves version fields
+00:08 +227: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldRuleSet round trips JSON and preserves displayPattern
+00:08 +228: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldRuleSet loads old JSON without display_pattern without error
+00:08 +229: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldRuleSet serializes enum match mode as enum in persisted JSON
+00:08 +230: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldRuleSet loads enumValue match mode name for internal compatibility
+00:08 +231: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldRuleSet damaged JSON bypasses shielding instead of throwing
+00:08 +232: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldRuleSet round trips avatarPendant and garb rule types in JSON
+00:08 +233: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore persists related video enabled flag through save and load
+00:08 +234: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore setRelatedVideoEnabled updates snapshot and storage
+00:08 +235: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore clear removes related video enabled flag
+00:08 +236: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore loads damaged raw payload as disabled fallback
+00:08 +237: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore rejects invalid regex without overwriting previous payload
+00:08 +238: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore rejects invalid range without overwriting previous payload
+00:08 +239: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore adds quickAction block rule without rebuilding existing namespace
+00:08 +240: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore quickAction preserves existing namespace flags without rules payload
+00:08 +241: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore dedupes quickAction rules by type scope and trimmed pattern ignoring case
+00:08 +242: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore dedupes quickAction rules by match mode too
+00:08 +243: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore preserves persisted token rules for compatibility
+00:08 +244: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore preserves token and regex as separate modes
+00:08 +245: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore quickAction loads persisted rules before appending without cached snapshot
+00:08 +246: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore merges hidden legacy text filters into imported shielding rules
+00:08 +247: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore persists imported legacy rules when saving
+00:08 +248: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore does not duplicate legacy rules already saved in the new system
+00:08 +249: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore does not regenerate legacy rules after import marker is set
+00:08 +250: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore exact to contains migration loads old keyword and reason exact rules as contains
+00:08 +251: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore exact to contains migration keeps non-keyword exact rules as exact
+00:08 +252: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore exact to contains migration is idempotent and preserves regex and token compatibility
+00:08 +253: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore new rule defaults keyword and reason keyword default to contains
+00:08 +254: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore new rule defaults uid category tag and user keyword default to exact
+00:08 +255: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore new rule defaults numeric rule types default to range
+00:08 +256: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/shielding_store_test.dart: ShieldSettingsStore new rule defaults comment member sex defaults to enum mode
+00:09 +257: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/upstream_reply_selection_test.dart: (setUpAll)
+00:09 +257: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/upstream_reply_selection_test.dart: selected comment text saves a structured rule, not legacy regex
+00:09 +258: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/upstream_reply_selection_test.dart: selected comment text saves a structured rule, not legacy regex
+00:09 +259: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/upstream_reply_selection_test.dart: selected comment text saves a structured rule, not legacy regex
+00:09 +260: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/upstream_reply_selection_test.dart: selected comment text saves a structured rule, not legacy regex
+00:10 +261: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/upstream_reply_selection_test.dart: selected comment text saves a structured rule, not legacy regex
+00:10 +262: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/video_card_shield_quick_action_test.dart: VideoCardShieldQuickAction text dialog creates video detail description rule
+00:10 +263: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/video_card_shield_quick_action_test.dart: VideoCardShieldQuickAction recommendation dialog shows editable title and UP inputs
+00:10 +264: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/video_card_shield_quick_action_test.dart: VideoCardShieldQuickAction recommendation dialog shows cover preview with save and cancel below
+00:10 +265: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/video_card_shield_quick_action_test.dart: VideoCardShieldQuickAction edited UP text is used for regex username keyword rule
+00:10 +266: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/video_card_shield_quick_action_test.dart: VideoCardShieldQuickAction UP keyword regex escapes edited metacharacters
+00:11 +267: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/video_card_shield_quick_action_test.dart: VideoCardShieldQuickAction recommendation reason action creates reason keyword rule
+00:11 +268: D:/Documents/vibe/PiliAvalon-Worksite/test/features/shielding/video_card_shield_quick_action_test.dart: VideoCardShieldQuickAction UID action keeps original uid after UP text edit
+00:11 +269: All tests passed!

@@ -672,6 +672,7 @@ if [ -n "$scenario" ] && [ "$status" -eq 0 ]; then
       scenario_success=0
       scenario_nav_attempt=0
       scenario_menu_ui=""
+      scenario_card_tapped=0
       scenario_log="$scenario_evidence_dir/navigation-log.txt"
       : > "$scenario_log"
 
@@ -732,7 +733,7 @@ PY
         local source_ui="$1"
         local attempt="$2"
         local matches="$scenario_evidence_dir/more-matches-${attempt}.txt"
-        find_nodes_by_text "$source_ui" "$matches" "更多选项" "更多设置" "More options" "Show menu"
+        python3 .github/scripts/android_runtime_smoke_navigation.py --detail-more-menu "$source_ui" > "$matches"
         if grep -qv '^#' "$matches" 2>/dev/null; then
           if tap_first_match "$matches" "$scenario_log"; then
             sleep 2
@@ -758,9 +759,8 @@ PY
         return 1
       }
 
-      # Try to open a visible video-detail more menu. The normal runtime launch
-      # may already restore the last detail route; otherwise collect diagnostic
-      # UI dumps while swiping through the launch screen.
+      # A fresh install starts on the recommendation feed. Open its first
+      # clickable video card, then use the detail page's own menu control.
       while [ "$scenario_nav_attempt" -lt "$max_scenario_swipes" ]; do
         scenario_nav_attempt=$((scenario_nav_attempt + 1))
         echo "--- temp quiet attempt ${scenario_nav_attempt} ---" >> "$scenario_log"
@@ -771,7 +771,7 @@ PY
           continue
         fi
 
-        if open_more_from_ui "$current_ui" "$scenario_nav_attempt"; then
+        if grep -q "返回主页" "$current_ui" && open_more_from_ui "$current_ui" "$scenario_nav_attempt"; then
           if grep -q "menu_detected=1" "$scenario_evidence_dir/menu-check-${scenario_nav_attempt}.txt"; then
             scenario_success=1
             echo "more_menu_opened_at_attempt=${scenario_nav_attempt}" >> "$scenario_log"
@@ -780,12 +780,33 @@ PY
           echo "more_candidate_opened_without_expected_menu=true" >> "$scenario_log"
           adb shell input keyevent 4 || true
           sleep 1
+        elif grep -q "返回主页" "$current_ui"; then
+          # Video player controls can be hidden until the player surface is tapped.
+          echo "detail_page_detected=true" >> "$scenario_log"
+          echo "action=tap_video_player_to_reveal_controls" >> "$scenario_log"
+          adb shell input tap 540 480 || true
+          sleep 1
         else
-          echo "more_candidate_not_found=true" >> "$scenario_log"
+          card_matches="$scenario_evidence_dir/video-card-matches-${scenario_nav_attempt}.txt"
+          if python3 .github/scripts/android_runtime_smoke_navigation.py --video-card "$current_ui" > "$card_matches" &&
+             tap_first_match "$card_matches" "$scenario_log"; then
+            scenario_card_tapped=$((scenario_card_tapped + 1))
+            echo "action=tap_recommendation_video_card" >> "$scenario_log"
+            echo "video_card_tap_count=${scenario_card_tapped}" >> "$scenario_log"
+            sleep 4
+          elif [ "$scenario_card_tapped" -gt 0 ]; then
+            # The card tap may have opened a player before its controls are
+            # exposed to UIAutomator. Tapping its surface reveals those controls.
+            echo "detail_controls_not_yet_exposed=true" >> "$scenario_log"
+            echo "action=tap_video_player_to_reveal_controls" >> "$scenario_log"
+            adb shell input tap 540 480 || true
+            sleep 1
+          else
+            echo "clickable_video_card_not_found=true" >> "$scenario_log"
+            echo "action=swipe_up" >> "$scenario_log"
+            swipe_vertical "up" 1
+          fi
         fi
-
-        echo "action=swipe_up" >> "$scenario_log"
-        swipe_vertical "up" 1
       done
 
       if [ "$scenario_success" -eq 1 ]; then

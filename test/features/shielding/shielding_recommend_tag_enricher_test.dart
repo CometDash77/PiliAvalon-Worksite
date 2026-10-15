@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:PiliPlus/features/shielding/recommendation_tag_store.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/features/shielding/shielding_recommend_tag_enricher.dart';
 import 'package:PiliPlus/http/loading_state.dart';
@@ -10,22 +11,44 @@ import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive.dart';
 
+/// A hand-cranked clock, for the 30s negative cache window.
+class _TestClock {
+  DateTime now = DateTime.fromMillisecondsSinceEpoch(1767225600000);
+
+  DateTime call() => now;
+
+  void advance(Duration delta) => now = now.add(delta);
+}
+
 /// A controllable tag-fetch stub for tests.
 class _FakeTagFetcher {
   _FakeTagFetcher();
 
+  /// Keyed by `bvid|cid` — the same key the cache uses, so a test can give one
+  /// video part different tags per cid.
   final Map<String, List<VideoTagItem>?> _responses = {};
   final Map<String, Duration> _delays = {};
+
+  /// One bvid per upstream call. Existing assertions use this.
   final List<String> fetchLog = [];
+
+  /// One `bvid|cid` per upstream call: proves *which* keys were requested.
+  final List<String> keyLog = [];
   int _activeWorkers = 0;
   int maxConcurrentObserved = 0;
 
+  static String keyOf(String bvid, Object? cid) => '$bvid|${cid ?? ''}';
+
   void setResponse(String bvid, List<VideoTagItem>? tags) {
-    _responses[bvid] = tags;
+    setResponseFor(bvid, null, tags);
+  }
+
+  void setResponseFor(String bvid, Object? cid, List<VideoTagItem>? tags) {
+    _responses[keyOf(bvid, cid)] = tags;
   }
 
   void setDelay(String bvid, Duration delay) {
-    _delays[bvid] = delay;
+    _delays[keyOf(bvid, null)] = delay;
   }
 
   Future<LoadingState<List<VideoTagItem>?>> call(
@@ -33,16 +56,17 @@ class _FakeTagFetcher {
     Object? cid,
   ) async {
     fetchLog.add(bvid);
+    keyLog.add(keyOf(bvid, cid));
     _activeWorkers++;
     if (_activeWorkers > maxConcurrentObserved) {
       maxConcurrentObserved = _activeWorkers;
     }
     try {
-      final delay = _delays[bvid] ?? Duration.zero;
+      final delay = _delays[keyOf(bvid, cid)] ?? Duration.zero;
       if (delay > Duration.zero) {
         await Future.delayed(delay);
       }
-      final tags = _responses[bvid];
+      final tags = _responses[keyOf(bvid, cid)];
       if (tags == null) {
         // Simulate an API error
         return const Error('simulated failure');
@@ -377,38 +401,51 @@ void main() {
       expect(result, isEmpty);
     });
 
-    test('failed tag fetch is not cached', () async {
-      final fetcher = _FakeTagFetcher();
-      // First call: simulate failure by not setting a response.
-      // The fake returns Error by default when no response is set.
-      // Wait, looking at _FakeTagFetcher, null in _responses means Error.
+    test(
+      'a failed tag fetch is negative-cached for 30s instead of retried',
+      () async {
+        final clock = _TestClock();
+        // No response set → the stub returns Error, fail-open keeps the item.
+        final fetcher = _FakeTagFetcher();
 
-      final enricher = RecommendationTagEnricher(fetchTags: fetcher.call);
+        final enricher = RecommendationTagEnricher(
+          fetchTags: fetcher.call,
+          store: RecommendationTagStore(clock: clock.call),
+        );
 
-      // First call: no response set → Error → fail-open.
-      await enricher.enrichAndFilter<String>(
-        ['item-1'],
-        ShieldRuleSet(),
-        getBvid: (_) => 'BV1',
-        getCid: (_) => null,
-      );
+        final first = await enricher.enrichAndFilter<String>(
+          ['item-1'],
+          ShieldRuleSet(),
+          getBvid: (_) => 'BV1',
+          getCid: (_) => null,
+        );
+        expect(first, ['item-1']);
+        expect(fetcher.fetchLog.length, 1);
 
-      final firstCallCount = fetcher.fetchLog.length;
+        // The upstream is healthy again, but the failure is still inside its
+        // negative-cache window: the same key is not hammered every batch.
+        fetcher.setResponse('BV1', _tags(['now-available']));
+        await enricher.enrichAndFilter<String>(
+          ['item-2'],
+          ShieldRuleSet(),
+          getBvid: (_) => 'BV1',
+          getCid: (_) => null,
+        );
+        expect(fetcher.fetchLog.length, 1);
 
-      // Now set a success response. Since failure wasn't cached, a
-      // second call should fetch again.
-      fetcher.setResponse('BV1', _tags(['now-available']));
-
-      await enricher.enrichAndFilter<String>(
-        ['item-2'],
-        ShieldRuleSet(),
-        getBvid: (_) => 'BV1',
-        getCid: (_) => null,
-      );
-
-      // Should have fetched again (not from cache).
-      expect(fetcher.fetchLog.length, greaterThan(firstCallCount));
-    });
+        // Past the window the retry goes out and the second pass sees the
+        // freshly fetched tags.
+        clock.advance(negativeTagCacheTtl + const Duration(seconds: 1));
+        final third = await enricher.enrichAndFilter<String>(
+          ['item-3'],
+          _tagBlockRuleSet('now-available'),
+          getBvid: (_) => 'BV1',
+          getCid: (_) => null,
+        );
+        expect(fetcher.fetchLog.length, 2);
+        expect(third, isEmpty);
+      },
+    );
 
     test(
       'successful fetch cached by first instance is reused by a second instance',
@@ -630,6 +667,166 @@ void main() {
 
       GStorage.setting.put(SettingBoxKey.tagEnrichCacheMaxMb, 'xyz');
       expect(tagEnrichCacheMaxMb, 10);
+    });
+
+    // -- Deduplication ---------------------------------------------------
+
+    test(
+      'K distinct bvids issue at most K upstream fetches, however often the '
+      'batch repeats them',
+      () async {
+        const k = 8;
+        final fetcher = _FakeTagFetcher();
+        for (int i = 0; i < k; i++) {
+          fetcher.setResponse('BV$i', _tags(['safe']));
+        }
+
+        final enricher = RecommendationTagEnricher(fetchTags: fetcher.call);
+        // 3K survivor slots over only K distinct bvids: repeats inside one
+        // batch must merge into the in-flight request for that key.
+        final survivors = List.generate(k * 3, (i) => i % k);
+
+        final first = await enricher.enrichAndFilter<int>(
+          survivors,
+          ShieldRuleSet(),
+          getBvid: (i) => 'BV$i',
+          getCid: (_) => null,
+        );
+        // A second batch with the same keys must not touch the transport at
+        // all: the successful results are cached.
+        final second = await enricher.enrichAndFilter<int>(
+          survivors.reversed.toList(),
+          ShieldRuleSet(),
+          getBvid: (i) => 'BV$i',
+          getCid: (_) => null,
+        );
+
+        expect(first, hasLength(k * 3));
+        expect(second, hasLength(k * 3));
+        expect(fetcher.fetchLog, hasLength(lessThanOrEqualTo(k)));
+        expect(
+          fetcher.fetchLog.toSet(),
+          hasLength(k),
+          reason: 'every distinct key still has to be fetched once',
+        );
+        expect(
+          fetcher.fetchLog.toSet(),
+          hasLength(fetcher.fetchLog.length),
+          reason: 'a key must never be requested twice in one cache lifetime',
+        );
+      },
+    );
+
+    test(
+      'the same bvid with different cids is fetched and cached separately',
+      () async {
+        final fetcher = _FakeTagFetcher()
+          ..setResponseFor('BV1', '111', _tags(['part-1']))
+          ..setResponseFor('BV1', '222', _tags(['part-2']));
+
+        final enricher = RecommendationTagEnricher(fetchTags: fetcher.call);
+
+        final r1 = await enricher.enrichAndFilter<String>(
+          ['a'],
+          _tagBlockRuleSet('part-1'),
+          getBvid: (_) => 'BV1',
+          getCid: (_) => '111',
+        );
+        final r2 = await enricher.enrichAndFilter<String>(
+          ['b'],
+          _tagBlockRuleSet('part-2'),
+          getBvid: (_) => 'BV1',
+          getCid: (_) => '222',
+        );
+        // Back to part 1: cached, so no third fetch.
+        final r3 = await enricher.enrichAndFilter<String>(
+          ['c'],
+          _tagBlockRuleSet('part-1'),
+          getBvid: (_) => 'BV1',
+          getCid: (_) => '111',
+        );
+
+        expect(fetcher.keyLog, ['BV1|111', 'BV1|222']);
+        // Each part was judged against its own tags.
+        expect(r1, isEmpty);
+        expect(r2, isEmpty);
+        expect(r3, isEmpty);
+      },
+    );
+
+    // -- Shared entry point ----------------------------------------------
+
+    test('the detail page reads what the recommendation surface cached', () async {
+      final fetcher = _FakeTagFetcher()..setResponse('BV1', _tags(['shared']));
+
+      final enricher = RecommendationTagEnricher(fetchTags: fetcher.call);
+      await enricher.enrichAndFilter<String>(
+        ['item'],
+        ShieldRuleSet(),
+        getBvid: (_) => 'BV1',
+        getCid: (_) => null,
+      );
+      expect(fetcher.fetchLog.length, 1);
+
+      // The detail page goes through the shared entry point. The stub is
+      // passed as its transport too, so a cache miss would show up as an extra
+      // fetch instead of hitting the real network.
+      final tags = await RecommendationTagEnricher.fetchSharedTags(
+        bvid: 'BV1',
+        cid: null,
+        fetcher: fetcher.call,
+      );
+
+      expect(tags!.map((t) => t.tagName).toList(), ['shared']);
+      expect(
+        fetcher.fetchLog.length,
+        1,
+        reason: 'the detail page read the recommendation surface cache',
+      );
+
+      // ...and the other direction: tags the detail page fetched are reused
+      // by the recommendation surface.
+      fetcher.setResponse('BV2', _tags(['from-detail']));
+      final fresh = await RecommendationTagEnricher.fetchSharedTags(
+        bvid: 'BV2',
+        cid: null,
+        fetcher: fetcher.call,
+      );
+      expect(fresh!.map((t) => t.tagName).toList(), ['from-detail']);
+      expect(fetcher.fetchLog.length, 2);
+
+      final blocked = await enricher.enrichAndFilter<String>(
+        ['item-2'],
+        _tagBlockRuleSet('from-detail'),
+        getBvid: (_) => 'BV2',
+        getCid: (_) => null,
+      );
+      expect(blocked, isEmpty);
+      expect(
+        fetcher.fetchLog.length,
+        2,
+        reason: 'the recommendation surface reused the detail page fetch',
+      );
+    });
+
+    test('the video detail page fetches tags through the shared entry point', () {
+      // The controller is a GetX/GetX-mixin class that cannot be instantiated
+      // in a unit test, so the wiring is asserted on the source instead: it is
+      // the one thing that would silently re-introduce a second fetch path.
+      final source = File('lib/pages/common/common_intro_controller.dart')
+          .readAsStringSync()
+          .replaceAll(RegExp(r'\s+'), ' ');
+
+      expect(
+        source,
+        contains('RecommendationTagEnricher.fetchSharedTags('),
+        reason: 'the detail page must use the shared tag entry point',
+      );
+      expect(
+        source,
+        isNot(contains('UserHttp.videoTags(')),
+        reason: 'the detail page must not call the tag API directly',
+      );
     });
   });
 }

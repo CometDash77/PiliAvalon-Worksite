@@ -10,11 +10,13 @@ import 'package:PiliPlus/common/widgets/main_layout.dart';
 import 'package:PiliPlus/common/widgets/route_aware_mixin.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
 import 'package:PiliPlus/pages/home/view.dart';
+import 'package:PiliPlus/pages/home/widgets/zen_mode_toggle.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:PiliPlus/utils/android/android_helper.dart';
 import 'package:PiliPlus/utils/app_scheme.dart';
+import 'package:PiliPlus/utils/device_utils.dart';
 import 'package:PiliPlus/utils/extension/context_ext.dart';
 import 'package:PiliPlus/utils/extension/size_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
@@ -22,11 +24,11 @@ import 'package:PiliPlus/utils/mobile_observer.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
+import 'package:PiliPlus/utils/zen_mode.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:tray_manager/tray_manager.dart';
-import 'package:win32/win32.dart' as kernel32;
 import 'package:window_manager/window_manager.dart';
 
 class MainApp extends StatefulWidget {
@@ -185,15 +187,7 @@ class _MainAppState extends PopScopeState<MainApp>
     await GStorage.compact();
     await GStorage.close();
     await trayManager.destroy();
-    if (Platform.isWindows) {
-      // flutter_inappwebview
-      // 6.2.0-beta.2+ https://github.com/pichillilorenzo/flutter_inappwebview/issues/2482
-      // 6.1.5 https://github.com/pichillilorenzo/flutter_inappwebview/issues/2512#issuecomment-3031039587
-      final hProcess = kernel32.GetCurrentProcess();
-      kernel32.TerminateProcess(hProcess, 0);
-    } else {
-      exit(0);
-    }
+    DeviceUtils.exitApp();
   }
 
   @override
@@ -567,20 +561,31 @@ class _MainAppState extends PopScopeState<MainApp>
   }
 
   Widget userAndSearchVertical() {
-    return Column(
-      children: [
-        userAvatar(colorScheme: _colorScheme, mainController: _mainController),
-        const SizedBox(height: 8),
-        msgBadge(_mainController),
-        IconButton(
-          tooltip: '搜索',
-          icon: const Icon(
-            Icons.search_outlined,
-            semanticLabel: '搜索',
+    // R6: 平板/侧栏同规则 —— Zen 下只剩搜索与开关,无头像无消息徽标。
+    return Obx(() {
+      final layout = HomeZenLayout.resolve(zen: ZenMode.isOn, tabCount: 0);
+      return Column(
+        children: [
+          // 普通态(#97):开关常显,头像/徽标保持原位;Zen 下只剩开关与搜索(R6)。
+          const ZenModeToggle(),
+          if (layout.showUserAvatar) ...[
+            userAvatar(
+              colorScheme: _colorScheme,
+              mainController: _mainController,
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (layout.showMessageBadge) msgBadge(_mainController),
+          IconButton(
+            tooltip: '搜索',
+            icon: const Icon(
+              Icons.search_outlined,
+              semanticLabel: '搜索',
+            ),
+            onPressed: () => Get.toNamed('/search'),
           ),
-          onPressed: () => Get.toNamed('/search'),
-        ),
-      ],
-    );
+        ],
+      );
+    });
   }
 }

@@ -1,0 +1,13 @@
+﻿Analyzing PiliAvalon-Worksite...                                
+
+   info - 'alpha' is deprecated and shouldn't be used. Use (*.a * 255.0).round().clamp(0, 255). Try replacing the use of the deprecated member with the replacement - lib\pages\dynamics\widgets\vote_decoration.dart:114:20 - deprecated_member_use
+   info - Unnecessary duplication of receiver. Try using a cascade to avoid the duplication - test\features\shielding\upstream_reply_selection_test.dart:65:7 - cascade_invocations
+   info - Unnecessary duplication of receiver. Try using a cascade to avoid the duplication - tool\bench\shield_matcher_bench.dart:131:3 - cascade_invocations
+
+flutter.bat : 3 issues found. (ran in 24.2s)
+所在位置 行:5 字符: 1
++ & D:/flutter-sdk/flutter/bin/flutter.bat analyze --no-pub --no-fatal- ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (3 issues found. (ran in 24.2s):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

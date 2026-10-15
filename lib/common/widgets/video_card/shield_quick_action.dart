@@ -257,6 +257,7 @@ abstract final class VideoCardShieldQuickAction {
         ShieldRuleType.publishTime => '屏蔽视频发布时间 $pattern',
         ShieldRuleType.isUpowerExclusive => '屏蔽充电专属状态 $pattern',
         ShieldRuleType.staffKeyword => '屏蔽制作人员关键词「$pattern」',
+        ShieldRuleType.roomId => '屏蔽直播间 $pattern',
       };
 
   static bool _isRecommendationQuickActionType(ShieldRuleType type) =>
@@ -277,7 +278,8 @@ abstract final class VideoCardShieldQuickAction {
         ShieldRuleType.commentMemberSex ||
         ShieldRuleType.commentMemberLevel ||
         ShieldRuleType.avatarPendant ||
-        ShieldRuleType.garb => false,
+        ShieldRuleType.garb ||
+        ShieldRuleType.roomId => false,
       };
 
   static String _contextualRuleLabel(

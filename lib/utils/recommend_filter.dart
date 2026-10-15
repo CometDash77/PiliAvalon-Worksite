@@ -1,7 +1,13 @@
 import 'package:PiliPlus/features/shielding/shielding.dart';
-import 'package:PiliPlus/models/model_video.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 
+/// 设置镜像层。
+///
+/// 判定本体在无 IO 的纯层 `RecommendationFilter`（首页一条候选经
+/// `RecommendationFilter.visible` 单遍判定），这里只保留三件事：设置静态量的
+/// 内存镜像、设置层唯一写入口 [updateSettings]、与 `ReplyGrpc` 共用的
+/// [shieldRuleSetProvider] 槽位转发。旧判定转发方法已删除——同一份判定只在
+/// 纯层存在一份，产品与测试都直接调用纯层。
 abstract final class RecommendFilter {
   static int minDurationForRcmd = Pref.minDurationForRcmd;
   static int minPlayForRcmd = Pref.minPlayForRcmd;
@@ -22,103 +28,88 @@ abstract final class RecommendFilter {
     caseSensitive: false,
   );
   static bool enableFilter = rcmdRegExp.pattern.isNotEmpty;
-  static ShieldRuleSet Function()? shieldRuleSetProvider;
   static bool useLegacyTextFilter = false;
 
-  static bool get legacyRecommendationEnabled {
-    final ruleSet =
-        shieldRuleSetProvider?.call() ?? ShieldSettingsStore().snapshot();
-    return ruleSet.isScopeEnabled(ShieldScope.recommendation);
+  /// 兼容转发：与 `ReplyGrpc.shieldRuleSetProvider` 指向同一个槽位。
+  static ShieldRuleSet Function()? get shieldRuleSetProvider =>
+      ShieldingRuntime.shieldRuleSetProvider;
+
+  static set shieldRuleSetProvider(ShieldRuleSet Function()? provider) {
+    ShieldingRuntime.shieldRuleSetProvider = provider;
   }
 
-  static bool filter(BaseVideoItemModel videoItem) {
-    if (!legacyRecommendationEnabled) {
-      return false;
-    }
-    //由于相关视频中没有已关注标签，只能视为非关注视频
-    if (videoItem.isFollowed && exemptFilterForFollowed) {
-      return false;
-    }
-    return filterAll(videoItem);
-  }
+  /// 把当前内存镜像打成一份不可变配置，交给纯判定层。
+  static RecommendationFilterConfig toConfig() => RecommendationFilterConfig(
+    minDurationForRcmd: minDurationForRcmd,
+    minPlayForRcmd: minPlayForRcmd,
+    minLikeRatioForRecommend: minLikeRatioForRecommend,
+    filterInteractionRateForRecommend: filterInteractionRateForRecommend,
+    minInteractionRateForRecommend: minInteractionRateForRecommend,
+    filterTripleRateForRecommend: filterTripleRateForRecommend,
+    minTripleRateForRecommend: minTripleRateForRecommend,
+    filterContentValueForRecommend: filterContentValueForRecommend,
+    minContentValueForRecommend: minContentValueForRecommend,
+    exemptFilterForFollowed: exemptFilterForFollowed,
+    applyFilterToRelatedVideos: applyFilterToRelatedVideos,
+    rcmdRegExp: rcmdRegExp,
+    enableFilter: enableFilter,
+    useLegacyTextFilter: useLegacyTextFilter,
+  );
 
-  static bool filterLikeRatio(int? like, int? view) {
-    if (!legacyRecommendationEnabled) {
-      return false;
-    }
-    if (view != null) {
-      return (view > -1 && view < minPlayForRcmd) ||
-          (like != null &&
-              like > -1 &&
-              like * 100 < minLikeRatioForRecommend * view);
-    }
-    return false;
-  }
-
-  static bool filterDerivedMetrics(BaseVideoItemModel videoItem) {
-    if (!legacyRecommendationEnabled) {
-      return false;
-    }
-    if (videoItem.isFollowed && exemptFilterForFollowed) {
-      return false;
-    }
-
-    final stat = videoItem.stat;
-    return _filterMetric(
-          enabled: filterInteractionRateForRecommend,
-          numerator: (stat.danmu ?? 0) + (stat.reply ?? 0),
-          denominator: stat.view,
-          threshold: minInteractionRateForRecommend,
-        ) ||
-        _filterMetric(
-          enabled: filterTripleRateForRecommend,
-          numerator: (stat.like ?? 0) + (stat.coin ?? 0) + (stat.favorite ?? 0),
-          denominator: stat.view,
-          threshold: minTripleRateForRecommend,
-        ) ||
-        _filterMetric(
-          enabled: filterContentValueForRecommend,
-          numerator: stat.coin ?? 0,
-          denominator: stat.like,
-          threshold: minContentValueForRecommend,
-        );
-  }
-
-  static bool filterTitle(String title) {
-    if (!legacyRecommendationEnabled) {
-      return false;
-    }
-    if (!useLegacyTextFilter) {
-      return false;
-    }
-    return (enableFilter && rcmdRegExp.hasMatch(title));
-  }
-
-  static bool filterAll(BaseVideoItemModel videoItem) {
-    if (!legacyRecommendationEnabled) {
-      return false;
-    }
-    return (videoItem.duration > 0 &&
-            videoItem.duration < minDurationForRcmd) ||
-        filterLikeRatio(videoItem.stat.like, videoItem.stat.view) ||
-        filterDerivedMetrics(videoItem) ||
-        filterTitle(videoItem.title);
-  }
-
-  static bool _filterMetric({
-    required bool enabled,
-    required num numerator,
-    required num? denominator,
-    required double threshold,
+  /// 设置层唯一的写入口：设置页不再直接给这些静态量赋值。
+  ///
+  /// 持久化仍由设置页控件自己完成（`SwitchItem` 与阈值对话框写的都是同一个
+  /// `SettingBoxKey`），这里只收敛内存镜像，行为与改造前一致。只更新显式传入
+  /// 的字段。
+  static void updateSettings({
+    int? minDurationForRcmd,
+    int? minPlayForRcmd,
+    int? minLikeRatioForRecommend,
+    bool? filterInteractionRateForRecommend,
+    double? minInteractionRateForRecommend,
+    bool? filterTripleRateForRecommend,
+    double? minTripleRateForRecommend,
+    bool? filterContentValueForRecommend,
+    double? minContentValueForRecommend,
+    bool? exemptFilterForFollowed,
+    bool? applyFilterToRelatedVideos,
   }) {
-    if (!enabled) {
-      return false;
+    if (minDurationForRcmd != null) {
+      RecommendFilter.minDurationForRcmd = minDurationForRcmd;
     }
-    final denominatorValue = denominator?.toDouble();
-    if (denominatorValue == null || denominatorValue <= 0) {
-      return false;
+    if (minPlayForRcmd != null) {
+      RecommendFilter.minPlayForRcmd = minPlayForRcmd;
     }
-    final metricValue = numerator.toDouble() / denominatorValue * 100;
-    return metricValue < threshold;
+    if (minLikeRatioForRecommend != null) {
+      RecommendFilter.minLikeRatioForRecommend = minLikeRatioForRecommend;
+    }
+    if (filterInteractionRateForRecommend != null) {
+      RecommendFilter.filterInteractionRateForRecommend =
+          filterInteractionRateForRecommend;
+    }
+    if (minInteractionRateForRecommend != null) {
+      RecommendFilter.minInteractionRateForRecommend =
+          minInteractionRateForRecommend;
+    }
+    if (filterTripleRateForRecommend != null) {
+      RecommendFilter.filterTripleRateForRecommend =
+          filterTripleRateForRecommend;
+    }
+    if (minTripleRateForRecommend != null) {
+      RecommendFilter.minTripleRateForRecommend = minTripleRateForRecommend;
+    }
+    if (filterContentValueForRecommend != null) {
+      RecommendFilter.filterContentValueForRecommend =
+          filterContentValueForRecommend;
+    }
+    if (minContentValueForRecommend != null) {
+      RecommendFilter.minContentValueForRecommend = minContentValueForRecommend;
+    }
+    if (exemptFilterForFollowed != null) {
+      RecommendFilter.exemptFilterForFollowed = exemptFilterForFollowed;
+    }
+    if (applyFilterToRelatedVideos != null) {
+      RecommendFilter.applyFilterToRelatedVideos = applyFilterToRelatedVideos;
+    }
   }
 }

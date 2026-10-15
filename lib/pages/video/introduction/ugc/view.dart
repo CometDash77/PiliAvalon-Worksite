@@ -43,6 +43,7 @@ import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
+import 'package:PiliPlus/utils/zen_mode.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
@@ -101,122 +102,120 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
         right: Style.safeSpace,
         top: 10,
       ),
-      sliver: Obx(() {
-        final videoDetail = introController.videoDetail.value;
-        final isLoading = videoDetail.bvid == null;
-        return SliverToBoxAdapter(
-          child: GestureDetector(
-            onTap: () {
-              if (isLoading) return;
-              feedBack();
-              introController.expand.toggle();
-            },
-            child: TranslucentColumn(
-              crossAxisAlignment: .start,
-              children: [
-                NoTranslucentArea(
-                  child: _buildOwnerInfo(
-                    isLoading,
-                    isPortrait,
-                    isHorizontal,
-                    videoDetail,
+      sliver: Obx(
+        () {
+          final videoDetail = introController.videoDetail.value;
+          final isLoading = videoDetail.bvid == null;
+          return SliverToBoxAdapter(
+            child: GestureDetector(
+              onTap: () {
+                if (isLoading) return;
+                feedBack();
+                introController.expand.toggle();
+              },
+              child: TranslucentColumn(
+                crossAxisAlignment: .start,
+                children: [
+                  NoTranslucentArea(
+                    child: _buildOwnerInfo(
+                      isLoading,
+                      isPortrait,
+                      isHorizontal,
+                      videoDetail,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                _buildTitle(isLoading, isHorizontal, videoDetail),
-                const SizedBox(height: 8),
-                Stack(
-                  clipBehavior: .none,
-                  children: [
-                    _buildInfo(videoDetail.stat, videoDetail.pubdate),
-                    if (introController.enableAi) _aiBtn,
-                  ],
-                ),
-                if (introController.showArgueMsg)
-                  if (videoDetail.argueInfo?.argueMsg case final argueMsg?
-                      when argueMsg.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    _buildArgueInfo(argueMsg),
-                  ],
-                if (isHorizontal && PlatformUtils.isDesktop)
-                  ..._infos(videoDetail)
-                else
-                  Obx(
-                    () => AnimatedHeightWidgetExt(
-                      expand: introController.expand.value,
-                      duration: const Duration(milliseconds: 300),
-                      child: TranslucentColumn(
-                        mainAxisSize: .min,
-                        crossAxisAlignment: .start,
-                        children: _infos(videoDetail),
+                  const SizedBox(height: 8),
+                  _buildTitle(isLoading, isHorizontal, videoDetail),
+                  const SizedBox(height: 8),
+                  Stack(
+                    clipBehavior: .none,
+                    children: [
+                      _buildInfo(videoDetail.stat, videoDetail.pubdate),
+                      if (!ZenMode.isOn && introController.enableAi) _aiBtn,
+                    ],
+                  ),
+                  if (introController.showArgueMsg)
+                    if (videoDetail.argueInfo?.argueMsg case final argueMsg?
+                        when argueMsg.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      _buildArgueInfo(argueMsg),
+                    ],
+                  if (isHorizontal && PlatformUtils.isDesktop)
+                    ..._infos(videoDetail)
+                  else
+                    Obx(
+                      () => AnimatedHeightWidgetExt(
+                        expand: introController.expand.value,
+                        duration: const Duration(milliseconds: 300),
+                        child: TranslucentColumn(
+                          mainAxisSize: .min,
+                          crossAxisAlignment: .start,
+                          children: _infos(videoDetail),
+                        ),
                       ),
                     ),
-                  ),
-                Obx(
-                  () => introController.status.value
-                      ? const SizedBox.shrink()
-                      : Center(
-                          child: TextButton.icon(
-                            icon: const Icon(Icons.refresh),
-                            onPressed: () {
-                              introController
-                                ..status.value = true
-                                ..queryVideoIntro();
-                              if (videoDetailCtr.videoUrl.isNullOrEmpty &&
-                                  !videoDetailCtr.isQuerying) {
-                                videoDetailCtr.queryVideoUrl();
-                              }
-                            },
-                            label: const Text("点此重新加载"),
+                  Obx(
+                    () => introController.status.value
+                        ? const SizedBox.shrink()
+                        : Center(
+                            child: TextButton.icon(
+                              icon: const Icon(Icons.refresh),
+                              onPressed: () {
+                                introController
+                                  ..status.value = true
+                                  ..queryVideoIntro();
+                                if (videoDetailCtr.videoUrl.isNullOrEmpty &&
+                                    !videoDetailCtr.isQuerying) {
+                                  videoDetailCtr.queryVideoUrl();
+                                }
+                              },
+                              label: const Text("点此重新加载"),
+                            ),
                           ),
+                  ),
+                  // 点赞收藏转发 布局样式2
+                  // R20 hides the action row in Zen.
+                  if (!isHorizontal && !ZenMode.isOn) ...[
+                    const SizedBox(height: 8),
+                    actionGrid(
+                      context,
+                      isLoading,
+                      introController,
+                      videoDetail.stat,
+                    ),
+                  ],
+                  // 合集
+                  if (!isLoading &&
+                      (isPortrait ||
+                          !videoDetailCtr
+                              .plPlayerController
+                              .horizontalSeasonPanel)) ...[
+                    if (videoDetail.hasSeason)
+                      Obx(
+                        () => SeasonPanel(
+                          key: ValueKey(introController.videoDetail.value),
+                          heroTag: widget.heroTag,
+                          showEpisodes: widget.showEpisodes,
+                          ugcIntroController: introController,
                         ),
-                ),
-                // 点赞收藏转发 布局样式2
-                if (!isHorizontal) ...[
-                  const SizedBox(height: 8),
-                  actionGrid(
-                    context,
-                    isLoading,
-                    introController,
-                    videoDetail.stat,
-                  ),
+                      ),
+                  ],
+                  if (videoDetail.hasParts)
+                    Obx(
+                      () => PagesPanel(
+                        key: ValueKey(introController.videoDetail.value),
+                        heroTag: widget.heroTag,
+                        ugcIntroController: introController,
+                        bvid: introController.bvid,
+                        showEpisodes: widget.showEpisodes,
+                      ),
+                    ),
                 ],
-                // 合集
-                if (!isLoading &&
-                    videoDetail.ugcSeason != null &&
-                    (isPortrait ||
-                        !videoDetailCtr
-                            .plPlayerController
-                            .horizontalSeasonPanel))
-                  Obx(
-                    () => SeasonPanel(
-                      key: ValueKey(introController.videoDetail.value),
-                      heroTag: widget.heroTag,
-                      showEpisodes: widget.showEpisodes,
-                      ugcIntroController: introController,
-                    ),
-                  ),
-                if (!isLoading &&
-                    videoDetail.pages != null &&
-                    videoDetail.pages!.length > 1 &&
-                    (isPortrait ||
-                        !videoDetailCtr
-                            .plPlayerController
-                            .horizontalSeasonPanel))
-                  Obx(
-                    () => PagesPanel(
-                      key: ValueKey(introController.videoDetail.value),
-                      heroTag: widget.heroTag,
-                      ugcIntroController: introController,
-                      bvid: introController.bvid,
-                      showEpisodes: widget.showEpisodes,
-                    ),
-                  ),
-              ],
+              ),
             ),
-          ),
-        );
-      }),
+          );
+        },
+      ),
     );
   }
 
@@ -303,6 +302,8 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
     NoTranslucentArea(
       child: Obx(() {
         final videoTags = introController.videoTags.value;
+        // R20 hides tags while Zen is on.
+        if (ZenMode.isOn) return const SizedBox.shrink();
         if (videoTags == null || videoTags.isEmpty) {
           return const SizedBox.shrink();
         }
@@ -323,7 +324,11 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
         child: Text(
           text,
           textScaler: TextScaler.noScaling,
-          strutStyle: const StrutStyle(leading: 0, height: 1, fontSize: 12),
+          strutStyle: const StrutStyle(
+            leading: 0,
+            height: 1,
+            fontSize: 12,
+          ),
           style: TextStyle(
             height: 1,
             fontSize: 12,
@@ -435,30 +440,35 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
   }
 
   Widget followButton(BuildContext context) {
-    return Obx(() {
-      int attr = introController.followStatus.value.attribute ?? 0;
-      return TextButton(
-        onPressed: () => introController.actionRelationMod(context),
-        style: TextButton.styleFrom(
-          tapTargetSize: .shrinkWrap,
-          visualDensity: const VisualDensity(vertical: -2.8),
-          foregroundColor: attr != 0
-              ? colorScheme.outline
-              : colorScheme.onSecondaryContainer,
-          backgroundColor: attr != 0
-              ? colorScheme.onInverseSurface
-              : colorScheme.secondaryContainer,
-        ),
-        child: Text(switch (attr) {
-          1 => '悄悄关注',
-          2 => '已关注',
-          4 || 6 => '已互关',
-          128 => '已拉黑',
-          -10 => '特别关注',
-          _ => ' 关注 ',
-        }, style: const TextStyle(fontSize: 13)),
-      );
-    });
+    return Obx(
+      () {
+        int attr = introController.followStatus.value.attribute ?? 0;
+        return TextButton(
+          onPressed: () => introController.actionRelationMod(context),
+          style: TextButton.styleFrom(
+            tapTargetSize: .shrinkWrap,
+            visualDensity: const VisualDensity(vertical: -2.8),
+            foregroundColor: attr != 0
+                ? colorScheme.outline
+                : colorScheme.onSecondaryContainer,
+            backgroundColor: attr != 0
+                ? colorScheme.onInverseSurface
+                : colorScheme.secondaryContainer,
+          ),
+          child: Text(
+            switch (attr) {
+              1 => '悄悄关注',
+              2 => '已关注',
+              4 || 6 => '已互关',
+              128 => '已拉黑',
+              -10 => '特别关注',
+              _ => ' 关注 ',
+            },
+            style: const TextStyle(fontSize: 13),
+          ),
+        );
+      },
+    );
   }
 
   Widget actionGrid(
@@ -727,23 +737,25 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
           Expanded(
             child: Align(
               alignment: .centerLeft,
-              child: _buildAvatar(() {
-                if (mid != null) {
-                  feedBack();
-                  if (!isPortrait && introController.horizontalMemberPage) {
-                    widget.onShowMemberPage(mid);
-                  } else {
-                    Get.toNamed(
-                      '/member?mid=$mid&from_view_aid=${videoDetailCtr.aid}',
-                    );
+              child: _buildAvatar(
+                () {
+                  if (mid != null) {
+                    feedBack();
+                    if (!isPortrait && introController.horizontalMemberPage) {
+                      widget.onShowMemberPage(mid);
+                    } else {
+                      Get.toNamed(
+                        '/member?mid=$mid&from_view_aid=${videoDetailCtr.aid}',
+                      );
+                    }
                   }
-                }
-              }),
+                },
+              ),
             ),
           ),
-          followButton(context),
+          if (!ZenMode.isOn) followButton(context),
         ],
-        if (isHorizontal) ...[
+        if (isHorizontal && !ZenMode.isOn) ...[
           const SizedBox(width: 10),
           Expanded(
             child: actionGrid(
@@ -758,7 +770,11 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
     );
   }
 
-  Widget _buildStaff(bool isPortrait, int? ownerMid, Staff item) {
+  Widget _buildStaff(
+    bool isPortrait,
+    int? ownerMid,
+    Staff item,
+  ) {
     void onTap() => Get.toNamed(
       '/member?mid=${item.mid}&from_view_aid=${videoDetailCtr.aid}',
     );
@@ -820,35 +836,37 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
               Positioned(
                 top: 0,
                 right: -6,
-                child: Obx(() {
-                  if (introController.staffRelations['status'] == true &&
-                      introController.staffRelations['${item.mid}'] == null) {
-                    return Material(
-                      type: .circle,
-                      color: colorScheme.secondaryContainer,
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: () => RequestUtils.actionRelationMod(
-                          context: context,
-                          mid: item.mid,
-                          isFollow: false,
-                          afterMod: (val) =>
-                              introController.staffRelations['${item.mid}'] =
-                                  true,
-                        ),
-                        child: Padding(
-                          padding: const .all(2),
-                          child: Icon(
-                            MdiIcons.plus,
-                            size: 16,
-                            color: colorScheme.onSecondaryContainer,
+                child: Obx(
+                  () {
+                    if (introController.staffRelations['status'] == true &&
+                        introController.staffRelations['${item.mid}'] == null) {
+                      return Material(
+                        type: .circle,
+                        color: colorScheme.secondaryContainer,
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: () => RequestUtils.actionRelationMod(
+                            context: context,
+                            mid: item.mid,
+                            isFollow: false,
+                            afterMod: (val) =>
+                                introController.staffRelations['${item.mid}'] =
+                                    true,
+                          ),
+                          child: Padding(
+                            padding: const .all(2),
+                            child: Icon(
+                              MdiIcons.plus,
+                              size: 16,
+                              color: colorScheme.onSecondaryContainer,
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  }
-                  return const SizedBox.shrink();
-                }),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
               ),
             ],
           ),
@@ -879,7 +897,9 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
     );
   }
 
-  Widget _buildAvatar(VoidCallback onPushMember) => GestureDetector(
+  Widget _buildAvatar(
+    VoidCallback onPushMember,
+  ) => GestureDetector(
     onTap: onPushMember,
     onLongPress: () {
       final card = introController.userStat.value.card;
@@ -896,67 +916,75 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
             '/member?mid=${introController.userStat.value.card?.mid}&from_view_aid=${videoDetailCtr.aid}',
           )
         : null,
-    child: Obx(() {
-      final userStat = introController.userStat.value;
-      final isVip = (userStat.card?.vip?.status ?? 0) > 0;
-      return Row(
-        spacing: 10,
-        mainAxisSize: .min,
-        children: [
-          PendantAvatar(
-            userStat.card?.face,
-            size: 35,
-            badgeSize: 14,
-            vipStatus: userStat.card?.vip?.status,
-            officialType: userStat.card?.official?.type,
-          ),
-          Column(
-            crossAxisAlignment: .start,
-            children: [
-              Text(
-                userStat.card?.name ?? "",
-                maxLines: 1,
-                overflow: .ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: isVip && userStat.card?.vip?.type == 2
-                      ? colorScheme.vipColor
-                      : null,
+    child: Obx(
+      () {
+        final userStat = introController.userStat.value;
+        final isVip = (userStat.card?.vip?.status ?? 0) > 0;
+        return Row(
+          spacing: 10,
+          mainAxisSize: .min,
+          children: [
+            PendantAvatar(
+              userStat.card?.face,
+              size: 35,
+              badgeSize: 14,
+              vipStatus: userStat.card?.vip?.status,
+              officialType: userStat.card?.official?.type,
+            ),
+            Column(
+              crossAxisAlignment: .start,
+              children: [
+                Text(
+                  userStat.card?.name ?? "",
+                  maxLines: 1,
+                  overflow: .ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isVip && userStat.card?.vip?.type == 2
+                        ? colorScheme.vipColor
+                        : null,
+                  ),
                 ),
-              ),
-              Text(
-                '${NumUtils.numFormat(userStat.follower)}粉丝    ${'${NumUtils.numFormat(userStat.archiveCount)}视频'}',
-                style: TextStyle(fontSize: 12, color: colorScheme.outline),
-              ),
-            ],
-          ),
-        ],
-      );
-    }),
+                Text(
+                  '${NumUtils.numFormat(userStat.follower)}粉丝    ${'${NumUtils.numFormat(userStat.archiveCount)}视频'}',
+                  style: TextStyle(fontSize: 12, color: colorScheme.outline),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    ),
   );
 
   Widget _buildInfo(VideoStat? stat, int? pubdate) {
+    // R19 retains the play count. R20 drops the danmaku count, publish date,
+    // anonymity icon and 在线人数. Read `ZenMode` here so the Obx wrapping
+    // this sliver subscribes to it and rebuilds on a Zen flip.
+    final zen = ZenMode.isOn;
     return Row(
       spacing: 10,
       children: [
         StatWidget(type: .play, value: stat?.view, color: colorScheme.outline),
-        StatWidget(
-          type: .danmaku,
-          value: stat?.danmaku,
-          color: colorScheme.outline,
-        ),
-        Text(
-          DateFormatUtils.format(pubdate),
-          style: TextStyle(fontSize: 12, color: colorScheme.outline),
-        ),
-        if (MineController.anonymity.value)
+        if (!zen)
+          StatWidget(
+            type: .danmaku,
+            value: stat?.danmaku,
+            color: colorScheme.outline,
+          ),
+        if (!zen)
+          Text(
+            DateFormatUtils.format(pubdate),
+            style: TextStyle(fontSize: 12, color: colorScheme.outline),
+          ),
+        if (!zen && MineController.anonymity.value)
           Icon(
             MdiIcons.incognito,
             size: 15,
             color: colorScheme.outline,
             semanticLabel: '无痕',
           ),
-        if (introController.isShowOnlineTotal)
+        if (!zen && introController.isShowOnlineTotal)
           Obx(
             () => Text(
               '${introController.total.value}人在看',

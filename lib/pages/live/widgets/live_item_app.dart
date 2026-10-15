@@ -17,10 +17,15 @@ class LiveCardVApp extends StatelessWidget {
   final CardLiveItem item;
   final bool showFirstFrame;
 
+  /// Optional shield entry, supplied only by the standalone live
+  /// recommendation page; other callers leave it null.
+  final Widget? shieldAction;
+
   const LiveCardVApp({
     super.key,
     required this.item,
     this.showFirstFrame = false,
+    this.shieldAction,
   });
 
   @override
@@ -150,6 +155,8 @@ class LiveCardVApp extends StatelessWidget {
               ),
             ),
           ),
+        if (shieldAction != null)
+          Positioned(top: 4, right: 4, child: shieldAction!),
       ],
     );
   }

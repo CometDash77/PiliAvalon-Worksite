@@ -1,3 +1,4 @@
+import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/http/api.dart';
 import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/http/loading_state.dart';
@@ -84,7 +85,10 @@ abstract final class PgcHttp {
       },
     );
     if (res.data['code'] == 0) {
-      return Success(PgcIndexResult.fromJson(res.data['data']).list);
+      final list = PgcIndexResult.fromJson(res.data['data']).list;
+      return Success(
+        list == null ? null : await JevFinalScreen.pgcIndex().screen(list),
+      );
     } else {
       return Error(res.data['message']);
     }

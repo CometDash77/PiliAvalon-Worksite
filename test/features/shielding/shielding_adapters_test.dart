@@ -6,7 +6,6 @@ import 'package:PiliPlus/models/home/rcmd/result.dart';
 import 'package:PiliPlus/models/model_hot_video_item.dart';
 import 'package:PiliPlus/models/model_rec_video_item.dart';
 import 'package:PiliPlus/pages/video/reply_reply/controller.dart';
-import 'package:PiliPlus/utils/recommend_filter.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -78,6 +77,48 @@ void main() {
       expect(candidate.authorName, '玩家');
       expect(candidate.category, '游戏');
       expect(candidate.reason, isNull);
+    });
+
+    test('parses app card_goto and suppresses the vertical-card reason', () {
+      final item = RcmdVideoItemAppModel.fromJson({
+        'player_args': {'aid': 1, 'cid': 2, 'duration': 60},
+        'bvid': 'BV1',
+        'cover': '',
+        'cover_left_text_1': '1',
+        'cover_left_text_2': '1',
+        'title': '竖屏视频',
+        'args': {'up_id': 88, 'up_name': '玩家'},
+        'rcmd_reason': '竖屏',
+        'card_goto': 'av',
+        'param': '1',
+        'uri': '',
+      });
+
+      expect(item.goto, 'av');
+      expect(item.owner.name, '玩家');
+      expect(item.rcmdReason, isNull);
+    });
+
+    test('uses app card_goto to parse bangumi badge and owner label', () {
+      final item = RcmdVideoItemAppModel.fromJson({
+        'player_args': {'aid': 1, 'cid': 2, 'duration': 60},
+        'bvid': 'BV1',
+        'cover': '',
+        'cover_left_text_1': '1',
+        'cover_left_text_2': '1',
+        'title': '番剧',
+        'desc_button': {'text': '番剧出品'},
+        'args': {'up_id': 88, 'up_name': '出品方'},
+        'rcmd_reason': '',
+        'card_goto': 'bangumi',
+        'cover_right_text': '番剧',
+        'param': '1',
+        'uri': '',
+      });
+
+      expect(item.goto, 'bangumi');
+      expect(item.owner.name, '番剧出品');
+      expect(item.pgcBadge, '番剧');
     });
 
     test('web recommendation UP regex blocks owner name substring', () {
@@ -598,25 +639,7 @@ void main() {
     );
 
     test('legacy recommendation filters obey recommendation scene switch', () {
-      addTearDown(() {
-        RecommendFilter.minDurationForRcmd = 0;
-        RecommendFilter.minPlayForRcmd = 0;
-        RecommendFilter.minLikeRatioForRecommend = 0;
-        RecommendFilter.exemptFilterForFollowed = false;
-        RecommendFilter.applyFilterToRelatedVideos = false;
-        RecommendFilter.rcmdRegExp = RegExp('', caseSensitive: false);
-        RecommendFilter.enableFilter = false;
-        RecommendFilter.useLegacyTextFilter = false;
-        RecommendFilter.shieldRuleSetProvider = null;
-      });
-
-      RecommendFilter.minDurationForRcmd = 120;
-      RecommendFilter.minPlayForRcmd = 1000;
-      RecommendFilter.minLikeRatioForRecommend = 10;
-      RecommendFilter.rcmdRegExp = RegExp('剧透', caseSensitive: false);
-      RecommendFilter.enableFilter = true;
-      RecommendFilter.useLegacyTextFilter = true;
-      RecommendFilter.shieldRuleSetProvider = () => ShieldRuleSet(
+      final ruleSet = ShieldRuleSet(
         recommendationEnabled: false,
         rules: [
           ShieldRule(
@@ -629,6 +652,14 @@ void main() {
             updatedAt: DateTime.fromMillisecondsSinceEpoch(1),
           ),
         ],
+      );
+      final config = RecommendationFilterConfig(
+        minDurationForRcmd: 120,
+        minPlayForRcmd: 1000,
+        minLikeRatioForRecommend: 10,
+        rcmdRegExp: RegExp('剧透', caseSensitive: false),
+        enableFilter: true,
+        useLegacyTextFilter: true,
       );
 
       final item = HotVideoItemModel.fromJson({
@@ -649,43 +680,42 @@ void main() {
         'stat': {'view': 10, 'like': 0, 'danmaku': 1},
       });
 
-      expect(RecommendFilter.filter(item), isFalse);
-      expect(RecommendFilter.filterTitle(item.title), isFalse);
-      expect(RecommendFilter.filterLikeRatio(0, 10), isFalse);
+      expect(RecommendationFilter.filter(ruleSet, config, item), isFalse);
+      expect(
+        RecommendationFilter.filterTitle(ruleSet, config, item.title),
+        isFalse,
+      );
+      expect(
+        RecommendationFilter.filterLikeRatio(ruleSet, config, 0, 10),
+        isFalse,
+      );
     });
 
     test(
       'legacy title keyword path is disabled after merge into shielding',
       () {
-        addTearDown(() {
-          RecommendFilter.rcmdRegExp = RegExp('', caseSensitive: false);
-          RecommendFilter.enableFilter = false;
-          RecommendFilter.useLegacyTextFilter = false;
-          RecommendFilter.shieldRuleSetProvider = null;
-        });
+        final config = RecommendationFilterConfig(
+          rcmdRegExp: RegExp('剧透', caseSensitive: false),
+          enableFilter: true,
+        );
 
-        RecommendFilter.rcmdRegExp = RegExp('剧透', caseSensitive: false);
-        RecommendFilter.enableFilter = true;
-        RecommendFilter.shieldRuleSetProvider = () => ShieldRuleSet();
-
-        expect(RecommendFilter.filterTitle('剧透短视频'), isFalse);
+        expect(
+          RecommendationFilter.filterTitle(
+            ShieldRuleSet(),
+            config,
+            '剧透短视频',
+          ),
+          isFalse,
+        );
       },
     );
 
     test('legacy numeric recommendation filters stay active', () {
-      addTearDown(() {
-        RecommendFilter.minDurationForRcmd = 0;
-        RecommendFilter.minPlayForRcmd = 0;
-        RecommendFilter.minLikeRatioForRecommend = 0;
-        RecommendFilter.exemptFilterForFollowed = false;
-        RecommendFilter.applyFilterToRelatedVideos = false;
-        RecommendFilter.shieldRuleSetProvider = null;
-      });
-
-      RecommendFilter.minDurationForRcmd = 120;
-      RecommendFilter.minPlayForRcmd = 1000;
-      RecommendFilter.minLikeRatioForRecommend = 10;
-      RecommendFilter.shieldRuleSetProvider = () => ShieldRuleSet();
+      final config = RecommendationFilterConfig(
+        minDurationForRcmd: 120,
+        minPlayForRcmd: 1000,
+        minLikeRatioForRecommend: 10,
+      );
 
       final item = HotVideoItemModel.fromJson({
         'aid': 1,
@@ -705,7 +735,10 @@ void main() {
         'stat': {'view': 10, 'like': 0, 'danmaku': 1},
       });
 
-      expect(RecommendFilter.filter(item), isTrue);
+      expect(
+        RecommendationFilter.filter(ShieldRuleSet(), config, item),
+        isTrue,
+      );
     });
 
     test('direct reply target lookup runs before comment shielding', () {

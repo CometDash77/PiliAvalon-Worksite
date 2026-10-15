@@ -100,6 +100,9 @@ abstract final class SearchHttp {
         dynamic data;
         try {
           switch (searchType) {
+            case SearchType.all:
+              data = SearchVideoData.fromSearchAll(dataData);
+              break;
             case SearchType.video:
               data = SearchVideoData.fromJson(dataData);
               break;

@@ -16,6 +16,8 @@ enum ShieldRuleType {
   publishTime,
   isUpowerExclusive,
   staffKeyword,
+  // feature-specific stable live room identity (see map #69)
+  roomId,
 }
 
 enum ShieldMatchMode {
@@ -248,9 +250,11 @@ class ShieldCandidate {
     this.uid,
     this.authorName,
     this.authorTokens = const [],
+    this.authorTokensProvider,
     this.category,
     this.tags = const [],
     this.tokens = const [],
+    this.tokensProvider,
     this.avatarPendantValues = const [],
     this.garbValues = const [],
     this.durationSeconds,
@@ -262,6 +266,7 @@ class ShieldCandidate {
     this.pubdate,
     this.staffNames = const [],
     this.isUpowerExclusive,
+    this.roomId,
   });
 
   final ShieldScope scope;
@@ -273,7 +278,19 @@ class ShieldCandidate {
   final List<String> authorTokens;
   final String? category;
   final List<String> tags;
+
+  /// Tokens consumed by [ShieldMatchMode.token] rules.
+  ///
+  /// Adapters whose token split is not cheap to build eagerly can leave this
+  /// empty and hand over [tokensProvider] instead; the matcher only calls the
+  /// provider when a token rule actually needs the tokens, and only once per
+  /// candidate. A non-empty [tokens] still wins over the provider, and an empty
+  /// provider result falls back to splitting the raw values, exactly like an
+  /// empty [tokens] list does.
   final List<String> tokens;
+
+  /// Lazy source of [tokens]; see [tokens].
+  final Iterable<String> Function()? tokensProvider;
   final List<String> avatarPendantValues;
   final List<String> garbValues;
   final num? durationSeconds;
@@ -281,11 +298,15 @@ class ShieldCandidate {
   final num? danmakuCount;
   final String? commentMemberSex;
   final num? commentMemberLevel;
+  /// Lazy source of [authorTokens]; same contract as [tokensProvider].
+  final Iterable<String> Function()? authorTokensProvider;
   // task-066 detail-introduction candidate metadata
   final String? description;
   final int? pubdate;
   final List<String> staffNames;
   final bool? isUpowerExclusive;
+  // feature-specific stable live room identity (see map #69)
+  final String? roomId;
 }
 
 class ShieldMatchResult {

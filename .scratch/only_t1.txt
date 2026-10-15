@@ -1,0 +1,5 @@
+﻿00:00 +0: loading D:/Documents/vibe/PiliAvalon-Worksite/test/features/zen_mode/home_zen_layout_test.dart
+00:00 +0: (setUpAll)
+00:00 +0: zen home top bar widgets toggle always visible; normal-state tap enters and exits zen (#97)
+00:01 +1: (tearDownAll)
+00:01 +1: All tests passed!
