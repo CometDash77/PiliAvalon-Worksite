@@ -588,7 +588,7 @@ void main() {
       messages: <String>[],
     );
 
-    expect(find.text('当前模式：Decision'), findsOneWidget);
+    expect(find.text('当前模式：Decision 判断'), findsOneWidget);
     expect(find.text('甲主题'), findsOneWidget);
     expect(find.text('乙主题'), findsOneWidget);
 

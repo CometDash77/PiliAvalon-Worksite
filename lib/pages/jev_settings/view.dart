@@ -526,7 +526,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         title: Text(_modeLabel(mode)),
         subtitle: Text(_modeDescription(mode)),
         value: mode,
-        groupValue: _mode,
+        groupValue: _needsModeChoice ? null : _mode,
         onChanged: _modeBusy ? null : (value) => value == null ? null : _saveMode(value),
       ),
     custom.ListTile(
