@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:PiliPlus/features/jev/jev_settings.dart';
+
 import 'package:PiliPlus/features/jev/jev_contract.dart';
 import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/jev/jev_screen_log.dart';
@@ -63,11 +65,8 @@ class LlmCommentResult {
   final bool cacheable;
 }
 
-/// Generic-line COMMENT pipeline (spec 3): Jev runs first, this pass sees
-/// only the survivors. Serial batches of [JevLimits.batchSize] candidates,
-/// one request per batch, no retries; a failed batch fails open; the page
-/// budget arrives via [filter]'s [timeout], tightened by the controller
-/// that runs both lines. Mid-pass policy drift voids the whole page.
+/// LLM comment pipeline: runs only in global LLM mode, after deterministic
+/// filters. Serial batches, no fallback; stale mode results fail open.
 class LlmCommentScreening {
   LlmCommentScreening({
     LlmChatClient? client,
@@ -75,7 +74,7 @@ class LlmCommentScreening {
     LlmCredentialStore? credentials,
     JevRuleStore? rules,
     LlmVerdictCache? cache,
-  }) : _client = client ?? LlmChatClient(),
+  }) : _client = client ?? LlmChatClient(settings: settings, credentials: credentials),
        _settings = settings ?? LlmSettingsStore(),
        _credentials = credentials ?? SecureLlmCredentialStore(),
        _rules = rules ?? JevRuleStore(),
@@ -83,6 +82,7 @@ class LlmCommentScreening {
 
   final LlmChatClient _client;
   final LlmSettingsStore _settings;
+  ScreeningModeStore get modes => _settings.modes;
   final LlmCredentialStore _credentials;
   final JevRuleStore _rules;
   final LlmVerdictCache _cache;
@@ -95,6 +95,10 @@ class LlmCommentScreening {
   /// rules remain the single comment config source, #113).
   Future<bool> isEnabled() async {
     try {
+      final mode = await modes.load();
+      if (mode.mode != ScreeningEngineMode.llm || !mode.isCurrent) return false;
+      if (!(await JevSettingsStore(box: _settings.box).load())
+          .isSurfaceEnabled(JevSurface.comment)) return false;
       final views = await _commentViews();
       if (views.isEmpty) return false;
       await _resolve(settings: _settings, credentials: _credentials);
@@ -118,6 +122,10 @@ class LlmCommentScreening {
     Duration? timeout,
     bool screenLog = true,
   }) async {
+    final mode = await modes.load();
+    if (mode.mode != ScreeningEngineMode.llm || !mode.isCurrent) {
+      return LlmCommentResult(replies: replies, cacheable: false);
+    }
     final budget = timeout == null || timeout >= LlmLimits.requestTimeout
         ? LlmLimits.requestTimeout
         : timeout;
@@ -134,6 +142,10 @@ class LlmCommentScreening {
     var expired = false;
     var initialFingerprint = '';
     try {
+      if (!(await JevSettingsStore(box: _settings.box).load())
+          .isSurfaceEnabled(JevSurface.comment)) {
+        return LlmCommentResult(replies: replies, cacheable: false);
+      }
       final views = await _commentViews();
       if (views.isEmpty || replies.isEmpty) {
         return LlmCommentResult(replies: replies, cacheable: cacheable);
@@ -167,7 +179,7 @@ class LlmCommentScreening {
       // Definite cached verdicts answer without the upstream (spec 5).
       final resolved = List<bool>.filled(replies.length, false);
       final cacheOn = _cache.enabled;
-      final generation = initialFingerprint;
+      final generation = '${mode.generation}|$initialFingerprint';
       if (cacheOn) {
         for (final i in sent) {
           final identity = _commentIdentity(replies[i]);
@@ -189,7 +201,7 @@ class LlmCommentScreening {
       ) {
         final end = math.min(start + JevLimits.batchSize, pending.length);
         final batch = pending.sublist(start, end);
-        if (watch.elapsed >= budget) {
+        if (!mode.isCurrent || watch.elapsed >= budget) {
           expired = true;
           cacheable = false;
           break;
@@ -222,6 +234,7 @@ class LlmCommentScreening {
           final remaining = budget - watch.elapsed;
           final outcome = await _client
               .call(
+                isCurrent: () => mode.isCurrent,
                 system: llmSystemPrompt,
                 user: LlmPrompt.commentUserMessage(
                   rules: views,
@@ -230,6 +243,7 @@ class LlmCommentScreening {
                 timeout: remaining,
               )
               .timeout(remaining);
+          if (!mode.isCurrent) break;
           if (!outcome.ok) {
             failure ??= 'upstream';
             cacheable = false;
@@ -296,7 +310,9 @@ class LlmCommentScreening {
         final views = LlmCommentRuleView.of(
           ruleConfig.activeFor(JevRuleTarget.comment),
         );
-        if (initialFingerprint != _fingerprint(config, views)) {
+        final settings = await JevSettingsStore(box: _settings.box).load().timeout(remaining);
+        if (!settings.isSurfaceEnabled(JevSurface.comment) ||
+            initialFingerprint != _fingerprint(config, views)) {
           // Decisions compiled under a stale policy are void.
           failure ??= 'drift';
           _recordPassFailure(
@@ -307,8 +323,11 @@ class LlmCommentScreening {
           return LlmCommentResult(replies: replies, cacheable: false);
         }
       } catch (_) {
-        cacheable = false;
+        return LlmCommentResult(replies: replies, cacheable: false);
       }
+    }
+    if (!mode.isCurrent) {
+      return LlmCommentResult(replies: replies, cacheable: false);
     }
     final now = DateTime.now().millisecondsSinceEpoch;
     final blocked = <JevScreenLogEntry>[];
@@ -449,8 +468,8 @@ class LlmVideoScreenOutcome {
   final int elapsedMs;
 }
 
-/// Generic-line VIDEO pipeline (spec 3): runs after the Jev evaluation on
-/// the unhit survivors. One request per candidate, no retries; a failed
+/// LLM video pipeline: runs only in global LLM mode.
+/// One request per candidate, no retries or fallback; a failed
 /// item fails open. Returns an [LlmVideoScreenOutcome] and never throws.
 class LlmVideoScreening {
   LlmVideoScreening({
@@ -459,7 +478,7 @@ class LlmVideoScreening {
     LlmCredentialStore? credentials,
     JevRuleStore? rules,
     LlmVerdictCache? cache,
-  }) : _client = client ?? LlmChatClient(),
+  }) : _client = client ?? LlmChatClient(settings: settings, credentials: credentials),
        _settings = settings ?? LlmSettingsStore(),
        _credentials = credentials ?? SecureLlmCredentialStore(),
        _rules = rules ?? JevRuleStore(),
@@ -471,6 +490,7 @@ class LlmVideoScreening {
   // one blob, so switching backends never re-asks for the same rule.
   final JevRuleStore _rules;
   final LlmSettingsStore _settings;
+  ScreeningModeStore get modes => _settings.modes;
   final LlmCredentialStore _credentials;
   final LlmVerdictCache _cache;
 
@@ -485,6 +505,8 @@ class LlmVideoScreening {
   /// Whether the generic video line would run at all.
   Future<bool> isEnabled() async {
     try {
+      final mode = await modes.load();
+      if (mode.mode != ScreeningEngineMode.llm || !mode.isCurrent) return false;
       await _migrateRules();
       final rules = (await _rules.load()).activeVideoTextRules();
       if (rules.isEmpty) return false;
@@ -504,7 +526,8 @@ class LlmVideoScreening {
     Duration? timeout,
   }) async {
     final hidden = List<bool>.filled(candidates.length, false);
-    if (candidates.isEmpty) {
+    final mode = await modes.load();
+    if (mode.mode != ScreeningEngineMode.llm || !mode.isCurrent || candidates.isEmpty) {
       return LlmVideoScreenOutcome(hidden: hidden);
     }
     final budget = timeout == null || timeout >= LlmLimits.requestTimeout
@@ -542,6 +565,7 @@ class LlmVideoScreening {
       );
       modelId = context.config.model;
       final fingerprint = _fingerprint(context.config, rules);
+      final generation = '${mode.generation}|$fingerprint';
       final knownIds = {for (final rule in rules) rule.id};
       final cacheOn = _cache.enabled;
       final pendingCache = <String, bool>{};
@@ -550,19 +574,20 @@ class LlmVideoScreening {
         for (var i = 0; i < candidates.length; i++) {
           final identity = _videoIdentity(candidates[i]);
           if (identity == null) continue;
-          final cached = _cache.lookup(fingerprint, identity);
+          final cached = _cache.lookup(generation, identity);
           if (cached == null) continue;
           resolved[i] = true;
           if (cached) hidden[i] = true;
         }
       }
       for (var i = 0; i < candidates.length; i++) {
+        if (!mode.isCurrent) return done(List<bool>.filled(candidates.length, false));
         if (resolved[i]) continue;
         final candidate = candidates[i];
         final title = candidate.title.trim();
         // Empty titles carry no semantic to judge; fail open, do not cache.
         if (title.isEmpty) continue;
-        if (watch.elapsed >= budget) {
+        if (!mode.isCurrent || watch.elapsed >= budget) {
           // Over budget: no further verdict may be applied or cached.
           return done(
             List<bool>.filled(candidates.length, false),
@@ -574,6 +599,7 @@ class LlmVideoScreening {
           final remaining = budget - watch.elapsed;
           final outcome = await _client
               .call(
+                isCurrent: () => mode.isCurrent,
                 system: llmVideoSystemPrompt,
                 user: LlmPrompt.videoUserMessage(
                   rules: rules,
@@ -584,6 +610,7 @@ class LlmVideoScreening {
                 timeout: remaining,
               )
               .timeout(remaining);
+          if (!mode.isCurrent) break;
           if (!outcome.ok) {
             failure ??= 'upstream';
             continue;
@@ -610,6 +637,7 @@ class LlmVideoScreening {
           failure ??= e is TimeoutException ? 'timeout' : 'upstream';
         }
       }
+      if (!mode.isCurrent) return done(List<bool>.filled(candidates.length, false));
       // Mid-pass policy drift voids the whole pass (Jev precedent).
       final remaining = budget - watch.elapsed;
       if (remaining <= Duration.zero) {
@@ -629,8 +657,9 @@ class LlmVideoScreening {
           failure: failure ?? 'drift',
         );
       }
+      if (!mode.isCurrent) return done(List<bool>.filled(candidates.length, false));
       for (final entry in pendingCache.entries) {
-        _cache.put(fingerprint, entry.key, hide: entry.value);
+        _cache.put(generation, entry.key, hide: entry.value);
       }
       return done(
         hidden,

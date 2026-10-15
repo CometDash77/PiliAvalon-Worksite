@@ -109,11 +109,6 @@ abstract final class JevLimits {
 
   static const Duration requestTimeout = Duration(seconds: 8);
 
-  /// Dual-line page budget for the Jev line (issue #113): when the
-  /// generic LLM line also runs, Jev gets at most this slice of the
-  /// shared 8s page budget; the remainder goes to the generic line.
-  static const Duration dualShare = Duration(seconds: 4);
-
   /// Batches are serialised: at most one Jev request is in flight.
   static const int maxConcurrentRequests = 1;
 

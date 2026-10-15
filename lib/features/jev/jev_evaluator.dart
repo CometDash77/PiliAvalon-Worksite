@@ -229,13 +229,10 @@ class JevEvaluator {
   final JevRuleStore _rules;
   final JevVerdictCache _verdictCache;
 
-  /// 设置存储出口：终审屏借它的 box 落全局模式键（issue #142），
-  /// 保证模式键与评测器设置同库、测试可整链注入。
   JevSettingsStore get settings => _settings;
+  ScreeningModeStore get modes => _settings.modes;
 
-  /// Screens [candidates] for [surface]. When [passTimeout] is set (dual-
-  /// input; callers drop the hidden entries before render and before
-  /// exposure recording.
+  /// Screens candidates with Decision only; mode changes void this pass.
   Future<JevScreening> screen(
     List<JevCandidate> candidates, {
     required JevSurface surface,
@@ -250,8 +247,10 @@ class JevEvaluator {
     final hidden = List<bool>.filled(candidates.length, false);
     final decisions = List<JevScreenDecision?>.filled(candidates.length, null);
 
+    final mode = await modes.load();
     final settings = await _settings.load();
-    if (!settings.isSurfaceEnabled(surface)) {
+    if (mode.mode != ScreeningEngineMode.decision ||
+        !mode.isCurrent || !settings.isSurfaceEnabled(surface)) {
       return JevScreening(status: JevScreenStatus.disabled, hidden: hidden);
     }
     // The confirmation latch is part of the routing rule (issue #38): an
@@ -297,16 +296,15 @@ class JevEvaluator {
     // of scope this round (issue #124); a config-read failure keeps today's
     // behavior (no cache).
     final cacheEnabled = _cacheEnabled(surface);
-    final generation = cacheEnabled
-        ? _generationKey(
-            provider: provider,
-            model: settings.modelFor(provider),
-            builtin: builtin,
-            activeRules: activeRules,
-            state: state,
-            surface: surface,
-          )
-        : null;
+    final policy = _generationKey(
+      provider: provider,
+      model: settings.modelFor(provider),
+      builtin: builtin,
+      activeRules: activeRules,
+      state: state,
+      surface: surface,
+    );
+    final generation = cacheEnabled ? '${mode.generation}|$policy' : null;
 
     // Cache identity per slot; served slots are answered locally.
     final identities = List<String?>.filled(candidates.length, null);
@@ -382,6 +380,10 @@ class JevEvaluator {
     var requests = 0;
     final watch = passTimeout == null ? null : (Stopwatch()..start());
     for (var start = 0; start < groups.length; start += JevLimits.batchSize) {
+      if (!mode.isCurrent) {
+        _completeChunk(groups.sublist(start));
+        break;
+      }
       final end = math.min(start + JevLimits.batchSize, groups.length);
       final chunk = groups.sublist(start, end);
       final remaining = watch == null ? null : passTimeout! - watch.elapsed;
@@ -430,6 +432,10 @@ class JevEvaluator {
             ? await transportFuture
             // Late answers cannot alter the output (snapshot semantics).
             : await transportFuture.timeout(remaining);
+        if (!mode.isCurrent) {
+          _completeChunk(groups.sublist(start));
+          break;
+        }
         if (data is! Map || data['answers'] is! Map) {
           _completeChunk(chunk);
           continue;
@@ -494,6 +500,33 @@ class JevEvaluator {
       }
     }
 
+    var policyCurrent = false;
+    try {
+      final current = await _settings.load();
+      final currentRules = await _rules.load();
+      final currentBuiltin = currentRules.builtinEnabled(target);
+      policyCurrent = current.isSurfaceEnabled(surface) &&
+          current.provider == provider && current.providerConfirmed &&
+          policy == _generationKey(
+            provider: provider,
+            model: current.modelFor(provider),
+            builtin: currentBuiltin,
+            activeRules: currentRules.activeFor(target),
+            state: currentBuiltin
+                ? (await _preferences.load()).statePayload()
+                : <String, Object?>{},
+            surface: surface,
+          );
+    } catch (_) {
+      // Unreadable policy cannot validate an old verdict: fail open.
+    }
+    if (!mode.isCurrent || !policyCurrent) {
+      return JevScreening(
+        status: JevScreenStatus.disabled,
+        hidden: List<bool>.filled(candidates.length, false),
+        requests: requests,
+      );
+    }
     return JevScreening(
       status: answeredSlots > 0
           ? JevScreenStatus.evaluated

@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:PiliPlus/features/jev/jev_comment_screening.dart';
+import 'package:PiliPlus/features/jev/jev_comment_migration.dart';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,7 +10,7 @@ import 'package:PiliPlus/features/jev/jev_credential_store.dart'
 import 'package:PiliPlus/features/jev/jev_contract.dart' show JevSurface;
 import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/jev/jev_screen_log.dart';
-import 'package:PiliPlus/features/jev/jev_settings.dart' show JevSettingsBox;
+import 'package:PiliPlus/features/jev/jev_settings.dart';
 import 'package:PiliPlus/features/llm/llm.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
@@ -87,6 +90,9 @@ ReplyInfo reply(String text, {int id = 1}) => ReplyInfo(
 
 Future<_FakeBox> _readyBox() async {
   final box = _FakeBox();
+  await JevSettingsStore(box: box).save(const JevSettings(
+    mode: ScreeningEngineMode.llm, surfaces: {JevSurface.comment, JevSurface.hot},
+  ));
   await LlmSettingsStore(box: box).save(
     const LlmProviderConfig(
       protocol: LlmProtocol.openAICompatible,
@@ -161,6 +167,55 @@ void main() {
     JevScreenLog.instance = JevScreenLog(box: _LogBox());
   });
 
+  test('shared comment route uses LLM only and discards stale replies', () async {
+    final box = await _readyBox();
+    final entered = Completer<void>();
+    final response = Completer<Object?>();
+    final stub = _Stub((_, _, _) {
+      entered.complete();
+      return response.future;
+    });
+    var decisionCalls = 0;
+    final shared = JevCommentScreening(
+      settings: JevSettingsStore(box: box), rules: JevRuleStore(box: box),
+      llmScreening: _screening(box, stub),
+      transport: ({required provider, required apiKey, required body}) async {
+        decisionCalls++;
+        return null;
+      },
+    );
+    expect(await shared.isEnabled(), isTrue);
+    final replies = [reply('垃圾评论')];
+    final pending = shared.filter(replies, screenLog: false);
+    await entered.future;
+    await shared.modes.save(ScreeningEngineMode.off);
+    response.complete(_openaiOk(_llmJson([{'rule_id': 'c1_r1', 'reason': 'hit'}])));
+    expect((await pending).replies, replies);
+    expect(await shared.isEnabled(), isFalse);
+    expect((await shared.filter(replies)).replies, replies);
+    expect(decisionCalls, 0);
+    expect(stub.calls, hasLength(1));
+  });
+
+  test('LLM-first comments migrate retired criteria and surface before screening', () async {
+    final box = await _readyBox();
+    await JevRuleStore(box: box).save(const JevRuleConfig());
+    box.map.remove(JevSettingsStore.surfaceKey(JevSurface.comment));
+    box.map[JevSettingsStore.commentEnabledKey] = true;
+    box.map[JevSettingsStore.commentCriteriaKey] = '隐藏旧规则广告';
+    JevCommentCriteriaMigration.resetForTest();
+    final stub = _Stub((_, _, _) async => _openaiOk(_llmJson([])));
+    final shared = JevCommentScreening(
+      settings: JevSettingsStore(box: box), rules: JevRuleStore(box: box),
+      llmScreening: _screening(box, stub),
+    );
+    await shared.filter([reply('a')], screenLog: false);
+    expect(stub.calls, hasLength(1));
+    expect(_userOf(stub.calls.single), contains('隐藏旧规则广告'));
+    expect(box.map.containsKey(JevSettingsStore.commentCriteriaKey), isFalse);
+    expect((await shared.modes.load()).mode, ScreeningEngineMode.llm);
+  });
+
   test('no active comment rules: nothing is sent', () async {
     final box = _FakeBox();
     await LlmSettingsStore(box: box).save(
@@ -179,6 +234,23 @@ void main() {
     expect(result.replies.map((r) => r.content.message).toList(), ['a', 'b']);
     expect(stub.calls, isEmpty);
   });
+
+  for (final change in ['last rule removed', 'surface disabled']) {
+    test('comment late hit is discarded after $change', () async {
+      final box = await _readyBox();
+      final stub = _Stub((_, _, _) async {
+        if (change == 'last rule removed') {
+          await JevRuleStore(box: box).save(const JevRuleConfig());
+        } else {
+          await box.put(JevSettingsStore.surfaceKey(JevSurface.comment), false);
+        }
+        return _openaiOk(_llmJson([{'rule_id': 'candidate_1:r1', 'reason': 'hit'}]));
+      });
+      final input = [reply('comment')];
+      expect((await _screening(box, stub).filter(input, screenLog: false)).replies, input);
+      expect(stub.calls, hasLength(1));
+    });
+  }
 
   test('a hit hides only the matching candidate', () async {
     final box = await _readyBox();

@@ -1,21 +1,24 @@
 import 'package:PiliPlus/features/jev/jev_contract.dart';
+import 'package:PiliPlus/features/jev/screening_mode.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:flutter/foundation.dart' show immutable, setEquals, mapEquals;
 
 // Issue #144: JevSettingsBox itself moved to the pure-interface
 // jev_contract.dart; re-exported here so existing importers are unaffected.
 export 'package:PiliPlus/features/jev/jev_contract.dart' show JevSettingsBox;
+export 'package:PiliPlus/features/jev/screening_mode.dart';
 
 /// Persisted, non-secret Jev configuration (issues #32/#35).
 @immutable
 class JevSettings {
   const JevSettings({
-    this.enabled = false,
+    bool enabled = false,
+    ScreeningEngineMode? mode,
     this.provider,
     this.surfaces = const <JevSurface>{},
     this.providerConfirmed = false,
     this.modelOverrides = const <JevProvider, String>{},
-  });
+  }) : mode = mode ?? (enabled ? ScreeningEngineMode.decision : ScreeningEngineMode.off);
 
   final Map<JevProvider, String> modelOverrides;
 
@@ -39,7 +42,8 @@ class JevSettings {
   static const JevSettings disabled = JevSettings();
 
   /// Master switch; off means no collection and no evaluation.
-  final bool enabled;
+  final ScreeningEngineMode mode;
+  bool get enabled => mode != ScreeningEngineMode.off;
 
   /// Explicit provider choice. The credential itself lives in the credential
   /// store and never here.
@@ -60,12 +64,14 @@ class JevSettings {
 
   JevSettings copyWith({
     bool? enabled,
+    ScreeningEngineMode? mode,
     JevProvider? provider,
     Set<JevSurface>? surfaces,
     bool? providerConfirmed,
     Map<JevProvider, String>? modelOverrides,
   }) => JevSettings(
-    enabled: enabled ?? this.enabled,
+    mode: mode ?? (enabled == null ? this.mode :
+        enabled ? ScreeningEngineMode.decision : ScreeningEngineMode.off),
     provider: provider ?? this.provider,
     surfaces: surfaces ?? this.surfaces,
     providerConfirmed: providerConfirmed ?? this.providerConfirmed,
@@ -84,7 +90,7 @@ class JevSettings {
 
   /// Drops the provider choice and the confirmation latch of the stored key.
   JevSettings withoutProvider() => JevSettings(
-    enabled: enabled,
+    mode: mode,
     surfaces: surfaces,
     modelOverrides: modelOverrides,
   );
@@ -92,7 +98,7 @@ class JevSettings {
   @override
   bool operator ==(Object other) =>
       other is JevSettings &&
-      other.enabled == enabled &&
+      other.mode == mode &&
       other.provider == provider &&
       other.providerConfirmed == providerConfirmed &&
       setEquals(other.surfaces, surfaces) &&
@@ -100,7 +106,7 @@ class JevSettings {
 
   @override
   int get hashCode => Object.hash(
-    enabled,
+    mode,
     provider,
     providerConfirmed,
     Object.hashAllUnordered(surfaces),
@@ -188,7 +194,10 @@ class JevSettingsStore {
   /// Drops the cached snapshot (used when a settings export is restored).
   static void resetCache() => _cache = null;
 
+  ScreeningModeStore get modes => ScreeningModeStore(box: _box);
+
   Future<JevSettings> load() async {
+    final mode = await modes.load();
     final surfaces = <JevSurface>{};
     for (final surface in JevSurface.values) {
       if (_flag(_box.get(surfaceKey(surface), defaultValue: false))) {
@@ -206,7 +215,7 @@ class JevSettingsStore {
     }
     final settings = JevSettings(
       modelOverrides: Map.unmodifiable(models),
-      enabled: _flag(_box.get(enabledKey, defaultValue: false)),
+      mode: mode.mode,
       provider: provider,
       surfaces: surfaces,
       providerConfirmed:
@@ -217,7 +226,12 @@ class JevSettingsStore {
     return settings;
   }
 
-  Future<void> save(JevSettings settings) async {
+  Future<void> save(JevSettings settings, {bool saveMode = true}) async {
+    // Config edits must not erase an unknown/future mode or migration notice.
+    final rawMode = _box.get(ScreeningModeStore.key);
+    if (saveMode && (rawMode == null || ScreeningEngineMode.values.any((m) => m.name == rawMode))) {
+      if (rawMode != settings.mode.name) await modes.save(settings.mode);
+    }
     await _box.put(enabledKey, settings.enabled);
     final provider = settings.provider;
     if (provider == null) {

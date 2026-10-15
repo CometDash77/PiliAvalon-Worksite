@@ -1,5 +1,5 @@
 import 'package:PiliPlus/features/jev/jev_settings.dart'
-    show HiveJevSettingsBox, JevSettingsBox;
+    show HiveJevSettingsBox, JevSettingsBox, ScreeningModeStore;
 import 'package:PiliPlus/features/llm/llm_contract.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:flutter/foundation.dart' show immutable;
@@ -171,6 +171,9 @@ class LlmSettingsStore {
   JevSettingsBox? _lazyBox;
   JevSettingsBox get _box =>
       _lazyBox ??= _boxOrNull ?? HiveJevSettingsBox(GStorage.setting);
+
+  JevSettingsBox get box => _box;
+  ScreeningModeStore get modes => ScreeningModeStore(box: _boxOrNull);
 
   static const String namespace = 'piliavalon.llm.v1';
   static const String protocolKey = 'piliavalon.llm.v1.protocol';

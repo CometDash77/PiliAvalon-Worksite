@@ -7,8 +7,8 @@ import 'package:PiliPlus/features/llm/llm_settings.dart';
 import 'package:dio/dio.dart';
 
 // Why one generic-line chat call could not produce a usable verdict (spec 4).
-// Every kind fails open upstream: the affected content stays visible, the
-// other line's hits stand, and nothing enters the verdict cache.
+// Every kind fails open upstream: affected content stays visible and
+// no failed verdict enters the cache or triggers another backend.
 enum LlmChatFailureKind {
   config, // provider config incomplete or not confirmed
   credential, // key missing or the OS credential store failed
@@ -68,6 +68,7 @@ class LlmChatClient {
     required String system,
     required String user,
     Duration? timeout,
+    bool Function()? isCurrent,
   }) async {
     final config = await _settings.load();
     if (config.issues.isNotEmpty ||
@@ -86,6 +87,9 @@ class LlmChatClient {
       return const LlmChatOutcome.failed(LlmChatFailureKind.credential, null);
     }
     try {
+      if (isCurrent != null && !isCurrent()) {
+        return const LlmChatOutcome.failed(LlmChatFailureKind.cancelled, null);
+      }
       final data = await _transport(
         endpoint: config.chatEndpoint!,
         headers: <String, String>{

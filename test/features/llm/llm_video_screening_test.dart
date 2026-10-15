@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:PiliPlus/features/jev/jev_credential_store.dart'
     show JevKeyStoreStatus;
 import 'package:PiliPlus/features/jev/jev_rules.dart';
-import 'package:PiliPlus/features/jev/jev_settings.dart' show JevSettingsBox;
+import 'package:PiliPlus/features/jev/jev_evaluator.dart';
+import 'package:PiliPlus/features/jev/jev_final_screen.dart';
+import 'package:PiliPlus/features/jev/jev_settings.dart';
+import 'package:PiliPlus/features/jev/jev_contract.dart' show JevSurface;
 import 'package:PiliPlus/features/llm/llm.dart';
 
 class _FakeBox implements JevSettingsBox {
@@ -76,6 +80,9 @@ class _Stub {
 
 Future<_FakeBox> _confirmedBox() async {
   final box = _FakeBox();
+  await JevSettingsStore(box: box).save(const JevSettings(
+    mode: ScreeningEngineMode.llm, surfaces: {JevSurface.comment, JevSurface.hot},
+  ));
   await LlmSettingsStore(box: box).save(
     const LlmProviderConfig(
       protocol: LlmProtocol.openAICompatible,
@@ -130,6 +137,74 @@ String _userOf(_Call call) =>
 
 void main() {
   setUp(LlmVerdictCache.resetCache);
+
+  test('global Off sends zero LLM requests despite saved ready config', () async {
+    final box = await _readyBox();
+    await box.put('piliavalon.screening.v1.mode', 'off');
+    final stub = _Stub((_, _, _) async => _openaiOk(_llmJson([])));
+    final result = await _screening(box, stub).screen([
+      const LlmVideoCandidate(title: '第一话', identity: 'BV1'),
+    ]);
+    expect(result.hidden, [false]);
+    expect(stub.calls, isEmpty);
+  });
+
+  test('Decision sends zero LLM requests', () async {
+    final box = await _readyBox();
+    await ScreeningModeStore(box: box).save(ScreeningEngineMode.decision);
+    final stub = _Stub((_, _, _) async => _openaiOk(_llmJson([])));
+    expect((await _screening(box, stub).screen([
+      const LlmVideoCandidate(title: 'x'),
+    ])).hidden, [false]);
+    expect(stub.calls, isEmpty);
+  });
+
+  test('LLM switch invalidates pending hits, cache and following requests', () async {
+    final box = await _readyBox();
+    final entered = Completer<void>();
+    final response = Completer<Object?>();
+    final stub = _Stub((_, _, _) {
+      entered.complete();
+      return response.future;
+    });
+    final screening = _screening(box, stub);
+    final pending = screening.screen([
+      const LlmVideoCandidate(title: 'first', identity: 'BV1'),
+      const LlmVideoCandidate(title: 'second', identity: 'BV2'),
+    ]);
+    await entered.future;
+    await screening.modes.save(ScreeningEngineMode.off);
+    await screening.modes.save(ScreeningEngineMode.llm);
+    response.complete(_openaiOk(_llmJson([{'rule_id': 'v1', 'reason': 'hit'}])));
+    expect((await pending).hidden, [false, false]);
+    expect(stub.calls, hasLength(1));
+    final fresh = _Stub((_, _, _) async => _openaiOk(_llmJson([])));
+    expect((await _screening(box, fresh).screen([
+      const LlmVideoCandidate(title: 'first', identity: 'BV1'),
+    ])).hidden, [false]);
+    expect(fresh.calls, hasLength(1));
+  });
+
+  for (final change in ['last rule removed', 'surface disabled']) {
+    test('video late hit is discarded after $change', () async {
+      final box = await _readyBox();
+      final stub = _Stub((_, _, _) async {
+        if (change == 'last rule removed') {
+          await JevRuleStore(box: box).save(const JevRuleConfig());
+        } else {
+          await box.put(JevSettingsStore.surfaceKey(JevSurface.hot), false);
+        }
+        return _openaiOk(_llmJson([{'rule_id': 'v1', 'reason': 'hit'}]));
+      });
+      final screen = JevFinalScreen<String>(
+        surface: JevSurface.hot, toCandidate: (title) => JevCandidate(title: title),
+        evaluator: JevEvaluator(settings: JevSettingsStore(box: box)),
+        videoScreening: _screening(box, stub),
+      );
+      expect(await screen.screen(['video']), ['video']);
+      expect(stub.calls, hasLength(1));
+    });
+  }
 
   test('a hit hides the candidate and quotes title and rule text', () async {
     final box = await _readyBox();

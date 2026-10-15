@@ -22,15 +22,80 @@ class _MemoryBox implements JevSettingsBox {
 void main() {
   setUp(JevSettingsStore.resetCache);
 
-  test('defaults to fully disabled', () async {
+  test('defaults to Decision with no configured surfaces', () async {
     final settings = await JevSettingsStore(box: _MemoryBox()).load();
-    expect(settings.enabled, isFalse);
+    expect(settings.mode, ScreeningEngineMode.decision);
     expect(settings.provider, isNull);
     expect(settings.providerConfirmed, isFalse);
     expect(settings.surfaces, isEmpty);
     for (final surface in JevSurface.values) {
       expect(settings.isSurfaceEnabled(surface), isFalse);
     }
+  });
+
+  test('legacy migration preserves config and requires an explicit LLM choice', () async {
+    for (final enabled in [true, false]) {
+      for (final llmKey in [null, 'piliavalon.llm.v1.model', 'piliavalon.llm.v2.accounts']) {
+        final box = _MemoryBox();
+        box.values.addAll({
+          JevSettingsStore.enabledKey: enabled,
+          JevSettingsStore.providerKey: 'typesafe',
+          'piliavalon.jev.v1.rules.v1': 'legacy-rule-blob',
+          if (llmKey != null) llmKey: 'saved-config',
+        });
+        final before = Map<String, Object?>.of(box.values);
+        final store = JevSettingsStore(box: box);
+        final first = await store.load();
+        expect(first.mode, llmKey != null || !enabled
+            ? ScreeningEngineMode.off : ScreeningEngineMode.decision);
+        expect(store.modes.needsChoice, llmKey != null);
+        expect(await store.load(), first);
+        for (final entry in before.entries) {
+          expect(box.values[entry.key], entry.value);
+        }
+        // A config save is not an explicit mode choice.
+        await store.save(first.withSurface(JevSurface.hot, value: true));
+        expect(store.modes.needsChoice, llmKey != null);
+        await store.modes.save(ScreeningEngineMode.llm);
+        expect((await store.load()).mode, ScreeningEngineMode.llm);
+        expect(store.modes.needsChoice, isFalse);
+        expect(box.values['piliavalon.jev.v1.rules.v1'], 'legacy-rule-blob');
+      }
+    }
+  });
+
+  test('unknown mode fails open without rewriting future data', () async {
+    final box = _MemoryBox()..values[ScreeningModeStore.key] = 'future-mode';
+    final store = JevSettingsStore(box: box);
+    final settings = await store.load();
+    expect(settings.mode, ScreeningEngineMode.off);
+    await store.save(settings.withSurface(JevSurface.hot, value: true));
+    expect(box.values[ScreeningModeStore.key], 'future-mode');
+    await store.modes.save(ScreeningEngineMode.off);
+    expect(store.modes.needsChoice, isFalse);
+  });
+
+  test('mode switches serialize and invalidate old snapshots even after ABA', () async {
+    final store = ScreeningModeStore(box: _MemoryBox());
+    final before = await store.load();
+    final off = store.save(ScreeningEngineMode.off);
+    expect(before.isCurrent, isFalse);
+    final back = store.save(ScreeningEngineMode.decision);
+    await Future.wait([off, back]);
+    final after = await store.load();
+    expect(after.mode, ScreeningEngineMode.decision);
+    expect(after.isCurrent, isTrue);
+    expect(before.isCurrent, isFalse);
+  });
+
+  test('saving an old configuration draft cannot restore its old mode', () async {
+    final box = _MemoryBox();
+    final store = JevSettingsStore(box: box);
+    final draft = await store.load();
+    await store.modes.save(ScreeningEngineMode.off);
+    await store.save(draft.withSurface(JevSurface.hot, value: true), saveMode: false);
+    expect((await store.load()).mode, ScreeningEngineMode.off);
+    expect((await store.load()).surfaces, contains(JevSurface.hot));
   });
 
   test('round-trips the non-secret configuration', () async {
@@ -123,7 +188,7 @@ void main() {
     );
     expect(box.values, isNotEmpty);
     for (final key in box.values.keys) {
-      expect(key.startsWith(JevSettingsStore.namespace), isTrue, reason: key);
+      expect(key == ScreeningModeStore.key || key.startsWith(JevSettingsStore.namespace), isTrue, reason: key);
     }
     expect(box.values.containsKey('piliavalon.jev.v1.surface.music'), isTrue);
     expect(box.values['piliavalon.jev.v1.surface.music'], isFalse);

@@ -6,7 +6,6 @@ import 'package:PiliPlus/features/llm/llm.dart';
 import 'package:PiliPlus/features/llm/llm_credential_store.dart';
 import 'package:PiliPlus/features/llm/llm_provider_config_store.dart';
 import 'package:PiliPlus/features/llm/llm_provider_presets.dart';
-import 'package:PiliPlus/features/screening/screening_mode.dart';
 import 'package:PiliPlus/pages/jev_settings/view.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart' hide ListTile;
@@ -169,6 +168,7 @@ void main() {
     LlmModelCatalog? llmCatalog,
     LlmHttpProbe? llmProbe,
     LlmProviderConfigStore? llmProviderStore,
+    bool seedMode = true,
     double height = 3200,
     double width = 1400,
   }) async {
@@ -181,7 +181,7 @@ void main() {
             llmProbe != null
         ? ScreeningEngineMode.llm
         : ScreeningEngineMode.decision;
-    await store.box.put(ScreeningModeStore.modeKey, mode.id);
+    if (seedMode) await store.box.put(ScreeningModeStore.key, mode.name);
     await tester.pumpWidget(
       MaterialApp(
         home: JevSettingsPage(
@@ -372,7 +372,7 @@ void main() {
     },
   );
 
-  testWidgets('an unusable secure store keeps Jev off', (tester) async {
+  testWidgets('an unusable secure store preserves the route but sends nothing', (tester) async {
     final box = _MemoryBox();
     box.values[JevSettingsStore.enabledKey] = true;
     final credentials = _FakeCredentialStore(
@@ -399,7 +399,7 @@ void main() {
     );
 
     expect(find.text('系统安全存储不可用，Jev 保持关闭'), findsOneWidget);
-    expect(box.values[JevSettingsStore.enabledKey], isFalse);
+    expect(box.values[ScreeningModeStore.key], 'decision');
     expect(credentials.writeCount, 0);
     expect(probes, isEmpty);
     expect(
@@ -588,7 +588,7 @@ void main() {
       messages: <String>[],
     );
 
-    expect(find.text('Jev 已关闭：暂停收集，档与过期计时保留'), findsOneWidget);
+    expect(find.text('当前模式：Decision'), findsOneWidget);
     expect(find.text('甲主题'), findsOneWidget);
     expect(find.text('乙主题'), findsOneWidget);
 
@@ -771,7 +771,7 @@ void main() {
       expect(legacy.confirmed, isTrue);
       expect(v1Credentials.stored[LlmProtocol.openAICompatible], 'sk-or-k');
       expect((await provStore.load('openrouter'))!.confirmed, isTrue);
-      expect(messages.last, '测试通过，筛选线已切换到该提供方');
+      expect(messages.last, '测试通过，已保存 LLM 提供方；全局模式保持不变');
     },
   );
 
@@ -1080,6 +1080,41 @@ void main() {
     expect(find.text('隐私说明'), findsOneWidget);
   });
 
+  testWidgets('legacy LLM stays paused until an explicit choice, preserving config', (
+    tester,
+  ) async {
+    final box = _MemoryBox();
+    box.values.addAll({
+      JevSettingsStore.enabledKey: true,
+      JevSettingsStore.providerKey: 'typesafe',
+      LlmSettingsStore.modelKey: 'saved-model',
+    });
+    final credentials = _FakeCredentialStore()..stored = 'saved-key';
+    await pumpPage(
+      tester,
+      store: JevSettingsStore(box: box),
+      credentials: credentials,
+      validator: JevKeyValidator(),
+      messages: <String>[],
+      seedMode: false,
+    );
+
+    expect(find.text('升级后需要选择筛选模式'), findsOneWidget);
+    expect(find.text('语义筛选已关闭'), findsOneWidget);
+    expect(find.text('Jev（专用模型）'), findsNothing);
+    expect(find.text('通用模型（提供方预设）'), findsNothing);
+    expect(box.values[ScreeningModeStore.key], 'choice_required');
+    await tester.tap(find.byKey(const ValueKey('screening-mode-off')));
+    await tester.pumpAndSettle();
+    expect(box.values[ScreeningModeStore.key], 'off');
+    expect(find.text('升级后需要选择筛选模式'), findsNothing);
+    expect(box.values[JevSettingsStore.providerKey], 'typesafe');
+    expect(box.values[LlmSettingsStore.modelKey], 'saved-model');
+    expect(credentials.stored, 'saved-key');
+    expect(credentials.writeCount, 0);
+    expect(credentials.deleteCount, 0);
+  });
+
   testWidgets('mode selection keeps only the active engine configuration visible', (
     tester,
   ) async {
@@ -1100,14 +1135,18 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Jev（专用模型）'), findsNothing);
     expect(find.text('通用模型（提供方预设）'), findsOneWidget);
-    expect(box.values[ScreeningModeStore.modeKey], 'llm');
+    expect(box.values[ScreeningModeStore.key], 'llm');
+    await tester.tap(find.text(JevSurface.comment.label));
+    await tester.pumpAndSettle();
+    expect(box.values[JevSettingsStore.surfaceKey(JevSurface.comment)], isTrue);
+    expect((await store.load()).mode, ScreeningEngineMode.llm);
 
     await tester.tap(find.byKey(const ValueKey('screening-mode-off')));
     await tester.pumpAndSettle();
     expect(find.text('Jev（专用模型）'), findsNothing);
     expect(find.text('通用模型（提供方预设）'), findsNothing);
     expect(find.text('语义筛选已关闭'), findsOneWidget);
-    expect(box.values[ScreeningModeStore.modeKey], 'off');
+    expect(box.values[ScreeningModeStore.key], 'off');
   });
 
   // 评论过滤标准区块已在 issue #122 中随双轨合并移除：独立开关与标准文本

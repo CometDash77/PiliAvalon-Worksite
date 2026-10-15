@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:PiliPlus/features/jev/jev.dart';
+import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -134,6 +136,61 @@ void main() {
   });
 
   JevCandidate candidate(String title) => JevCandidate(title: title);
+
+  test('Off and LLM never invoke the Decision transport', () async {
+    final h = _Harness();
+    final capture = _CapturingTransport(reply: (_) => _answers({'candidate_1': 1}));
+    final evaluator = h.evaluator(capture);
+    for (final mode in [ScreeningEngineMode.off, ScreeningEngineMode.llm]) {
+      await evaluator.modes.save(mode);
+      expect((await evaluator.screen([candidate('x')], surface: JevSurface.homeWeb)).hidden, [false]);
+    }
+    expect(capture.calls, 0);
+  });
+
+  test('Decision mode change discards pending answers and later batches', () async {
+    final h = _Harness();
+    final entered = Completer<void>();
+    final response = Completer<Object?>();
+    var calls = 0;
+    final evaluator = h.evaluator(_CapturingTransport(), transport:
+      ({required provider, required apiKey, required body}) {
+        calls++;
+        entered.complete();
+        return response.future;
+      });
+    final pending = evaluator.screen(List.generate(4, (i) => candidate('x-$i')),
+        surface: JevSurface.homeWeb);
+    await entered.future;
+    await evaluator.modes.save(ScreeningEngineMode.off);
+    await evaluator.modes.save(ScreeningEngineMode.decision);
+    response.complete(_answers({'candidate_1': 1, 'candidate_2': 1, 'candidate_3': 1}));
+    expect((await pending).hidden, [false, false, false, false]);
+    expect(calls, 1);
+  });
+
+  for (final change in ['model', 'surface', 'rules']) {
+    test('Decision discards a late hit after changing $change', () async {
+      final h = _Harness();
+      final evaluator = h.evaluator(_CapturingTransport(), transport:
+        ({required provider, required apiKey, required body}) async {
+          switch (change) {
+            case 'model':
+              await h.settingsBox.put(JevSettingsStore.modelKey(provider), 'new-model');
+            case 'surface':
+              await h.settingsBox.put(JevSettingsStore.surfaceKey(JevSurface.homeWeb), false);
+            case 'rules':
+              await JevRuleStore(box: h.settingsBox).save(
+                const JevRuleConfig(disabledBuiltins: {JevRuleTarget.video}));
+          }
+          return _answers({'candidate_1': 1});
+        });
+      final result = await evaluator.screen([candidate('x')], surface: JevSurface.homeWeb);
+      expect(result.requests, 1);
+      expect(result.hidden, [false]);
+      expect(result.decisions.whereType<JevScreenDecision>(), isEmpty);
+    });
+  }
 
   for (final provider in JevProvider.values) {
     test(

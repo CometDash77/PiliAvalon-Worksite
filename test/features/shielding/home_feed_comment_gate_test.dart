@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:PiliPlus/features/jev/jev_comment_screening.dart';
+import 'package:PiliPlus/features/jev/jev_settings.dart';
 import 'package:PiliPlus/features/shielding/home_feed_comment_gate.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart';
@@ -25,6 +27,20 @@ const _guardOff = CommentShieldingConfig();
 LoadingState<MainListReply> _visible() =>
     Success(MainListReply(replies: [_reply('visible comment')]));
 
+class _SemanticScreening extends JevCommentScreening {
+  int calls = 0;
+  bool ready = true;
+  @override
+  Future<bool> isEnabled() async => ready;
+  @override
+  Future<JevCommentResult> filter(List<ReplyInfo> replies, {
+    List<String?>? parents, Duration? timeout, bool screenLog = true,
+  }) async {
+    calls++;
+    return JevCommentResult(replies: ready ? [] : replies, cacheable: ready);
+  }
+}
+
 void main() {
   late Directory directory;
 
@@ -45,6 +61,49 @@ void main() {
   setUp(() {
     HomeFeedCommentGate.resetDecisionCache();
     HomeFeedCommentGate.decisionCacheClock = DateTime.now;
+  });
+
+  test('mode switch restores prior semantic hits but keeps deterministic removals', () async {
+    final screening = _SemanticScreening();
+    await screening.modes.save(ScreeningEngineMode.decision);
+    final waiting = Completer<void>();
+    final last = Completer<LoadingState<MainListReply>>();
+    final pending = HomeFeedCommentGate.filter<int>(
+      [1, 2, 3], config: _guardOn, ruleSet: ShieldRuleSet(),
+      getAid: (item) => item, maxConcurrent: 1, commentScreening: screening,
+      loader: ({required oid, required type, required mode, required offset, required cursorNext}) async {
+        if (oid == 1) return _visible(); // Removed only by semantics.
+        if (oid == 2) return Success(MainListReply(replies: [_reply('x')]));
+        waiting.complete();
+        return last.future;
+      },
+    );
+    await waiting.future; // Earlier decisions have already been aggregated.
+    await screening.modes.save(ScreeningEngineMode.off);
+    await screening.modes.save(ScreeningEngineMode.decision);
+    last.complete(_visible());
+    expect(await pending, [1, 3]);
+    expect(screening.calls, 1); // No new semantic work after the switch.
+  });
+
+  test('LLM readiness recovery cannot persist a paid gate decision', () async {
+    final screening = _SemanticScreening()..ready = false;
+    await screening.modes.save(ScreeningEngineMode.llm);
+    var recover = true;
+    Future<List<int>> run() => HomeFeedCommentGate.filter<int>(
+      [1], config: _guardOn, ruleSet: ShieldRuleSet(),
+      getAid: (item) => item, commentScreening: screening,
+      loader: ({required oid, required type, required mode, required offset, required cursorNext}) async {
+        screening.ready = recover;
+        return _visible();
+      },
+    );
+    expect(await run(), isEmpty);
+    expect(HomeFeedCommentGate.decisionCacheEntryCount, 0);
+    screening.ready = recover = false;
+    expect(await run(), [1]);
+    expect(screening.calls, 2);
+    await screening.modes.save(ScreeningEngineMode.decision);
   });
 
   group('HomeFeedCommentGate', () {

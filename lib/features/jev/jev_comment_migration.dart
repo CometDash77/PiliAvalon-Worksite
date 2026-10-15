@@ -98,6 +98,7 @@ abstract final class JevCommentCriteriaMigration {
         if (!current.surfaces.contains(JevSurface.comment)) {
           await settingsStore.save(
             current.withSurface(JevSurface.comment, value: true),
+            saveMode: false,
           );
         }
       }

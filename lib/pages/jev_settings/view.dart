@@ -4,7 +4,6 @@ import 'package:PiliPlus/common/widgets/flutter/list_tile.dart' as custom;
 import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/features/jev/jev_rules.dart';
 import 'package:PiliPlus/features/llm/llm.dart';
-import 'package:PiliPlus/features/screening/screening_mode.dart';
 import 'package:PiliPlus/pages/jev_settings/jev_filter_log_section.dart';
 import 'package:PiliPlus/pages/jev_settings/jev_rules_hub_page.dart';
 import 'package:PiliPlus/pages/jev_settings/jev_screen_log_page.dart';
@@ -123,7 +122,6 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   late JevSettings _settings = JevSettingsStore.snapshot;
   late final ScreeningModeStore _modeStore = ScreeningModeStore(box: _store.box);
   ScreeningEngineMode _mode = ScreeningEngineMode.decision;
-  String? _migrationNotice;
   JevSelectionState _selection = const JevSelectionState();
   JevPreferenceProfile _profile = JevPreferenceProfile.empty;
   JevKeyStoreStatus _keyStoreStatus = JevKeyStoreStatus.available;
@@ -131,6 +129,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   bool _busy = false;
   bool _obscureKey = true;
   bool _hasStoredKey = false;
+  bool _modeBusy = false;
+  bool _needsModeChoice = false;
 
   // Issue #123: verdict-cache bounds, read from the settings box in _load().
   bool _cacheEnabled = true;
@@ -169,7 +169,6 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   Future<void> _load() async {
     final settings = await _store.load();
     final mode = await _modeStore.load();
-    final notice = await _modeStore.readNotice();
     final profile = await _preferences.load();
     final status = await _credentials.status();
     // Issue #123: verdict-cache bounds live in the settings box; reads are
@@ -203,15 +202,10 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     LlmProviderPreset providerPreset =
         kLlmProviderPresets.firstWhere((p) => p.id == providerId);
     if (!mounted) return;
-    if (status == JevKeyStoreStatus.unavailable && settings.enabled) {
-      // Issue #32: without a usable credential store Jev stays disabled.
-      await _saveSettings(settings.copyWith(enabled: false));
-      if (!mounted) return;
-    }
     setState(() {
-      _settings = JevSettingsStore.snapshot;
-      _mode = mode;
-      _migrationNotice = notice;
+      _settings = settings;
+      _mode = mode.mode;
+      _needsModeChoice = _modeStore.needsChoice;
       _profile = profile;
       _cacheEnabled = cacheEnabled;
       _cacheEntries = JevVerdictCache.cachedEntryCount;
@@ -254,7 +248,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     if (!mounted) return false;
     final previous = _settings;
     setState(() => _settings = next);
-    final write = _saveQueue.then((_) => _store.save(next));
+    final write = _saveQueue.then((_) => _store.save(next, saveMode: false));
     _saveQueue = write.catchError((Object _) {});
     try {
       await write;
@@ -461,8 +455,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         ),
         children: [
           ..._buildModeSection(),
+          if (_mode != ScreeningEngineMode.off) ..._buildSwitchSection(),
           if (_mode == ScreeningEngineMode.decision) ...[
-            ..._buildSwitchSection(),
             ..._buildCacheSection(),
             const Divider(height: 1),
           ],
@@ -527,13 +521,13 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     ),
     for (final mode in ScreeningEngineMode.values)
       RadioListTile<ScreeningEngineMode>(
-        key: ValueKey('screening-mode-${mode.id}'),
+        key: ValueKey('screening-mode-${mode.name}'),
         dense: true,
         title: Text(_modeLabel(mode)),
         subtitle: Text(_modeDescription(mode)),
         value: mode,
         groupValue: _mode,
-        onChanged: (value) => value == null ? null : _saveMode(value),
+        onChanged: _modeBusy ? null : (value) => value == null ? null : _saveMode(value),
       ),
     custom.ListTile(
       dense: true,
@@ -545,19 +539,11 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
           : '当前模式：${_modeLabel(_mode)}'),
       subtitle: Text(_modeSummary()),
     ),
-    if (_migrationNotice case final notice?)
-      custom.ListTile(
-        dense: true,
-        leading: const Icon(Icons.info_outline),
-        title: Text(notice),
-        trailing: IconButton(
-          tooltip: '关闭提示',
-          icon: const Icon(Icons.close),
-          onPressed: () async {
-            await _modeStore.saveNotice(null);
-            if (mounted) setState(() => _migrationNotice = null);
-          },
-        ),
+    if (_needsModeChoice)
+      const custom.ListTile(
+        leading: Icon(Icons.info_outline),
+        title: Text('升级后需要选择筛选模式'),
+        subtitle: Text('旧版 LLM 配置或未知模式已暂停；请选择关闭、Decision 或 LLM。两套模型、密钥与规则均已保留。'),
       ),
   ];
 
@@ -587,17 +573,30 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   }
 
   Future<void> _saveMode(ScreeningEngineMode mode) async {
-    if (mode == _mode) return;
-    await _modeStore.save(mode);
-    if (!mounted) return;
-    setState(() => _mode = mode);
-    _toast('已切换为${_modeLabel(mode)}；另一模式配置保留');
+    if (_modeBusy || (mode == _mode && !_needsModeChoice)) return;
+    setState(() => _modeBusy = true);
+    try {
+      await _modeStore.save(mode);
+      await _saveQueue;
+      final settings = await _store.load();
+      if (!mounted) return;
+      setState(() {
+        _settings = settings;
+        _mode = settings.mode;
+        _needsModeChoice = false;
+      });
+      _toast('已切换为${_modeLabel(mode)}；另一模式配置保留');
+    } catch (error) {
+      _toast('模式保存失败：$error');
+    } finally {
+      if (mounted) setState(() => _modeBusy = false);
+    }
   }
 
   List<Widget> _buildSwitchSection() => [
     const Padding(
       padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Text('Decision 生效入口（各自的开关）'),
+      child: Text('生效入口（各自的开关）'),
     ),
     for (final surface in JevSurface.values)
       SwitchListTile(
@@ -1188,7 +1187,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       ),
       title: Text(
         _provAccount.confirmed
-            ? '该提供方已通过测试并驱动筛选线'
+            ? '该提供方已通过测试；仅在全局 LLM 模式下参与筛选'
             : '该提供方尚未生效：需「测试连接」通过后才驱动筛选线',
       ),
       subtitle: const Text('目录成功只说明能拉到模型；保存配置只落盘；测试通过才锁存确认并写穿到筛选线'),
@@ -1391,6 +1390,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
     final legacy = mapping.config!;
     try {
       await _llmStore.save(legacy);
+      if (mounted) setState(() => _activeLlm = legacy);
       if (key.isEmpty) {
         await _llmCredentials.delete(legacy.protocol!);
       } else {
@@ -1415,7 +1415,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       _provBusy = false;
       _llmProbeResult = result;
     });
-    _toast('测试通过，筛选线已切换到该提供方');
+    _toast('测试通过，已保存 LLM 提供方；全局模式保持不变');
   }
 
   String _llmProbeMessage(LlmProbeResult probe) {
