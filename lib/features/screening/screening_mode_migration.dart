@@ -47,7 +47,7 @@ abstract final class ScreeningModeMigration {
 
   static Future<bool> _jevAlive(JevSettingsStore? jevSettings) async {
     try {
-      return (jevSettings ?? JevSettingsStore()).load().enabled;
+      return (await (jevSettings ?? JevSettingsStore()).load()).enabled;
     } catch (_) {
       return false;
     }
