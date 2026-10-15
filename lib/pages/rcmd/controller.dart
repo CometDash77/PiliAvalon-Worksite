@@ -51,6 +51,13 @@ class RcmdController extends CommonListController {
   }
 
   @override
+  Future<void> onReload() {
+    if (isLoading || isClosed) return Future.value();
+    lastRefreshAt = null;
+    return super.onReload();
+  }
+
+  @override
   Future<void> onRefresh() {
     page = 0;
     isEnd = false;
