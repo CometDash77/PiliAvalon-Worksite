@@ -27,6 +27,7 @@ abstract final class ScreeningModeMigration {
   }) async {
     // 先落闩：本进程只做一次；失败也不在启动路径上反复重试
     // （键保留，下次启动重试，同 JevCommentCriteriaMigration 先例）。
+    if (_done) return;
     _done = true;
     final modeStore = store ?? ScreeningModeStore();
     // 幂等判据：mode 键已在 → 无论值是什么都不再动。
