@@ -23,6 +23,9 @@ class JevScreenLogEntry {
     this.reason,
     this.elapsedMs,
     this.failure,
+    this.llmInputTokens,
+    this.llmCacheHitTokens,
+    this.llmCacheMissTokens,
   });
 
   factory JevScreenLogEntry.fromJson(Map json) => JevScreenLogEntry(
@@ -43,6 +46,16 @@ class JevScreenLogEntry {
     reason: json['reason'] is String ? json['reason'] as String : null,
     elapsedMs: json['elapsedMs'] is int ? json['elapsedMs'] as int : null,
     failure: json['failure'] is String ? json['failure'] as String : null,
+    llmInputTokens:
+        json['llmInputTokens'] is int ? json['llmInputTokens'] as int : null,
+    llmCacheHitTokens:
+        json['llmCacheHitTokens'] is int
+        ? json['llmCacheHitTokens'] as int
+        : null,
+    llmCacheMissTokens:
+        json['llmCacheMissTokens'] is int
+        ? json['llmCacheMissTokens'] as int
+        : null,
   );
 
   /// epoch 毫秒。
@@ -77,6 +90,11 @@ class JevScreenLogEntry {
   /// 通用线整轮失败类别:timeout/upstream/parse/drift;成功命中行为 null。
   final String? failure;
 
+  /// 通用线上游 usage 观测(#176):输入/缓存命中/缓存未命中 token;Jev 线为 null。
+  final int? llmInputTokens;
+  final int? llmCacheHitTokens;
+  final int? llmCacheMissTokens;
+
   Map<String, Object?> toJson() => <String, Object?>{
     'time': time,
     'kind': kind.name,
@@ -89,6 +107,9 @@ class JevScreenLogEntry {
     if (reason != null) 'reason': reason,
     if (elapsedMs != null) 'elapsedMs': elapsedMs,
     if (failure != null) 'failure': failure,
+    if (llmInputTokens != null) 'llmInputTokens': llmInputTokens,
+    if (llmCacheHitTokens != null) 'llmCacheHitTokens': llmCacheHitTokens,
+    if (llmCacheMissTokens != null) 'llmCacheMissTokens': llmCacheMissTokens,
   };
 }
 
@@ -153,6 +174,9 @@ class JevScreenLog {
             reason: e.reason == null ? null : _clip(e.reason!),
             elapsedMs: e.elapsedMs,
             failure: e.failure,
+            llmInputTokens: e.llmInputTokens,
+            llmCacheHitTokens: e.llmCacheHitTokens,
+            llmCacheMissTokens: e.llmCacheMissTokens,
           ),
         )
         .toList();
@@ -181,7 +205,7 @@ class JevScreenLog {
   }
 
   /// 全部条目序列化为 JSON 文本(日志导出用)。字段与页面可见信息一致:
-  /// 时间/种类/来源线/入口/标题/摘要/规则/模型/理由/耗时/失败类别,
+  /// 时间/种类/来源线/入口/标题/摘要/规则/模型/理由/耗时/失败类别/usage token(输入/缓存命中/未命中),
   /// 不含密钥、认证头、Cookie 或任何账号标识。
   static String exportJson(List<JevScreenLogEntry> entries) => jsonEncode([
     for (final e in entries) e.toJson(),

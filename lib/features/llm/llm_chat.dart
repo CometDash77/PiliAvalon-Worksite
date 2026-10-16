@@ -22,7 +22,9 @@ enum LlmChatFailureKind {
 }
 
 class LlmChatOutcome {
-  const LlmChatOutcome.ok(this.text) : failure = null, detail = null;
+  const LlmChatOutcome.ok(this.text, {this.usage})
+    : failure = null,
+      detail = null;
 
   const LlmChatOutcome.failed(this.failure, this.detail) : text = null;
 
@@ -32,6 +34,9 @@ class LlmChatOutcome {
   /// Human-readable summary, at most [LlmLimits.maxDetailRunes] runes,
   /// built only from server error envelopes - never from request headers.
   final String? detail;
+
+  /// 上游 usage 观测（#176）：ok 且上游返回 usage 时非空；解析失败为 null。
+  final LlmUpstreamUsage? usage;
 
   bool get ok => text != null;
 }
@@ -69,6 +74,7 @@ class LlmChatClient {
     required String user,
     Duration? timeout,
     bool Function()? isCurrent,
+    Map<String, Object?>? thinkingFields,
   }) async {
     final config = await _settings.load();
     if (config.issues.isNotEmpty ||
@@ -101,6 +107,7 @@ class LlmChatClient {
           model: config.model,
           system: system,
           user: user,
+          thinkingFields: thinkingFields,
         ),
         timeout: timeout ?? LlmLimits.requestTimeout,
       );
@@ -120,6 +127,7 @@ class LlmChatClient {
     required String model,
     required String system,
     required String user,
+    Map<String, Object?>? thinkingFields,
   }) => switch (protocol) {
     LlmProtocol.openAICompatible => <String, Object?>{
       'model': model,
@@ -129,6 +137,7 @@ class LlmChatClient {
       ],
       'max_tokens': LlmLimits.maxCompletionTokens,
       'stream': false,
+      ...?thinkingFields,
     },
     LlmProtocol.anthropicCompatible => <String, Object?>{
       'model': model,
@@ -137,6 +146,7 @@ class LlmChatClient {
       'messages': <Object?>[
         <String, Object?>{'role': 'user', 'content': user},
       ],
+      ...?thinkingFields,
     },
   };
 
@@ -158,7 +168,10 @@ class LlmChatClient {
     if (text == null || text.trim().isEmpty) {
       return const LlmChatOutcome.failed(LlmChatFailureKind.emptyOutput, null);
     }
-    return LlmChatOutcome.ok(text);
+    return LlmChatOutcome.ok(
+      text,
+      usage: LlmUpstreamUsage.fromBody(protocol, data),
+    );
   }
 
   /// OpenAI finish_reason / Anthropic stop_reason; null when absent.

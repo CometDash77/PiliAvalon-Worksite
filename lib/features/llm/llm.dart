@@ -11,5 +11,6 @@ export 'llm_response.dart';
 export 'llm_rules.dart';
 export 'llm_screening.dart';
 export 'llm_settings.dart';
+export 'llm_thinking.dart';
 export 'llm_verdict.dart';
 export 'llm_verdict_cache.dart';

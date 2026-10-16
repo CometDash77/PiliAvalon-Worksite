@@ -42,3 +42,48 @@ abstract final class LlmResponseText {
     return parts.join(String.fromCharCode(10));
   }
 }
+
+
+/// 上游响应的 usage 观测（#176）：输入/缓存命中/缓存未命中 token。
+/// 解析失败或全空时返回 null（不挂观测负载）。
+class LlmUpstreamUsage {
+  const LlmUpstreamUsage({
+    this.inputTokens,
+    this.cacheHitTokens,
+    this.cacheMissTokens,
+  });
+
+  final int? inputTokens;
+  final int? cacheHitTokens;
+  final int? cacheMissTokens;
+
+  static LlmUpstreamUsage? fromBody(LlmProtocol protocol, Object? data) {
+    if (data is! Map) return null;
+    final usage = data['usage'];
+    if (usage is! Map) return null;
+    int? pos(Object? v) => v is int && v > 0 ? v : null;
+    final LlmUpstreamUsage parsed;
+    switch (protocol) {
+      case LlmProtocol.openAICompatible:
+        final details = usage['prompt_tokens_details'];
+        parsed = LlmUpstreamUsage(
+          inputTokens: pos(usage['prompt_tokens']),
+          cacheHitTokens: pos(usage['prompt_cache_hit_tokens']) ??
+              pos(details is Map ? details['cached_tokens'] : null),
+          cacheMissTokens: pos(usage['prompt_cache_miss_tokens']),
+        );
+      case LlmProtocol.anthropicCompatible:
+        parsed = LlmUpstreamUsage(
+          inputTokens: pos(usage['input_tokens']),
+          cacheHitTokens: pos(usage['cache_read_input_tokens']),
+          cacheMissTokens: pos(usage['cache_creation_input_tokens']),
+        );
+    }
+    if (parsed.inputTokens == null &&
+        parsed.cacheHitTokens == null &&
+        parsed.cacheMissTokens == null) {
+      return null;
+    }
+    return parsed;
+  }
+}

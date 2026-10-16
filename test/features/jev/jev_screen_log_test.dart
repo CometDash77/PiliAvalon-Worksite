@@ -416,6 +416,17 @@ void main() {
           failure: 'timeout',
           elapsedMs: 456,
         ),
+        const JevScreenLogEntry(
+          time: 3,
+          kind: JevScreenLogKind.comment,
+          surface: 'comment',
+          title: 'usage',
+          line: JevScreenLogLine.llm,
+          modelId: 'm1',
+          llmInputTokens: 100,
+          llmCacheHitTokens: 64,
+          llmCacheMissTokens: 36,
+        ),
       ]);
 
       final loaded = log.load();
@@ -432,6 +443,10 @@ void main() {
       expect(failed.failure, 'timeout');
       expect(failed.ruleId, isNull);
       expect(failed.reason, isNull);
+      final usage = loaded.singleWhere((e) => e.title == 'usage');
+      expect(usage.llmInputTokens, 100);
+      expect(usage.llmCacheHitTokens, 64);
+      expect(usage.llmCacheMissTokens, 36);
     });
 
     test('toJson 键白名单:jev 行无 line,llm 行仅输出非空可空字段', () {
@@ -456,6 +471,7 @@ void main() {
       const allowed = {
         'time', 'kind', 'surface', 'title', 'line', 'snippet', 'ruleId',
         'modelId', 'reason', 'elapsedMs', 'failure',
+        'llmInputTokens', 'llmCacheHitTokens', 'llmCacheMissTokens',
       };
       expect(jevRow.toJson().containsKey('line'), isFalse);
       expect(jevRow.toJson().keys.every(allowed.contains), isTrue);
@@ -490,6 +506,7 @@ void main() {
       const allowed = {
         'time', 'kind', 'surface', 'title', 'line', 'snippet', 'ruleId',
         'modelId', 'reason', 'elapsedMs', 'failure',
+        'llmInputTokens', 'llmCacheHitTokens', 'llmCacheMissTokens',
       };
       for (final row in decoded) {
         expect((row as Map).keys.every(allowed.contains), isTrue);

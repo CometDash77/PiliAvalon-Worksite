@@ -69,6 +69,11 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   // #105:筛选详情日志与设置共用本 box;测试注入的 store 自动生效。
   late final JevFilterLog _filterLog = JevFilterLog(box: _store.box);
 
+  // #176:思考选择注册表;与筛选线共用本 box,测试注入的 store 自动生效。
+  late final LlmThinkingStore _thinkingStore = LlmThinkingStore(
+    box: _store.box,
+  );
+
   late final JevModelCatalog _catalog = widget.catalog ?? JevModelCatalog();
 
   // Issue #131: generic-line provider dependencies and draft state.
@@ -92,6 +97,8 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   // persisted until 保存配置.
   LlmRouteProtocol? _provDraftProtocol;
   bool? _provDraftIncludesV1;
+  // #176:思考模式草稿(null=跟随上游默认);仅探活成功后写穿注册表。
+  LlmThinkingChoice? _provDraftThinking;
   bool _provInsecureConfirmed = false;
   bool _provCatalogBusy = false;
   bool _provBusy = false;
@@ -225,6 +232,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
           providerAccount ?? LlmProviderAccount(providerId: providerId);
       _provDraftProtocol = _provAccount.protocol;
       _provDraftIncludesV1 = _provAccount.includesV1Override;
+      _provDraftThinking = _provThinkingFor(_provAccount);
       _provInsecureConfirmed = _provAccount.httpInsecureConfirmed;
       _provKeyStored = (providerKey ?? '').isNotEmpty;
       _llmBaseUrlController.text = _provAccount.baseUrl.isEmpty
@@ -936,6 +944,27 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
   LlmResolvedProvider _provResolved(LlmProviderAccount account) =>
       LlmResolvedProvider(preset: _provPreset, account: account);
 
+  // #176:思考选择的 identity 一律以「筛选线将消费的 v1 legacy 配置」计算,
+  // 探活写穿与筛选线读取天然同源;映射失败(结构不完整)视为未选择。
+  LlmThinkingChoice? _provThinkingFor(LlmProviderAccount account) {
+    try {
+      final config = llmLegacyMappingFor(_provResolved(account)).config;
+      if (config == null) return null;
+      return _thinkingStore.choiceFor(LlmThinking.identityFor(config));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  LlmThinkingFlavor? get _provThinkingFlavor {
+    final resolved = _provResolved(_provDraftAccount);
+    return LlmThinking.flavorFor(
+      anthropicRoute:
+          resolved.effectiveProtocol == LlmRouteProtocol.anthropicMessages,
+      baseUrl: resolved.baseUrl,
+    );
+  }
+
   LlmProviderAccount get _provDraftAccount => LlmProviderAccount(
         providerId: _provId,
         protocol: _provDraftProtocol,
@@ -1085,6 +1114,39 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         ),
       ),
     ),
+    if (_provThinkingFlavor != null)
+      custom.ListTile(
+        key: const ValueKey('llm-thinking'),
+        dense: true,
+        leading: const Icon(Icons.psychology_outlined),
+        title: const Text('思考模式（DeepSeek）'),
+        subtitle: const Text(
+          '「测试连接」通过后生效；关闭=显式发送禁用思考的字段',
+        ),
+        trailing: DropdownButton<LlmThinkingChoice?>(
+          value: _provDraftThinking,
+          items: const [
+            DropdownMenuItem(value: null, child: Text('跟随上游默认')),
+            DropdownMenuItem(
+              value: LlmThinkingChoice.off,
+              child: Text('关闭思考'),
+            ),
+            DropdownMenuItem(
+              value: LlmThinkingChoice.low,
+              child: Text('低强度'),
+            ),
+            DropdownMenuItem(
+              value: LlmThinkingChoice.high,
+              child: Text('高强度'),
+            ),
+            DropdownMenuItem(
+              value: LlmThinkingChoice.max,
+              child: Text('最大强度'),
+            ),
+          ],
+          onChanged: (v) => setState(() => _provDraftThinking = v),
+        ),
+      ),
     if (_provCatalogResult case final result?)
       if (result.error == null && result.models.isNotEmpty)
         Padding(
@@ -1209,6 +1271,7 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       _provAccount = account;
       _provDraftProtocol = account.protocol;
       _provDraftIncludesV1 = account.includesV1Override;
+      _provDraftThinking = _provThinkingFor(account);
       _provInsecureConfirmed = account.httpInsecureConfirmed;
       _provKeyStored = (storedKey ?? '').isNotEmpty;
       _llmBaseUrlController.text =
@@ -1358,6 +1421,17 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
 
   Future<void> _probeProv() async {
     final resolved = _provResolved(_provAccount);
+    // #176:思考草稿只决定探活请求字段与成功后的写穿选择;探活对象仍是
+    // 已保存账号(与筛选线同源)。
+    final flavor = LlmThinking.flavorFor(
+      anthropicRoute:
+          resolved.effectiveProtocol == LlmRouteProtocol.anthropicMessages,
+      baseUrl: resolved.baseUrl,
+    );
+    Map<String, Object?>? thinkingFields;
+    if (flavor != null && _provDraftThinking != null) {
+      thinkingFields = LlmThinking.fieldsFor(flavor, _provDraftThinking!);
+    }
     final key = _provSavedKey();
     final generation = ++_provGeneration;
     setState(() {
@@ -1365,7 +1439,11 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       _llmProbeResult = null;
       _provMappingError = null;
     });
-    final result = await _llmProbe.callResolved(resolved: resolved, apiKey: key);
+    final result = await _llmProbe.callResolved(
+      resolved: resolved,
+      apiKey: key,
+      thinkingFields: thinkingFields,
+    );
     if (!mounted || generation != _provGeneration) return;
     if (!result.succeeded) {
       setState(() {
@@ -1404,6 +1482,13 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       _toast('筛选线切换失败：$error');
       return;
     }
+    // #176:思考选择写穿注册表(null=移除);失败静默,不阻塞筛选线切换。
+    try {
+      await _thinkingStore.write(
+        LlmThinking.identityFor(legacy),
+        _provDraftThinking,
+      );
+    } catch (_) {}
     try {
       await _provStore.save(_provAccount.copyWith(confirmed: true));
       final reloaded = await _provStore.load(_provId);

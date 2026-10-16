@@ -109,6 +109,9 @@ class JevFinalScreen<T> {
           line: llm == null ? JevScreenLogLine.jev : JevScreenLogLine.llm,
           ruleId: llm?.ruleIds[k], modelId: llm?.modelId,
           reason: llm?.reasons[k], elapsedMs: llm?.elapsedMs,
+          llmInputTokens: llm?.usages[k]?.inputTokens,
+          llmCacheHitTokens: llm?.usages[k]?.cacheHitTokens,
+          llmCacheMissTokens: llm?.usages[k]?.cacheMissTokens,
         ));
         if (decision != null) {
           final judgment = k < decision.decisions.length ? decision.decisions[k] : null;

@@ -342,6 +342,58 @@ void main() {
       expect(result.outcome, LlmProbeOutcome.invalidKey);
       expect(result.detail, contains('401'));
     });
+
+    test('thinking fields ride the openai probe body (#176)', () async {
+      final resolved = _resolved('deepseek', model: 'm1');
+      final adapter = _QueueAdapter([
+        const MapEntry(200, {
+          'choices': [
+            {
+              'message': {'content': 'OK'},
+            },
+          ],
+        }),
+      ]);
+      final probe = LlmHttpProbe(dio: Dio()..httpClientAdapter = adapter);
+      final result = await probe.callResolved(
+        resolved: resolved,
+        apiKey: 'k',
+        thinkingFields: const {
+          'thinking': {'type': 'enabled'},
+          'reasoning_effort': 'high',
+        },
+      );
+      expect(result.outcome, LlmProbeOutcome.ok);
+      final body = adapter.requests.single.data as Map;
+      expect((body['thinking'] as Map)['type'], 'enabled');
+      expect(body['reasoning_effort'], 'high');
+    });
+
+    test('thinking fields ride the anthropic probe body (#176)', () async {
+      final resolved = _resolved(
+        'deepseek',
+        protocol: LlmRouteProtocol.anthropicMessages,
+        model: 'm1',
+      );
+      final adapter = _QueueAdapter([
+        const MapEntry(200, {
+          'content': [
+            {'type': 'text', 'text': 'OK'},
+          ],
+        }),
+      ]);
+      final probe = LlmHttpProbe(dio: Dio()..httpClientAdapter = adapter);
+      final result = await probe.callResolved(
+        resolved: resolved,
+        apiKey: 'k',
+        thinkingFields: const {
+          'output_config': {'effort': 'low'},
+        },
+      );
+      expect(result.outcome, LlmProbeOutcome.ok);
+      final body = adapter.requests.single.data as Map;
+      expect((body['output_config'] as Map)['effort'], 'low');
+    });
   });
 
   group('bearerAuth persistence', () {

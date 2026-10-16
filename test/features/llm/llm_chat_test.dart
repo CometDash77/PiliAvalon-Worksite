@@ -163,6 +163,125 @@ void main() {
     expect(call.timeout, LlmLimits.requestTimeout);
   });
 
+  test('thinking fields merge into the request body (#176)', () async {
+    final box = _FakeBox();
+    final settings = await _settings(box);
+    final stub = _Stub((_, _, _) async => _openaiOk('ok'));
+    final client = LlmChatClient(
+      transport: stub.transport,
+      credentials: _FakeCredentials({LlmProtocol.openAICompatible: 'sk-1'}),
+      settings: settings,
+    );
+    final outcome = await client.call(
+      system: 'S',
+      user: 'U',
+      thinkingFields: const {
+        'thinking': {'type': 'enabled'},
+        'reasoning_effort': 'high',
+      },
+    );
+    expect(outcome.ok, isTrue);
+    final body = stub.calls.single.body;
+    expect((body['thinking'] as Map)['type'], 'enabled');
+    expect(body['reasoning_effort'], 'high');
+  });
+
+  test('without thinking fields the wire body stays clean (#176)', () async {
+    final box = _FakeBox();
+    final settings = await _settings(box);
+    final stub = _Stub((_, _, _) async => _openaiOk('ok'));
+    final client = LlmChatClient(
+      transport: stub.transport,
+      credentials: _FakeCredentials({LlmProtocol.openAICompatible: 'sk-1'}),
+      settings: settings,
+    );
+    final outcome = await client.call(system: 'S', user: 'U');
+    expect(outcome.ok, isTrue);
+    expect(stub.calls.single.body.containsKey('thinking'), isFalse);
+    expect(stub.calls.single.body.containsKey('reasoning_effort'), isFalse);
+  });
+
+  test('a live call carries parsed upstream usage (#176)', () async {
+    final box = _FakeBox();
+    final settings = await _settings(box);
+    final stub = _Stub(
+      (_, _, _) async => {
+        ..._openaiOk('ok'),
+        'usage': {
+          'prompt_tokens': 100,
+          'prompt_cache_hit_tokens': 64,
+          'prompt_cache_miss_tokens': 36,
+        },
+      },
+    );
+    final client = LlmChatClient(
+      transport: stub.transport,
+      credentials: _FakeCredentials({LlmProtocol.openAICompatible: 'sk-1'}),
+      settings: settings,
+    );
+    final outcome = await client.call(system: 'S', user: 'U');
+    expect(outcome.ok, isTrue);
+    expect(outcome.usage?.inputTokens, 100);
+    expect(outcome.usage?.cacheHitTokens, 64);
+    expect(outcome.usage?.cacheMissTokens, 36);
+  });
+
+  test('upstream usage parses openai and anthropic shapes (#176)', () {
+    const openai = {
+      'usage': {
+        'prompt_tokens': 100,
+        'prompt_cache_hit_tokens': 64,
+        'prompt_cache_miss_tokens': 36,
+      },
+    };
+    final a = LlmUpstreamUsage.fromBody(LlmProtocol.openAICompatible, openai);
+    expect(a?.inputTokens, 100);
+    expect(a?.cacheHitTokens, 64);
+    expect(a?.cacheMissTokens, 36);
+
+    const details = {
+      'usage': {
+        'prompt_tokens': 50,
+        'prompt_tokens_details': {'cached_tokens': 20},
+      },
+    };
+    final b = LlmUpstreamUsage.fromBody(
+      LlmProtocol.openAICompatible,
+      details,
+    );
+    expect(b?.inputTokens, 50);
+    expect(b?.cacheHitTokens, 20);
+    expect(b?.cacheMissTokens, isNull);
+
+    const anthropic = {
+      'usage': {
+        'input_tokens': 30,
+        'cache_read_input_tokens': 10,
+        'cache_creation_input_tokens': 5,
+      },
+    };
+    final c = LlmUpstreamUsage.fromBody(
+      LlmProtocol.anthropicCompatible,
+      anthropic,
+    );
+    expect(c?.inputTokens, 30);
+    expect(c?.cacheHitTokens, 10);
+    expect(c?.cacheMissTokens, 5);
+
+    const junk = {
+      'usage': {'prompt_tokens': 0},
+    };
+    expect(
+      LlmUpstreamUsage.fromBody(LlmProtocol.openAICompatible, junk),
+      isNull,
+    );
+    expect(LlmUpstreamUsage.fromBody(LlmProtocol.openAICompatible, 'x'), isNull);
+    expect(
+      LlmUpstreamUsage.fromBody(LlmProtocol.openAICompatible, {'no': 1}),
+      isNull,
+    );
+  });
+
   test('an anthropic call posts the native messages shape', () async {
     final box = _FakeBox();
     final settings = await _settings(

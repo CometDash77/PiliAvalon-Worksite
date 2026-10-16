@@ -10,8 +10,10 @@ import 'package:PiliPlus/features/llm/llm_chat.dart';
 import 'package:PiliPlus/features/llm/llm_contract.dart';
 import 'package:PiliPlus/features/llm/llm_credential_store.dart';
 import 'package:PiliPlus/features/llm/llm_prompt.dart';
+import 'package:PiliPlus/features/llm/llm_response.dart';
 import 'package:PiliPlus/features/llm/llm_rules.dart';
 import 'package:PiliPlus/features/llm/llm_settings.dart';
+import 'package:PiliPlus/features/llm/llm_thinking.dart';
 import 'package:PiliPlus/features/llm/llm_verdict.dart';
 import 'package:PiliPlus/features/llm/llm_verdict_cache.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
@@ -78,7 +80,8 @@ class LlmCommentScreening {
        _settings = settings ?? LlmSettingsStore(),
        _credentials = credentials ?? SecureLlmCredentialStore(),
        _rules = rules ?? JevRuleStore(),
-       _cache = cache ?? LlmVerdictCache();
+       _cache = cache ?? LlmVerdictCache(),
+       _thinking = LlmThinkingStore(box: settings?.box);
 
   final LlmChatClient _client;
   final LlmSettingsStore _settings;
@@ -86,6 +89,7 @@ class LlmCommentScreening {
   final LlmCredentialStore _credentials;
   final JevRuleStore _rules;
   final LlmVerdictCache _cache;
+  final LlmThinkingStore _thinking;
 
   /// A comment body never leaves the device beyond this many runes.
   static const int maxTextChars = LlmPrompt.maxTextChars;
@@ -141,6 +145,7 @@ class LlmCommentScreening {
     var cacheable = true;
     var expired = false;
     var initialFingerprint = '';
+    final usages = <int, LlmUpstreamUsage>{};
     try {
       if (!(await JevSettingsStore(box: _settings.box).load())
           .isSurfaceEnabled(JevSurface.comment)) {
@@ -155,7 +160,15 @@ class LlmCommentScreening {
         credentials: _credentials,
       );
       modelId = context.config.model;
-      initialFingerprint = _fingerprint(context.config, views);
+      final thinking = LlmThinking.planFor(
+        config: context.config,
+        store: _thinking,
+      );
+      initialFingerprint = _fingerprint(
+        context.config,
+        views,
+        thinking: thinking?.choice,
+      );
       // repeat_count keeps duplicated texts from being billed as new
       // candidates (Jev precedent).
       final repeats = <String, int>{};
@@ -241,6 +254,7 @@ class LlmCommentScreening {
                   candidates: candidates,
                 ),
                 timeout: remaining,
+                thinkingFields: thinking?.fields,
               )
               .timeout(remaining);
           if (!mode.isCurrent) break;
@@ -271,6 +285,12 @@ class LlmCommentScreening {
             hidden[index] = true;
             hiddenByRule[index] = hit.ruleId;
             hiddenReasons[index] = hit.reason;
+          }
+          final usage = outcome.usage;
+          if (usage != null) {
+            for (final b in batch) {
+              usages[b] = usage;
+            }
           }
           if (cacheOn) {
             for (var b = 0; b < batch.length; b++) {
@@ -311,8 +331,13 @@ class LlmCommentScreening {
           ruleConfig.activeFor(JevRuleTarget.comment),
         );
         final settings = await JevSettingsStore(box: _settings.box).load().timeout(remaining);
+        final thinkingNow = LlmThinking.planFor(
+          config: config,
+          store: _thinking,
+        );
         if (!settings.isSurfaceEnabled(JevSurface.comment) ||
-            initialFingerprint != _fingerprint(config, views)) {
+            initialFingerprint !=
+                _fingerprint(config, views, thinking: thinkingNow?.choice)) {
           // Decisions compiled under a stale policy are void.
           failure ??= 'drift';
           _recordPassFailure(
@@ -350,6 +375,9 @@ class LlmCommentScreening {
           modelId: modelId,
           reason: hiddenReasons[i],
           elapsedMs: watch.elapsedMilliseconds,
+          llmInputTokens: usages[i]?.inputTokens,
+          llmCacheHitTokens: usages[i]?.cacheHitTokens,
+          llmCacheMissTokens: usages[i]?.cacheMissTokens,
         ),
       );
     }
@@ -401,9 +429,10 @@ class LlmCommentScreening {
   /// confirmed latch + active comment rule_version (spec 5).
   static String _fingerprint(
     LlmProviderConfig config,
-    List<LlmCommentRuleView> views,
-  ) =>
-      'llm-comment|${config.protocol?.id}|${config.normalizedBaseUrl}|${config.model}|${config.confirmed}|${LlmCommentRuleView.canonicalJson(views)}';
+    List<LlmCommentRuleView> views, {
+    LlmThinkingChoice? thinking,
+  }) =>
+      'llm-comment|${config.protocol?.id}|${config.normalizedBaseUrl}|${config.model}|${config.confirmed}|${LlmCommentRuleView.canonicalJson(views)}|think:${thinking?.name ?? 'default'}';
 
   static String? _parentOf(List<String?>? parents, int index) =>
       parents == null || index >= parents.length ? null : parents[index];
@@ -449,6 +478,7 @@ class LlmVideoScreenOutcome {
     this.modelId,
     this.failure,
     this.elapsedMs = 0,
+    this.usages = const <int, LlmUpstreamUsage>{},
   });
 
   final List<bool> hidden;
@@ -466,6 +496,9 @@ class LlmVideoScreenOutcome {
   final String? failure;
 
   final int elapsedMs;
+
+  /// index → 该次 live 请求的上游 usage（#176）；缓存命中/void 轮缺失。
+  final Map<int, LlmUpstreamUsage> usages;
 }
 
 /// LLM video pipeline: runs only in global LLM mode.
@@ -482,7 +515,8 @@ class LlmVideoScreening {
        _settings = settings ?? LlmSettingsStore(),
        _credentials = credentials ?? SecureLlmCredentialStore(),
        _rules = rules ?? JevRuleStore(),
-       _cache = cache ?? LlmVerdictCache();
+       _cache = cache ?? LlmVerdictCache(),
+       _thinking = LlmThinkingStore(box: settings?.box);
 
   final LlmChatClient _client;
 
@@ -493,6 +527,7 @@ class LlmVideoScreening {
   ScreeningModeStore get modes => _settings.modes;
   final LlmCredentialStore _credentials;
   final LlmVerdictCache _cache;
+  final LlmThinkingStore _thinking;
 
   /// One-shot legacy-blob migration (#141); a failed migration fails open
   /// downstream (legacy rules simply stay invisible this pass).
@@ -543,18 +578,21 @@ class LlmVideoScreening {
       Map<int, String> reasons = const {},
       String? modelId,
       String? failure,
+      Map<int, LlmUpstreamUsage> usages = const {},
     }) => LlmVideoScreenOutcome(
       hidden: hidden,
       ruleIds: ruleIds,
       reasons: reasons,
       modelId: modelId,
       failure: failure,
+      usages: usages,
       elapsedMs: watch.elapsedMilliseconds,
     );
     final ruleIds = <int, String>{};
     final reasons = <int, String>{};
     String? modelId;
     String? failure;
+    final usages = <int, LlmUpstreamUsage>{};
     try {
       await _migrateRules();
       final rules = (await _rules.load()).activeVideoTextRules();
@@ -564,7 +602,15 @@ class LlmVideoScreening {
         credentials: _credentials,
       );
       modelId = context.config.model;
-      final fingerprint = _fingerprint(context.config, rules);
+      final thinking = LlmThinking.planFor(
+        config: context.config,
+        store: _thinking,
+      );
+      final fingerprint = _fingerprint(
+        context.config,
+        rules,
+        thinking: thinking?.choice,
+      );
       final generation = '${mode.generation}|$fingerprint';
       final knownIds = {for (final rule in rules) rule.id};
       final cacheOn = _cache.enabled;
@@ -608,6 +654,7 @@ class LlmVideoScreening {
                   tags: candidate.tags,
                 ),
                 timeout: remaining,
+                thinkingFields: thinking?.fields,
               )
               .timeout(remaining);
           if (!mode.isCurrent) break;
@@ -626,6 +673,8 @@ class LlmVideoScreening {
             ruleIds[i] = verdict.hits.first.ruleId;
             reasons[i] = verdict.hits.first.reason;
           }
+          final usage = outcome.usage;
+          if (usage != null) usages[i] = usage;
           if (cacheOn) {
             final identity = _videoIdentity(candidate);
             if (identity != null) {
@@ -650,7 +699,12 @@ class LlmVideoScreening {
       final config = await _settings.load().timeout(remaining);
       final rulesNow = (await _rules.load().timeout(remaining))
           .activeVideoTextRules();
-      if (_fingerprint(config, rulesNow) != fingerprint) {
+      final thinkingNow = LlmThinking.planFor(
+        config: config,
+        store: _thinking,
+      );
+      if (_fingerprint(config, rulesNow, thinking: thinkingNow?.choice) !=
+          fingerprint) {
         return done(
           List<bool>.filled(candidates.length, false),
           modelId: modelId,
@@ -667,6 +721,7 @@ class LlmVideoScreening {
         reasons: reasons,
         modelId: modelId,
         failure: failure,
+        usages: usages,
       );
     } catch (e) {
       if (e is _LlmUnavailable) {
@@ -684,9 +739,10 @@ class LlmVideoScreening {
   /// rule_version of the ACTIVE set (spec 5).
   static String _fingerprint(
     LlmProviderConfig config,
-    List<LlmVideoRule> rules,
-  ) =>
-      'llm-video|${config.protocol?.id}|${config.normalizedBaseUrl}|${config.model}|${config.confirmed}|${videoRuleVersion(rules)}';
+    List<LlmVideoRule> rules, {
+    LlmThinkingChoice? thinking,
+  }) =>
+      'llm-video|${config.protocol?.id}|${config.normalizedBaseUrl}|${config.model}|${config.confirmed}|${videoRuleVersion(rules)}|think:${thinking?.name ?? 'default'}';
 
   /// Cache identity: the caller-provided stable key, else the normalized
   /// title (same whitespace/lowercase rule as JevEvaluator titles). Empty

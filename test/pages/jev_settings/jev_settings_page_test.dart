@@ -143,6 +143,7 @@ class _FakeLlmResolvedProbe extends LlmHttpProbe {
   Future<LlmProbeResult> callResolved({
     required LlmResolvedProvider resolved,
     required String apiKey,
+    Map<String, Object?>? thinkingFields,
   }) {
     calls.add(resolved);
     return Future.value(result);

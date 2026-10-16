@@ -93,8 +93,14 @@ class _JevScreenLogPageState extends State<JevScreenLogPage> {
             if (entry.reason != null && entry.reason!.isNotEmpty)
               '理由:${entry.reason!}',
             if (entry.failure != null) '失败:${entry.failure!}',
+            if (entry.llmInputTokens != null ||
+                entry.llmCacheHitTokens != null ||
+                entry.llmCacheMissTokens != null)
+              'Tokens:输入 ${entry.llmInputTokens ?? '-'} · '
+                  '缓存命中 ${entry.llmCacheHitTokens ?? '-'} · '
+                  '未命中 ${entry.llmCacheMissTokens ?? '-'}',
           ].join('\n'),
-          maxLines: 5,
+          maxLines: 6,
           overflow: TextOverflow.ellipsis,
         ),
       ),

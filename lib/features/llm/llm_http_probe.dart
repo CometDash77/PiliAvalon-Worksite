@@ -134,9 +134,11 @@ class LlmHttpProbe {
   /// 例如家族根路径、Bearer-on-Anthropic），请求体仍按解析出的路线协议构造。
   /// 结构缺失（未选模型、路线不支持等）不发包：[LlmProbeResult.outcome]
   /// 为 null，原因在 [detail]。
+  /// [thinkingFields]（#176）随探活请求一起验证：与真实筛选请求同形。
   Future<LlmProbeResult> callResolved({
     required LlmResolvedProvider resolved,
     required String apiKey,
+    Map<String, Object?>? thinkingFields,
   }) async {
     final blocking = resolved.issues;
     if (blocking.isNotEmpty) {
@@ -154,6 +156,7 @@ class LlmHttpProbe {
             'messages': const <Map<String, String>>[
               {'role': 'user', 'content': _probePrompt},
             ],
+            ...?thinkingFields,
           },
           _ => <String, Object?>{
             'model': effectiveModel,
@@ -162,6 +165,7 @@ class LlmHttpProbe {
             ],
             'max_tokens': 16,
             'stream': false,
+            ...?thinkingFields,
           },
         },
         options: Options(
