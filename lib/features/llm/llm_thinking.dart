@@ -132,6 +132,11 @@ class LlmThinkingStore {
     } else {
       map[identity] = choice.name;
     }
-    await _box.put(key, jsonEncode(map));
+    if (map.isEmpty) {
+      // 注册表清空后不留空 JSON 行：箱中缺席 = 未选择。
+      await _box.delete(key);
+    } else {
+      await _box.put(key, jsonEncode(map));
+    }
   }
 }
