@@ -26,7 +26,7 @@ class LlmChatOutcome {
     : failure = null,
       detail = null;
 
-  const LlmChatOutcome.failed(this.failure, this.detail) : text = null;
+  const LlmChatOutcome.failed(this.failure, this.detail) : text = null, usage = null;
 
   final String? text;
   final LlmChatFailureKind? failure;
