@@ -103,16 +103,16 @@ class LlmThinkingStore {
   Map<String, String> _load() {
     try {
       final raw = _box.get(key);
-      if (raw is! String || raw.isEmpty) return const {};
+      if (raw is! String || raw.isEmpty) return <String, String>{};
       final decoded = jsonDecode(raw);
-      if (decoded is! Map) return const {};
+      if (decoded is! Map) return <String, String>{};
       final out = <String, String>{};
       decoded.forEach((k, v) {
         if (k is String && v is String) out[k] = v;
       });
       return out;
     } catch (_) {
-      return const {};
+      return <String, String>{};
     }
   }
 

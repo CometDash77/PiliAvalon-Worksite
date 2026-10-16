@@ -431,7 +431,7 @@ void main() {
 
       final loaded = log.load();
 
-      expect(loaded.map((e) => e.time), [2, 1]);
+      expect(loaded.map((e) => e.time), [3, 2, 1]);
       expect(loaded.every((e) => e.line == JevScreenLogLine.llm), isTrue);
       final hit = loaded.singleWhere((e) => e.title == '某视频');
       expect(hit.ruleId, 'v1');
