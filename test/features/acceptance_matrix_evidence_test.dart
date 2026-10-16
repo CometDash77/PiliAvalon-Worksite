@@ -157,6 +157,17 @@ Future<_Box> _decisionBox() async {
   box.map[JevSettingsStore.providerConfirmedKey] = true;
   // 终审判定缓存是进程内静态区（#123）；本文件关注实时判定，直接关闭。
   box.map[SettingBoxKey.jevVerdictCacheEnabled] = false;
+  // LLM 侧门禁预置：无 provider 配置或空 videoTextRules 时 LlmVideoScreening
+  // 整体禁用（isEnabled 空 rules→false），切到 LLM 模式的用例会全保留且零请求。
+  await LlmSettingsStore(box: box).save(LlmProviderConfig(
+    protocol: LlmProtocol.openAICompatible,
+    baseUrl: 'https://api.example.com/v1',
+    model: 'm1',
+    confirmed: true,
+  ));
+  await JevRuleStore(box: box).save(const JevRuleConfig(videoTextRules: [
+    LlmVideoRule(id: 'v1', text: '剧透内容'),
+  ]));
   await ScreeningModeStore(box: box).save(ScreeningEngineMode.decision);
   return box;
 }
@@ -420,22 +431,25 @@ void main() {
       expect(_userOf(llmStub.bodies.single), contains('剧透内容'));
       expect(llmStub.calls, 1);
 
-      // 一次保存（停用 r1 + 移除 v1）→ 两后端同步变化。
-      await JevRuleStore(box: box).save(const JevRuleConfig(rules: [
-        JevRule(
-          id: 'r1',
-          target: JevRuleTarget.video,
-          question: '有剧透吗',
-          threshold: .9,
-          enabled: false,
-        ),
-        JevRule(
-          id: 'r2',
-          target: JevRuleTarget.video,
-          question: '标题党吗',
-          threshold: .9,
-        ),
-      ]));
+      // 一次保存（停用 r1 + 移除 v1；v2 仅维持 LLM 管线启用）→ 两后端同步变化。
+      await JevRuleStore(box: box).save(const JevRuleConfig(
+        rules: [
+          JevRule(
+            id: 'r1',
+            target: JevRuleTarget.video,
+            question: '有剧透吗',
+            threshold: .9,
+            enabled: false,
+          ),
+          JevRule(
+            id: 'r2',
+            target: JevRuleTarget.video,
+            question: '标题党吗',
+            threshold: .9,
+          ),
+        ],
+        videoTextRules: [LlmVideoRule(id: 'v2', text: '其他内容')],
+      ));
       final capture2 = _Capture(
           reply: (_) async => _answers({
                 'candidate_1_rule_1': _noul(0.10),
