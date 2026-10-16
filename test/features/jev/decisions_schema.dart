@@ -35,7 +35,7 @@ bool acceptsDecisionsRequest(Object? value) {
     } else {
       // choice: criteria maps option ids to their labels (JevRule.compile).
       if (criteria.isEmpty ||
-          criteria.keys.any((k) => k is! String || (k as String).isEmpty) ||
+          criteria.keys.any((k) => k is! String || k.isEmpty) ||
           criteria.values.any((v) => v is! String)) {
         return false;
       }

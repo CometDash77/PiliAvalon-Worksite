@@ -159,7 +159,7 @@ Future<_Box> _decisionBox() async {
   box.map[SettingBoxKey.jevVerdictCacheEnabled] = false;
   // LLM 侧门禁预置：无 provider 配置或空 videoTextRules 时 LlmVideoScreening
   // 整体禁用（isEnabled 空 rules→false），切到 LLM 模式的用例会全保留且零请求。
-  await LlmSettingsStore(box: box).save(LlmProviderConfig(
+  await LlmSettingsStore(box: box).save(const LlmProviderConfig(
     protocol: LlmProtocol.openAICompatible,
     baseUrl: 'https://api.example.com/v1',
     model: 'm1',
@@ -180,7 +180,7 @@ Future<_Box> _llmVideoBox({bool decisionReady = false}) async {
     box.map[JevSettingsStore.providerKey] = 'typesafe';
     box.map[JevSettingsStore.providerConfirmedKey] = true;
   }
-  await LlmSettingsStore(box: box).save(LlmProviderConfig(
+  await LlmSettingsStore(box: box).save(const LlmProviderConfig(
     protocol: LlmProtocol.openAICompatible,
     baseUrl: 'https://api.example.com/v1',
     model: 'm1',
@@ -197,7 +197,7 @@ Future<_Box> _commentBox() async {
   final box = _Box();
   box.map[JevSettingsStore.enabledKey] = true;
   box.map[JevSettingsStore.surfaceKey(JevSurface.comment)] = true;
-  await LlmSettingsStore(box: box).save(LlmProviderConfig(
+  await LlmSettingsStore(box: box).save(const LlmProviderConfig(
     protocol: LlmProtocol.openAICompatible,
     baseUrl: 'https://api.example.com/v1',
     model: 'm1',
