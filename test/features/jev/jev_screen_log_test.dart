@@ -158,7 +158,10 @@ JevScreenLogEntry entry(String title, {JevScreenLogKind kind = JevScreenLogKind.
     );
 
 class _FakeVideoScreening extends LlmVideoScreening {
-  _FakeVideoScreening(this.outcome);
+  // 收敛后 JevRuleStore/JevSettingsStore 默认构造会触碰 GStorage.setting（测试
+  // 环境未初始化），注入隔离 box；与验收矩阵测试 _video 助手同一模式。
+  _FakeVideoScreening(this.outcome, MemoryBox box)
+    : super(rules: JevRuleStore(box: box), settings: LlmSettingsStore(box: box));
 
   final LlmVideoScreenOutcome outcome;
 
@@ -552,6 +555,7 @@ void main() {
             modelId: 'm1',
             elapsedMs: 88,
           ),
+          box,
         ),
       );
 
@@ -593,6 +597,7 @@ void main() {
             failure: 'timeout',
             elapsedMs: 300,
           ),
+          box,
         ),
       );
 

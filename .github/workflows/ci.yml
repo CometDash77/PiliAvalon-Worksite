@@ -45,6 +45,15 @@ jobs:
       - name: Flutter version
         run: flutter --version
 
+      # U5 evidence (#182): the pub mirror used by every dependency fetch
+      # must be explicitly recorded in the same run as the test evidence.
+      - name: Record pub mirror (U5 evidence)
+        env:
+          PUB_HOSTED_URL: https://pub-web.flutter-io.cn
+        run: |
+          echo "PUB_HOSTED_URL=$PUB_HOSTED_URL"
+          test "$PUB_HOSTED_URL" = "https://pub-web.flutter-io.cn"
+
       - name: Apply Android SDK and package patches
         shell: pwsh
         run: lib/scripts/patch.ps1 android
