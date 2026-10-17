@@ -9,7 +9,8 @@ import 'package:PiliPlus/models_new/pgc/pgc_rank/pgc_rank_item_model.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'decisions_schema.dart';
+import 'decisions_schema.dart';
+import 'package:PiliPlus/features/jev/jev_screen_log.dart';
 
 // 评测器测试假件的轻量复刻（见 jev_evaluator_test.dart）。
 class _MemoryBox implements JevSettingsBox {
