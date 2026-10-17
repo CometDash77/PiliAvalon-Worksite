@@ -15,21 +15,30 @@ bool acceptsDecisionsRequest(Object? value) {
   for (final entry in questions.entries) {
     final question = entry.value;
     if (entry.key is! String || question is! Map) return false;
+    final type = question['type'];
     if (question.keys.toSet().difference({
           'type',
           'instructions',
           'criteria',
         }).isNotEmpty ||
-        question['type'] != 'noul' ||
+        (type != 'noul' && type != 'choice') ||
         question['instructions'] is! String ||
         (question['instructions'] as String).isEmpty) {
       return false;
     }
     final criteria = question['criteria'];
-    if (criteria is! Map ||
-        criteria['true'] is! String ||
-        criteria['false'] is! String) {
-      return false;
+    if (criteria is! Map) return false;
+    if (type == 'noul') {
+      if (criteria['true'] is! String || criteria['false'] is! String) {
+        return false;
+      }
+    } else {
+      // choice: criteria maps option ids to their labels (JevRule.compile).
+      if (criteria.isEmpty ||
+          criteria.keys.any((k) => k is! String || k.isEmpty) ||
+          criteria.values.any((v) => v is! String)) {
+        return false;
+      }
     }
   }
   return true;
