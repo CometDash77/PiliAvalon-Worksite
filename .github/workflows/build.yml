@@ -105,7 +105,7 @@ jobs:
               if: ${{ github.event_name == 'workflow_dispatch' }}
               shell: pwsh
               env:
-                  PILI_VERSION_CODE_FLOOR: 5150
+                  PILI_VERSION_CODE_FLOOR: 5650
               run: lib/scripts/build.ps1 android
 
             - name: Flutter Build Release Apk

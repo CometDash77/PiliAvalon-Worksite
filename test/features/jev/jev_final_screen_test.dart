@@ -1,5 +1,6 @@
 import 'package:PiliPlus/features/jev/jev.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
+import 'package:PiliPlus/models_new/live/live_feed_index/card_data_list_item.dart';
 import 'package:PiliPlus/models/model_hot_video_item.dart';
 import 'package:PiliPlus/models/model_video.dart';
 import 'package:PiliPlus/models_new/music/bgm_recommend_list.dart';
@@ -461,4 +462,43 @@ void main() {
       expect(wrote, isFalse);
     });
   });
+  group('JevFinalScreen.live（issue #115）', () {
+    test('已关注房间豁免：不送审、原样保留', () async {
+      final box = _MemoryBox();
+      final liveLog = JevFilterLog(
+        box: box,
+        storageKey: '${JevSettingsStore.namespace}.live_filter_log.v1',
+        capacity: 500,
+      );
+      // 赋值不触发静态初始化器（读取才会），测试环境无 Hive。
+      JevFilterLog.live = liveLog;
+
+      final capture = _CapturingTransport(
+        reply: (index) => _answers({'candidate_1': 0.95}),
+      );
+      final screen = JevFinalScreen.live<CardLiveItem>(
+        evaluator: _Harness(surfaces: {JevSurface.live}).evaluator(capture),
+        followedRoomIds: {9527},
+      );
+
+      const items = [
+        CardLiveItem(uid: 1001, roomid: 9527, title: '已关注直播间'),
+        CardLiveItem(uid: 2002, roomid: 1111, title: '未关注直播间'),
+      ];
+      final result = await screen.screen(items);
+
+      // 已关注保留；未关注被 Jev 筛除。
+      expect(result.map((e) => e.title), ['已关注直播间']);
+      // 只有未关注卡片被送审：请求体里没有已关注卡片。
+      expect(capture.calls, 1);
+      final state = capture.bodies.single['state'] as Map;
+      expect((state['candidates'] as Map).values.map((c) => c['title']),
+          ['未关注直播间']);
+      await pumpEventQueue();
+
+      // 筛除记录进直播 500 条实例，不进通用最近 5 条。
+      expect(liveLog.load().single.title, '未关注直播间');
+    });
+  });
+
 }

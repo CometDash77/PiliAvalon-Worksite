@@ -22,6 +22,11 @@ enum JevRuleTarget {
 
 enum JevRuleType { noul, choice }
 
+/// 命中之后的动作（issue #115）：hide 是既有语义（命中即隐藏）；
+/// keep 只对直播开放——存在保留规则时，标题至少要命中一条保留规则
+/// 才会展示。旧记录没有该字段，默认 hide，行为不变。
+enum JevRuleAction { hide, keep }
+
 class JevRuleOption {
   const JevRuleOption({
     required this.id,
@@ -46,6 +51,7 @@ class JevRule {
     required this.target,
     required this.question,
     this.type = JevRuleType.noul,
+    this.action = JevRuleAction.hide,
     this.enabled = true,
     this.threshold = .95,
     this.hideOnYes = true,
@@ -61,6 +67,9 @@ class JevRule {
   final JevRuleTarget target;
   final String question;
   final JevRuleType type;
+
+  /// 命中后的动作；keep 仅直播可用（issue #115）。
+  final JevRuleAction action;
   final bool enabled;
   final double threshold;
   final bool hideOnYes;
@@ -71,8 +80,10 @@ class JevRule {
 
   String? validate() {
     if (id.trim().isEmpty) return '规则标识不能为空';
-    if (question.trim().isEmpty ||
-        question.length > JevLimits.maxQuestionChars) {
+    if (action == JevRuleAction.keep && target != JevRuleTarget.live) {
+      return '目前仅直播规则支持保留动作';
+    }
+    if (question.trim().isEmpty || question.length > JevLimits.maxQuestionChars) {
       return '问题需要 1–1000 个字符';
     }
     if (!threshold.isFinite || threshold < .5 || threshold > 1) {
@@ -106,6 +117,7 @@ class JevRule {
   JevRule copyWith({
     String? question,
     JevRuleType? type,
+    JevRuleAction? action,
     bool? enabled,
     double? threshold,
     bool? hideOnYes,
@@ -118,6 +130,7 @@ class JevRule {
     target: target,
     question: question ?? this.question,
     type: type ?? this.type,
+    action: action ?? this.action,
     enabled: enabled ?? this.enabled,
     threshold: threshold ?? this.threshold,
     hideOnYes: hideOnYes ?? this.hideOnYes,
@@ -173,8 +186,7 @@ class JevRule {
     );
     if ((sum - 1).abs() > .001) return false;
     final chosen = _probability(probabilities[choice]);
-    if (chosen == null ||
-        probabilities.values.any((p) => (p as num) > chosen)) {
+    if (chosen == null || probabilities.values.any((p) => (p as num) > chosen)) {
       return false;
     }
     return hiddenOptions.contains(choice) && confidence >= threshold;
@@ -190,6 +202,7 @@ class JevRule {
     'target': target.name,
     'question': question,
     'type': type.name,
+    'action': action.name,
     'enabled': enabled,
     'threshold': threshold,
     'hideOnYes': hideOnYes,
@@ -204,6 +217,13 @@ class JevRule {
     target: JevRuleTarget.values.byName(json['target'] as String),
     question: json['question'] as String,
     type: JevRuleType.values.byName(json['type'] as String),
+    action: json['action'] is String
+        ? (JevRuleAction.values.any(
+              (a) => a.name == json['action'],
+            )
+            ? JevRuleAction.values.byName(json['action'] as String)
+            : JevRuleAction.hide)
+        : JevRuleAction.hide,
     enabled: json['enabled'] == true,
     threshold: (json['threshold'] as num).toDouble(),
     hideOnYes: json['hideOnYes'] == true,
@@ -383,15 +403,8 @@ class LlmVideoRuleStore {
 
 /// A single non-secret blob keeps rule edits and builtin switches atomic.
 class JevRuleStore {
-  JevRuleStore({JevSettingsBox? box}) : _boxOrNull = box;
-
-  // 构造期不触碰 JevSettingsStore/GStorage（#130）：解析推迟到首次读写，
-  // 让 LlmCommentScreening 等默认构造在测试环境同样安全。
-  final JevSettingsBox? _boxOrNull;
-  JevSettingsBox? _lazyBox;
-  JevSettingsStore? _store;
-  JevSettingsBox get _box =>
-      _lazyBox ??= _boxOrNull ?? (_store ??= JevSettingsStore()).box;
+  JevRuleStore({JevSettingsBox? box}) : _box = box ?? JevSettingsStore().box;
+  final JevSettingsBox _box;
   static const key = '${JevSettingsStore.namespace}.rules.v1';
   Future<JevRuleConfig> load() async {
     final raw = _box.get(key);

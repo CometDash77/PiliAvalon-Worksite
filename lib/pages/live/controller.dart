@@ -1,5 +1,6 @@
 import 'package:PiliPlus/common/widgets/pair.dart';
 import 'package:PiliPlus/features/jev/jev_final_screen.dart';
+import 'package:PiliPlus/features/shielding/live_follow_exempt.dart';
 import 'package:PiliPlus/features/shielding/live_shielding.dart';
 import 'package:PiliPlus/features/shielding/shielding.dart';
 import 'package:PiliPlus/http/live.dart';
@@ -16,10 +17,30 @@ import 'package:flutter/widgets.dart' show ScrollController;
 import 'package:get/get.dart';
 
 class LiveController extends CommonListController with AccountMixin {
-  LiveController({ShieldRuleSet Function()? ruleSetProvider})
-    : _ruleSetProvider = ruleSetProvider ?? _storedRuleSet;
+  LiveController({
+    ShieldRuleSet Function()? ruleSetProvider,
+    Future<Set<int>?> Function()? followRoomIdsProvider,
+  }) : _ruleSetProvider = ruleSetProvider ?? _storedRuleSet,
+       _followRoomIdsProvider =
+           followRoomIdsProvider ?? LiveFollowExempt.followedRoomIds;
 
   final ShieldRuleSet Function() _ruleSetProvider;
+
+  /// 已关注主播房间号来源（issue #115）。进程内按控制器实例记忆一次：
+  /// 刷新不重取，切换账号时重置。测试注入替身避免触网。
+  /// 返回 null = 关注状态未知（查询失败），调用方保留候选并跳过所有直播过滤。
+  final Future<Set<int>?> Function() _followRoomIdsProvider;
+  Future<Set<int>?>? _followedRoomIdsFuture;
+
+  Future<Set<int>?> _followedRoomIds() =>
+      _followedRoomIdsFuture ??= () async {
+        try {
+          return await _followRoomIdsProvider();
+        } catch (_) {
+          // 关注查询异常 → 状态未知（不能当作未关注，issue #115）。
+          return null;
+        }
+      }();
 
   /// Keeps this feature independent of any in-flight runtime hook: the rules
   /// are read straight from the shielding store on every page load.
@@ -89,8 +110,20 @@ class LiveController extends CommonListController with AccountMixin {
   @override
   Future<void> handleListResponse(List dataList) async {
     final before = dataList.length;
-    LiveShielding.removeBlocked(dataList, _ruleSetProvider());
-    final visible = await JevFinalScreen.live<dynamic>().screen(dataList);
+    // 已关注主播豁免所有直播过滤（含硬屏蔽与 Jev，issue #115）。
+    final followed = await _followedRoomIds();
+    if (followed == null) {
+      // 关注查询失败 → 状态未知 → 保留候选，跳过所有直播过滤（issue #115）。
+      return;
+    }
+    LiveShielding.removeBlocked(
+      dataList,
+      _ruleSetProvider(),
+      exemptRoomIds: followed,
+    );
+    final visible = await JevFinalScreen.live<dynamic>(
+      followedRoomIds: followed,
+    ).screen(dataList);
     if (isClosed) return;
     if (!identical(visible, dataList)) {
       dataList
@@ -104,11 +137,18 @@ class LiveController extends CommonListController with AccountMixin {
 
   /// Re-applies the live rules to the already loaded page, so a rule saved from
   /// a card entry removes every newly matching card without another request.
-  int refilterLoadedItems() {
+  /// 已关注主播豁免同样生效（issue #115）。
+  Future<int> refilterLoadedItems() async {
     if (loadingState.value case Success(:final response)) {
       final items = response;
       if (items == null || items.isEmpty) return 0;
-      final removed = LiveShielding.removeBlocked(items, _ruleSetProvider());
+      final followed = await _followedRoomIds();
+      if (followed == null) return 0; // 关注状态未知 → 不动已加载列表。
+      final removed = LiveShielding.removeBlocked(
+        items,
+        _ruleSetProvider(),
+        exemptRoomIds: followed,
+      );
       if (removed == 0) return 0;
       hiddenCardCount += removed;
       loadingState.refresh();
@@ -237,7 +277,11 @@ class LiveController extends CommonListController with AccountMixin {
   }
 
   @override
-  void onChangeAccount(bool isLogin) => onReload();
+  void onChangeAccount(bool isLogin) {
+    // 换账号后关注列表变了，豁免集随之失效。
+    _followedRoomIdsFuture = null;
+    onReload();
+  }
 
   @override
   void onClose() {

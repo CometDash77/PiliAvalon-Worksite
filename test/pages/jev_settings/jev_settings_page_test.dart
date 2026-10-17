@@ -439,13 +439,13 @@ void main() {
         .widgetList<SwitchListTile>(find.byType(SwitchListTile))
         .toList();
     // Cache plus each wired surface. No second engine-wide master switch.
+    // #115 已接线直播面：所有面都有真实调用点，均可开关，无「尚未接线」副标题。
     expect(surfaces.length, JevSurface.values.length + 1);
     final wired = surfaces.where((tile) => tile.subtitle == null);
-    expect(wired.length, JevSurface.values.length - 1);
+    expect(wired.length, JevSurface.values.length);
     for (final tile in wired) {
       expect(tile.onChanged, isNotNull);
     }
-    // A surface with no call site says so and cannot be switched on.
     // 判定缓存开关(issue #123)自带副标题但不是生效入口，按 key 排除。
     for (final tile
         in surfaces.where(
@@ -467,11 +467,8 @@ void main() {
 
     await tester.tap(find.text(JevSurface.live.label), warnIfMissed: false);
     await tester.pumpAndSettle();
-    expect(box.values[JevSettingsStore.surfaceKey(JevSurface.live)], isFalse);
-    expect(
-      JevSettingsStore.snapshot.isSurfaceEnabled(JevSurface.live),
-      isFalse,
-    );
+    expect(box.values[JevSettingsStore.surfaceKey(JevSurface.live)], isTrue);
+    expect(JevSettingsStore.snapshot.isSurfaceEnabled(JevSurface.live), isTrue)
   });
 
   testWidgets('a hinted key never validates against the wrong provider', (

@@ -146,6 +146,7 @@ JevFilterLogEntry entry(
   double? confidence,
   double? threshold = 0.95,
   String? ruleId,
+  String? reason,
 }) => JevFilterLogEntry(
   time: time ?? DateTime.now().millisecondsSinceEpoch,
   surface: JevSurface.hot.id,
@@ -155,6 +156,7 @@ JevFilterLogEntry entry(
   confidence: confidence,
   threshold: threshold,
   ruleId: ruleId,
+  reason: reason,
 );
 
 void main() {
@@ -451,6 +453,53 @@ void main() {
 
       expect(result.outcome, JevProbeOutcome.ok);
       expect(JevFilterLog(box: box).load(), isEmpty);
+    });
+  });
+
+
+  group('直播筛除记录实例(issue #115)', () {
+    test('独立 storageKey 与默认实例互不覆盖', () async {
+      final box = MemoryBox();
+      final liveLog = JevFilterLog(box: box, storageKey: '${JevSettingsStore.namespace}.live_filter_log.v1', capacity: 500);
+      await JevFilterLog(box: box).record([entry('通用筛除', time: 1)]);
+      await liveLog.record([
+        entry('直播筛除', time: 2, reason: '未命中任何保留规则'),
+      ]);
+
+      expect(JevFilterLog(box: box).load().single.title, '通用筛除');
+      expect(liveLog.load().single.title, '直播筛除');
+      expect(liveLog.load().single.reason, '未命中任何保留规则');
+
+      // 清空只影响直播实例自己的 key。
+      await liveLog.clear();
+      expect(liveLog.load(), isEmpty);
+      expect(JevFilterLog(box: box).load(), hasLength(1));
+    });
+
+    test('环形上限 500 条:501 条只保留最新 500', () async {
+      final box = MemoryBox();
+      final liveLog = JevFilterLog(box: box, storageKey: '${JevSettingsStore.namespace}.live_filter_log.v1', capacity: 500);
+      final entries = [
+        for (var i = 1; i <= 501; i++) entry('直播间 $i', time: i),
+      ];
+      await liveLog.record(entries);
+      final loaded = liveLog.load();
+      expect(loaded, hasLength(500));
+      expect(loaded.first.title, '直播间 501');
+      expect(loaded.last.title, '直播间 2');
+    });
+
+    test('重启后仍可读(reason 一并持久化)', () async {
+      final box = MemoryBox();
+      final first = JevFilterLog(box: box, storageKey: '${JevSettingsStore.namespace}.live_filter_log.v1', capacity: 500);
+      await first.record([
+        entry('复合原因直播', time: 3, ruleId: 'keep-1', reason: '未命中任何保留规则'),
+      ]);
+
+      final second = JevFilterLog(box: box, storageKey: '${JevSettingsStore.namespace}.live_filter_log.v1', capacity: 500);
+      final loaded = second.load().single;
+      expect(loaded.ruleId, 'keep-1');
+      expect(loaded.reason, '未命中任何保留规则');
     });
   });
 }

@@ -10,7 +10,8 @@ String _targetLabel(JevRuleTarget target) => switch (target) {
 String _scope(JevRuleTarget target) => switch (target) {
   JevRuleTarget.video => '首页、相关、热门、排行、PGC、音乐推荐；沿用各入口开关。',
   JevRuleTarget.comment => '仅视频详情评论正文及必要回复上下文，不筛选实时弹幕。',
-  JevRuleTarget.live => '仅直播推荐卡片的标题、分区等现有内容，不读取房间消息。',
+  JevRuleTarget.live =>
+    '仅直播推荐卡片的标题、分区等现有内容，不读取房间消息；已关注主播豁免全部直播过滤。',
 };
 
 /// Local rule management; saving does not make a network request.
@@ -152,7 +153,11 @@ class _JevRulesPageState extends State<JevRulesPage> {
                 const SizedBox(height: 16),
                 Text(_scope(_target)),
                 const SizedBox(height: 8),
-                const Text('任一启用规则达到阈值就隐藏；不命中、不确定、信息不足或请求失败时正常展示。'),
+                Text(
+                  _target == JevRuleTarget.live
+                      ? '排除规则命中即隐藏；存在保留规则时，标题至少命中一条保留规则才展示；不确定、信息不足或请求失败时正常展示。'
+                      : '任一启用规则达到阈值就隐藏；不命中、不确定、信息不足或请求失败时正常展示。',
+                ),
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
@@ -215,7 +220,7 @@ class _JevRulesPageState extends State<JevRulesPage> {
                             '${rule.type == JevRuleType.noul ? 'Yes / No' : '选择题'} · 阈值 ${(rule.threshold * 100).round()}%',
                           ),
                           Text(
-                            '隐藏条件：${rule.type == JevRuleType.noul ? (rule.hideOnYes ? 'Yes' : 'No') : rule.options.where((o) => rule.hiddenOptions.contains(o.id)).map((o) => o.label).join('、')}',
+                            '${rule.action == JevRuleAction.keep ? '保留条件' : '隐藏条件'}：${rule.type == JevRuleType.noul ? (rule.hideOnYes ? 'Yes' : 'No') : rule.options.where((o) => rule.hiddenOptions.contains(o.id)).map((o) => o.label).join('、')}',
                           ),
                           Wrap(
                             crossAxisAlignment: WrapCrossAlignment.center,
@@ -290,6 +295,11 @@ class _RuleEditorState extends State<_RuleEditor> {
   );
   late final _no = TextEditingController(text: widget.initial?.noMeaning ?? '');
   late JevRuleType _type = widget.initial?.type ?? JevRuleType.noul;
+  // 保留动作仅直播开放（issue #115）；其他 target 固定 hide。
+  late JevRuleAction _action =
+      widget.target == JevRuleTarget.live
+      ? (widget.initial?.action ?? JevRuleAction.hide)
+      : JevRuleAction.hide;
   late bool _hideOnYes = widget.initial?.hideOnYes ?? true;
   late bool _enabled = widget.initial?.enabled ?? true;
   late double _threshold = widget.initial?.threshold ?? .95;
@@ -326,6 +336,7 @@ class _RuleEditorState extends State<_RuleEditor> {
       target: widget.target,
       question: _question.text.trim(),
       type: _type,
+      action: _action,
       enabled: _enabled,
       threshold: _threshold,
       hideOnYes: _hideOnYes,
@@ -397,6 +408,31 @@ class _RuleEditorState extends State<_RuleEditor> {
                 ? null
                 : (value) => setState(() => _type = value.single),
           ),
+          if (widget.target == JevRuleTarget.live) ...[
+            const SizedBox(height: 16),
+            const Text('命中之后做什么'),
+            SegmentedButton<JevRuleAction>(
+              segments: const [
+                ButtonSegment(
+                  value: JevRuleAction.hide,
+                  label: Text('排除（隐藏）'),
+                ),
+                ButtonSegment(
+                  value: JevRuleAction.keep,
+                  label: Text('保留（展示）'),
+                ),
+              ],
+              selected: {_action},
+              onSelectionChanged: _saving
+                  ? null
+                  : (value) => setState(() => _action = value.single),
+            ),
+            Text(
+              _action == JevRuleAction.keep
+                  ? '保留规则：存在保留规则时，标题至少命中一条保留规则才展示。'
+                  : '排除规则：命中即隐藏。',
+            ),
+          ],
           const SizedBox(height: 16),
           if (_type == JevRuleType.noul) ...[
             TextField(
@@ -412,7 +448,11 @@ class _RuleEditorState extends State<_RuleEditor> {
               decoration: const InputDecoration(labelText: 'No 的含义（选填）'),
             ),
             const SizedBox(height: 16),
-            const Text('哪个答案达到阈值时隐藏'),
+            Text(
+              _action == JevRuleAction.keep
+                  ? '哪个答案达到阈值时算命中（保留）'
+                  : '哪个答案达到阈值时隐藏',
+            ),
             SegmentedButton<bool>(
               segments: const [
                 ButtonSegment(value: true, label: Text('Yes')),
@@ -424,7 +464,11 @@ class _RuleEditorState extends State<_RuleEditor> {
                   : (value) => setState(() => _hideOnYes = value.single),
             ),
           ] else ...[
-            const Text('模型每次只选一个答案；可勾选多个选到就隐藏的选项。'),
+            Text(
+              _action == JevRuleAction.keep
+                  ? '模型每次只选一个答案；可勾选多个选到就算命中的选项。'
+                  : '模型每次只选一个答案；可勾选多个选到就隐藏的选项。',
+            ),
             for (final option in _options)
               Card(
                 key: ValueKey(option.id),
@@ -451,7 +495,11 @@ class _RuleEditorState extends State<_RuleEditor> {
                           Expanded(
                             child: CheckboxListTile(
                               contentPadding: EdgeInsets.zero,
-                              title: const Text('选到此答案时隐藏'),
+                              title: Text(
+                                _action == JevRuleAction.keep
+                                    ? '选到此答案时算命中（保留）'
+                                    : '选到此答案时隐藏',
+                              ),
                               value: option.hidden,
                               onChanged: _saving
                                   ? null
@@ -508,6 +556,8 @@ class _RuleEditorState extends State<_RuleEditor> {
           Text(
             _type == JevRuleType.noul
                 ? '选择 Yes 时使用 Yes 概率；选择 No 时使用 No 概率。'
+                : _action == JevRuleAction.keep
+                ? '返回选项在命中集合内，且模型置信度达到阈值才算命中。'
                 : '返回选项在隐藏集合内，且模型置信度达到阈值才隐藏。',
           ),
           SwitchListTile(

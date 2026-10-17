@@ -11,6 +11,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 ShieldRuleSet _liveRuleSet = ShieldRuleSet();
 
+/// 已关注主播豁免集（issue #115）：测试注入空集/样例集/null（未知），绝不触网。
+Set<int>? _followedRooms = const {};
+
+/// 置 true 时 provider 抛异常，模拟关注查询崩溃。
+bool _followProviderThrows = false;
+
 Future<void> _settle() async {
   await Future<void>.delayed(Duration.zero);
   await Future<void>.delayed(Duration.zero);
@@ -19,6 +25,8 @@ Future<void> _settle() async {
 void main() {
   setUp(() {
     _liveRuleSet = ShieldRuleSet();
+    _followedRooms = const {};
+    _followProviderThrows = false;
   });
 
   test('filters each loaded page and keeps the survivor order', () async {
@@ -227,7 +235,7 @@ void main() {
     // on the very next pass without another request.
     _liveRuleSet = await store.load();
 
-    expect(controller.refilterLoadedItems(), 1);
+    expect(await controller.refilterLoadedItems(), 1);
     expect(_uids(controller), [1001]);
     expect(controller.hiddenCardCount, 1);
     expect(controller.requestedPages, [1]);
@@ -239,14 +247,97 @@ void main() {
     );
     _liveRuleSet = await store.load();
 
-    expect(controller.refilterLoadedItems(), 0);
+    expect(await controller.refilterLoadedItems(), 0);
     expect(controller.requestedPages, [1]);
+  });
+
+  test('followed hosts are exempt from live rules and Jev (issue #115)', () async {
+    _liveRuleSet = _rules([_roomRule('1002')]);
+    _followedRooms = {1002};
+    final controller = _TestLiveController(
+      pages: [
+        [_card(1001, 1002), _card(1003, 1003)],
+      ],
+    );
+
+    await controller.queryData();
+
+    // 房间号规则命中已关注房间 1002 → 豁免保留；1003 无规则保留。
+    expect(_uids(controller), [1001, 1003]);
+    expect(controller.hiddenCardCount, 0);
+
+    // 快捷屏蔽同一主播后重过滤：豁免仍然生效。
+    _liveRuleSet = _rules([_roomRule('1002'), _uidRule('1002')]);
+    expect(await controller.refilterLoadedItems(), 0);
+    expect(_uids(controller), [1001, 1003]);
+    controller.onClose();
+  });
+
+  test('an empty follow set keeps the pre-#115 filtering behavior', () async {
+    _liveRuleSet = _rules([_uidRule('1002')]);
+    _followedRooms = const {};
+    final controller = _TestLiveController(
+      pages: [
+        [_card(1001), _card(1002)],
+      ],
+    );
+
+    await controller.queryData();
+
+    expect(_uids(controller), [1001]);
+    expect(controller.hiddenCardCount, 1);
+    controller.onClose();
+  });
+
+  test('unknown follow state keeps candidates and skips all live filtering (issue #115)', () async {
+    _liveRuleSet = _rules([_uidRule('1002'), _roomRule('1002')]);
+    _followedRooms = null; // 关注查询失败 → 状态未知。
+    final controller = _TestLiveController(
+      pages: [
+        [_card(1001), _card(1002)],
+      ],
+    );
+
+    await controller.queryData();
+
+    // 查询失败不能当作未关注：硬屏蔽与 Jev 都不执行，候选全保留。
+    expect(_uids(controller), [1001, 1002]);
+    expect(controller.hiddenCardCount, 0);
+
+    // 重过滤同样不动列表。
+    expect(await controller.refilterLoadedItems(), 0);
+    expect(_uids(controller), [1001, 1002]);
+    controller.onClose();
+  });
+
+  test('a throwing follow provider is unknown, not unfollowed (issue #115)', () async {
+    _liveRuleSet = _rules([_uidRule('1002')]);
+    _followProviderThrows = true;
+    final controller = _TestLiveController(
+      pages: [
+        [_card(1001), _card(1002)],
+      ],
+    );
+
+    await controller.queryData();
+
+    expect(_uids(controller), [1001, 1002]);
+    expect(controller.hiddenCardCount, 0);
+    controller.onClose();
   });
 }
 
 class _TestLiveController extends LiveController {
   _TestLiveController({required this.pages, this.totalCount})
-    : super(ruleSetProvider: () => _liveRuleSet);
+    : super(
+        ruleSetProvider: () => _liveRuleSet,
+        followRoomIdsProvider: () async {
+          if (_followProviderThrows) {
+            throw StateError('follow query failed');
+          }
+          return _followedRooms;
+        },
+      );
 
   final List<List<CardLiveItem>> pages;
   final int? totalCount;

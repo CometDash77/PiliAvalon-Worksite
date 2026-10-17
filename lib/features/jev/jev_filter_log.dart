@@ -17,6 +17,7 @@ class JevFilterLogEntry {
     this.confidence,
     this.threshold,
     this.ruleId,
+    this.reason,
   });
 
   factory JevFilterLogEntry.fromJson(Map json) => JevFilterLogEntry(
@@ -33,6 +34,7 @@ class JevFilterLogEntry {
     confidence: _score(json['confidence']),
     threshold: _score(json['threshold']),
     ruleId: json['ruleId'] is String ? json['ruleId'] as String : null,
+    reason: json['reason'] is String ? json['reason'] as String : null,
   );
 
   /// epoch 毫秒。
@@ -59,6 +61,10 @@ class JevFilterLogEntry {
   /// 命中的自定义规则标识;内置阈值筛除为 null。
   final String? ruleId;
 
+  /// 本地生成的复合筛除原因(issue #115,如保留规则未命中);单规则命中时
+  /// 为 null,数值字段已说明。从不来自模型调用。
+  final String? reason;
+
   Map<String, Object?> toJson() => <String, Object?>{
     'time': time,
     'surface': surface,
@@ -69,6 +75,7 @@ class JevFilterLogEntry {
     if (confidence != null) 'confidence': confidence,
     if (threshold != null) 'threshold': threshold,
     if (ruleId != null) 'ruleId': ruleId,
+    if (reason != null) 'reason': reason,
   };
 
   static double? _score(Object? value) {
@@ -87,12 +94,26 @@ class JevFilterLogEntry {
 /// 候选(连接验证/合成样例/独立测试不会写入);环形上限自动裁剪;
 /// 读取/写入的任何失败都被吞掉,绝不影响筛选主流程(fail-open)。
 class JevFilterLog {
-  JevFilterLog({JevSettingsBox? box}) : _box = box ?? JevSettingsStore().box;
+  /// [storageKey]/[capacity] 用于派生独立实例(issue #115 直播 500 条):
+  /// 与默认实例不同 key、互不覆盖;默认参数行为与 #105 完全一致。
+  JevFilterLog({JevSettingsBox? box, String? storageKey, this.capacity = maxEntries})
+    : _box = box ?? JevSettingsStore().box,
+      _key = storageKey ?? key;
 
   final JevSettingsBox _box;
+  final String _key;
+
+  /// 实例环形上限。
+  final int capacity;
 
   /// 默认实例;screen() 埋点与设置区块共用,测试可整体替换。
   static JevFilterLog instance = JevFilterLog();
+
+  /// 直播筛除记录(issue #115):独立存储,最近 500 条,可清空。
+  static JevFilterLog live = JevFilterLog(
+    storageKey: '${JevSettingsStore.namespace}.live_filter_log.v1',
+    capacity: 500,
+  );
 
   /// 有记录写入成功时自增;设置区块据此自动刷新。
   static final ValueNotifier<int> revision = ValueNotifier<int>(0);
@@ -110,7 +131,7 @@ class JevFilterLog {
 
   /// 读取全部记录,新的在前。单条损坏跳过,整体损坏返回空。
   List<JevFilterLogEntry> load() {
-    final raw = _box.get(key);
+    final raw = _box.get(_key);
     if (raw is! String || raw.isEmpty) return const <JevFilterLogEntry>[];
     try {
       final list = jsonDecode(raw) as List;
@@ -143,11 +164,12 @@ class JevFilterLog {
           confidence: e.confidence,
           threshold: e.threshold,
           ruleId: e.ruleId,
+          reason: e.reason,
         ),
     ];
     // 单次批量本身也可能超限:超出时只保留最新的一段。
-    final recent = all.length > maxEntries
-        ? all.sublist(all.length - maxEntries)
+    final recent = all.length > capacity
+        ? all.sublist(all.length - capacity)
         : all;
     if (recent.isEmpty) return Future<void>.value();
     final task = _tail.then((_) => _write(recent));
@@ -161,9 +183,9 @@ class JevFilterLog {
       // 展示时最新的在最前。
       final merged = <JevFilterLogEntry>[...fresh.reversed, ...load()];
       await _box.put(
-        key,
+        _key,
         jsonEncode([
-          for (final e in merged.take(maxEntries)) e.toJson(),
+          for (final e in merged.take(capacity)) e.toJson(),
         ]),
       );
       revision.value++;
@@ -175,7 +197,7 @@ class JevFilterLog {
   /// 清空全部记录。
   Future<void> clear() async {
     try {
-      await _box.delete(key);
+      await _box.delete(_key);
     } catch (_) {
       // 清理失败不影响筛选。
     }
