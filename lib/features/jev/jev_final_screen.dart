@@ -132,17 +132,23 @@ class JevFinalScreen<T> {
           failure: llm.failure, elapsedMs: llm.elapsedMs,
         ));
       }
-      try {
-        if (blocked.isNotEmpty) unawaited(JevScreenLog.instance.record(blocked));
-        if (filterBlocked.isNotEmpty) {
+      if (blocked.isNotEmpty) {
+        try {
+          unawaited(JevScreenLog.instance.record(blocked));
+        } catch (_) {
+          // 日志失败不影响筛选;两个日志汇互相独立,一个坏不拖死另一个。
+        }
+      }
+      if (filterBlocked.isNotEmpty) {
+        try {
           // #115:直播筛除写独立的 500 条记录页,与通用最近 5 条互不覆盖。
           unawaited(
             (surface == JevSurface.live ? JevFilterLog.live : JevFilterLog.instance)
                 .record(filterBlocked),
           );
+        } catch (_) {
+          // 日志失败不影响筛选。
         }
-      } catch (_) {
-        // Log storage must not affect screening.
       }
       return [for (var i = 0; i < items.length; i++) if (keep[i]) items[i]];
     } catch (_) {

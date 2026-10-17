@@ -468,7 +468,7 @@ void main() {
     await tester.tap(find.text(JevSurface.live.label), warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(box.values[JevSettingsStore.surfaceKey(JevSurface.live)], isTrue);
-    expect(JevSettingsStore.snapshot.isSurfaceEnabled(JevSurface.live), isTrue)
+    expect(JevSettingsStore.snapshot.isSurfaceEnabled(JevSurface.live), isTrue);
   });
 
   testWidgets('a hinted key never validates against the wrong provider', (
