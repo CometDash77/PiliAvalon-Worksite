@@ -202,6 +202,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  // Issue #146: 下拉开菜单用固定 pump 推进转场，不等 settle——
+  // 某些用例在目录加载转圈期间开菜单，pumpAndSettle 会永等。
+  Future<void> openLlmDropdown(WidgetTester tester, String key) async {
+    await tester.tap(find.byKey(ValueKey<String>(key)));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+  }
+
   testWidgets('old validation cannot confirm a changed provider or model', (
     tester,
   ) async {
@@ -741,6 +749,7 @@ void main() {
         height: 9600,
       );
 
+      await openLlmDropdown(tester, 'llm-provider-dropdown');
       await tester.tap(find.byKey(const ValueKey('llm-provider-openrouter')));
       await tester.pumpAndSettle();
       await tester.enterText(
@@ -891,6 +900,7 @@ void main() {
 
       await tester.tap(find.widgetWithText(TextButton, '获取模型目录'));
       await tester.pump();
+      await openLlmDropdown(tester, 'llm-provider-dropdown');
       await tester.tap(find.byKey(const ValueKey('llm-provider-openrouter')));
       await tester.pumpAndSettle();
       stale.complete(const LlmModelCatalogResult(['stale-model']));
@@ -927,6 +937,7 @@ void main() {
         height: 9600,
       );
 
+      await openLlmDropdown(tester, 'llm-provider-dropdown');
       await tester.tap(find.byKey(const ValueKey('llm-provider-xiaomimimo')));
       await tester.pumpAndSettle();
       expect(find.text(LlmPresetIssue.catalogUnavailable.message),
@@ -934,6 +945,87 @@ void main() {
       expect(find.text('mimo-v2.6-pro'), findsOneWidget);
       expect(find.text('mimo-v2.6-flash'), findsOneWidget);
       expect(catalog.calls, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'provider presets collapse into a dropdown; base url only for selection',
+    (tester) async {
+      await pumpPage(
+        tester,
+        store: JevSettingsStore(box: _MemoryBox()),
+        credentials: _FakeCredentialStore(),
+        validator: JevKeyValidator(),
+        messages: <String>[],
+        llmProviderStore: LlmProviderConfigStore(
+          box: _MemoryBox(),
+          credentials: _FakeLlmProviderCredentials(),
+        ),
+        height: 9600,
+      );
+
+      // 收起态：只有下拉与已选提供方的一行信息；其他提供方的
+      // API 地址不再常驻页面（#146 用户确认）。
+      expect(find.byType(DropdownButtonFormField<String>), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('llm-provider-openrouter')),
+        findsNothing,
+      );
+      expect(find.text('https://openrouter.ai/api'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('llm-provider-selected')),
+          matching: find.text('https://api.deepseek.com'),
+        ),
+        findsOneWidget,
+      );
+
+      // 展开态：候选项点选后仍走原 _selectLlmProvider 处理器。
+      await openLlmDropdown(tester, 'llm-provider-dropdown');
+      await tester.tap(find.byKey(const ValueKey('llm-provider-openrouter')));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('llm-provider-selected')),
+          matching: find.text('https://openrouter.ai/api'),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'provider dropdown survives narrow screens and large text',
+    (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+      addTearDown(tester.platformDispatcher.clearAllTestValues);
+      await pumpPage(
+        tester,
+        store: JevSettingsStore(box: _MemoryBox()),
+        credentials: _FakeCredentialStore(),
+        validator: JevKeyValidator(),
+        messages: <String>[],
+        llmProviderStore: LlmProviderConfigStore(
+          box: _MemoryBox(),
+          credentials: _FakeLlmProviderCredentials(),
+        ),
+        height: 2400,
+        width: 360,
+      );
+
+      // 窄屏 + 大字体：开菜单、选长显示名提供方，均不破版。
+      await openLlmDropdown(tester, 'llm-provider-dropdown');
+      await tester.tap(find.byKey(const ValueKey('llm-provider-xiaomimimo')));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('llm-provider-selected')),
+          matching: find.text('https://api.xiaomimimo.com'),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -955,6 +1047,7 @@ void main() {
         height: 9600,
       );
 
+      await openLlmDropdown(tester, 'llm-provider-dropdown');
       await tester.tap(
         find.byKey(const ValueKey('llm-provider-custom-openai')),
       );
@@ -1008,8 +1101,10 @@ void main() {
         height: 9600,
       );
 
+      await openLlmDropdown(tester, 'llm-provider-dropdown');
       await tester.tap(find.byKey(const ValueKey('llm-provider-openrouter')));
       await tester.pumpAndSettle();
+      await openLlmDropdown(tester, 'llm-route-dropdown');
       await tester.tap(find.byKey(const ValueKey('llm-route-openai_responses')));
       await tester.pumpAndSettle();
       await tester.enterText(

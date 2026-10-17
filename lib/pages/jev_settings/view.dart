@@ -980,41 +980,75 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
       padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Text('通用模型（提供方预设）'),
     ),
-    for (final preset in kLlmProviderPresets)
-      custom.ListTile(
-        key: ValueKey('llm-provider-${preset.id}'),
-        leading: Icon(
-          _provId == preset.id
-              ? Icons.radio_button_checked
-              : Icons.radio_button_unchecked,
+    // Issue #146（2026-10-15 用户确认）：提供方预设与协议选择收为下拉控件，
+    // 不用底部弹层；仅替换选择控件，_selectLlmProvider 与协议切换的副作用
+    // 原样保留。完整 API 地址不再常驻候选项，只在已选提供方下方显示一行。
+    Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: DropdownButtonFormField<String>(
+        key: const ValueKey('llm-provider-dropdown'),
+        value: _provId,
+        isExpanded: true,
+        menuMaxHeight: 320,
+        decoration: const InputDecoration(
+          labelText: '提供方预设',
+          border: OutlineInputBorder(),
         ),
-        title: Text(preset.displayName),
-        subtitle: Text(
-          preset.isCustom ? '自定义 OpenAI / Anthropic 兼容端点' : preset.baseUrl,
-        ),
-        onTap: () => _selectLlmProvider(preset.id),
+        items: [
+          for (final preset in kLlmProviderPresets)
+            DropdownMenuItem<String>(
+              key: ValueKey('llm-provider-${preset.id}'),
+              value: preset.id,
+              child: Text(preset.displayName),
+            ),
+        ],
+        onChanged: (id) {
+          if (id != null) _selectLlmProvider(id);
+        },
       ),
+    ),
+    Padding(
+      key: const ValueKey('llm-provider-selected'),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+      child: Text(
+        _provPreset.isCustom
+            ? '自定义 OpenAI / Anthropic 兼容端点'
+            : _provPreset.baseUrl,
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+    ),
     if (_provPreset.selectableProtocols.length > 1)
-      for (final route in _provPreset.selectableProtocols)
-        custom.ListTile(
-          key: ValueKey('llm-route-${route.id}'),
-          dense: true,
-          leading: Icon(
-            _provDraftProtocol == route ||
-                    (_provDraftProtocol == null &&
-                        route == _provPreset.primaryProtocol)
-                ? Icons.radio_button_checked
-                : Icons.radio_button_unchecked,
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        child: DropdownButtonFormField<LlmRouteProtocol>(
+          key: const ValueKey('llm-route-dropdown'),
+          value: _provDraftProtocol ?? _provPreset.primaryProtocol,
+          isExpanded: true,
+          menuMaxHeight: 320,
+          decoration: const InputDecoration(
+            labelText: '接口协议',
+            border: OutlineInputBorder(),
           ),
-          title: Text(route.label),
-          onTap: () => setState(() {
-            _provDraftProtocol =
-                route == _provPreset.primaryProtocol ? null : route;
-            _provGeneration++;
-            _provCatalogResult = null;
-            _llmProbeResult = null;
-          }),
+          items: [
+            for (final route in _provPreset.selectableProtocols)
+              DropdownMenuItem<LlmRouteProtocol>(
+                key: ValueKey('llm-route-${route.id}'),
+                value: route,
+                child: Text(route.label),
+              ),
+          ],
+          onChanged: (route) {
+            if (route == null) return;
+            setState(() {
+              _provDraftProtocol =
+                  route == _provPreset.primaryProtocol ? null : route;
+              _provGeneration++;
+              _provCatalogResult = null;
+              _llmProbeResult = null;
+            });
+          },
         ),
+      ),
     Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: TextField(
