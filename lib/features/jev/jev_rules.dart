@@ -403,8 +403,15 @@ class LlmVideoRuleStore {
 
 /// A single non-secret blob keeps rule edits and builtin switches atomic.
 class JevRuleStore {
-  JevRuleStore({JevSettingsBox? box}) : _box = box ?? JevSettingsStore().box;
-  final JevSettingsBox _box;
+  JevRuleStore({JevSettingsBox? box}) : _boxOrNull = box;
+
+  // 构造期不触碰 JevSettingsStore/GStorage（#130）：解析推迟到首次读写，
+  // 让 LlmCommentScreening 等默认构造在测试环境同样安全。
+  final JevSettingsBox? _boxOrNull;
+  JevSettingsBox? _lazyBox;
+  JevSettingsStore? _store;
+  JevSettingsBox get _box =>
+      _lazyBox ??= _boxOrNull ?? (_store ??= JevSettingsStore()).box;
   static const key = '${JevSettingsStore.namespace}.rules.v1';
   Future<JevRuleConfig> load() async {
     final raw = _box.get(key);
