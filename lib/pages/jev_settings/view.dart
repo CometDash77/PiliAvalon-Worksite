@@ -989,7 +989,6 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
         key: const ValueKey('llm-provider-dropdown'),
         value: _provId,
         isExpanded: true,
-        menuMaxHeight: 320,
         decoration: const InputDecoration(
           labelText: '提供方预设',
           border: OutlineInputBorder(),
@@ -1024,7 +1023,6 @@ class _JevSettingsPageState extends State<JevSettingsPage> {
           key: const ValueKey('llm-route-dropdown'),
           value: _provDraftProtocol ?? _provPreset.primaryProtocol,
           isExpanded: true,
-          menuMaxHeight: 320,
           decoration: const InputDecoration(
             labelText: '接口协议',
             border: OutlineInputBorder(),
