@@ -1048,6 +1048,14 @@ void main() {
       );
 
       await openLlmDropdown(tester, 'llm-provider-dropdown');
+      // 菜单 menuMaxHeight 320 内是懒加载列表；custom-openai 在第 8 位，
+      // 初始视口外，先在菜单内滚动到可见（#146：展开列表可滚动）。
+      await tester.dragUntilVisible(
+        find.byKey(const ValueKey('llm-provider-custom-openai')),
+        find.byType(Scrollable).last,
+        const Offset(0, -60),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey('llm-provider-custom-openai')),
       );
