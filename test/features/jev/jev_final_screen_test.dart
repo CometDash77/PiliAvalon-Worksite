@@ -9,7 +9,8 @@ import 'package:PiliPlus/models_new/pgc/pgc_rank/pgc_rank_item_model.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'decisions_schema.dart';
+import 'decisions_schema.dart';
+import 'package:PiliPlus/features/jev/jev_screen_log.dart';
 
 // 评测器测试假件的轻量复刻（见 jev_evaluator_test.dart）。
 class _MemoryBox implements JevSettingsBox {
@@ -472,6 +473,9 @@ void main() {
       );
       // 赋值不触发静态初始化器（读取才会），测试环境无 Hive。
       JevFilterLog.live = liveLog;
+      // 合并后的 screen() 会同时写统一 screen log（141 线特征）；默认静态构造
+      // 会触碰 GStorage.setting，测试环境注入空 box 隔离。
+      JevScreenLog.instance = JevScreenLog(box: _MemoryBox());
 
       final capture = _CapturingTransport(
         reply: (index) => _answers({'candidate_1': 0.95}),
